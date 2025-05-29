@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   Platform,
 } from "react-native";
-import { Problem, ProblemStatus } from "@/types"; // ProblemStatus도 import합니다.
+import { Problem, ProblemStatus, Project } from "@/types"; // Project 타입 import 추가
 
-// 각 상태별 색상 정의 (가독성 및 유지보수성 향상)
+// 각 상태별 색상 정의 (이전과 동일)
 type StatusStyle = {
   badgeBackgroundColor: string;
   badgeTextColor: string;
-  borderColor?: string; // 상태에 따라 카드 테두리 색상도 변경 가능
+  borderColor?: string;
 };
 
 const statusStyles: Record<ProblemStatus, StatusStyle> = {
@@ -40,17 +40,19 @@ const statusStyles: Record<ProblemStatus, StatusStyle> = {
 
 export interface ProblemCardProps {
   problem: Problem;
-  level?: number; // 트리 리스트에서의 들여쓰기 레벨
-  onPress?: (problem: Problem) => void; // 카드 전체 클릭 시 (예: 상세 보기)
+  allProjects: Project[]; // Problem에 연결된 Project를 찾기 위해 추가
+  level?: number;
+  onPress?: (problem: Problem) => void;
   onEdit?: (problem: Problem) => void;
   onAddSubproblem?: (parentId: string) => void;
-  onDefineTasks?: (problemId: string) => void; // '막다른 길의 문제'일 경우
-  onMarkResolved?: (problemId: string) => void; // 해결됨으로 상태 변경
-  onStartRetrospective?: (problemId: string) => void; // 회고 시작
+  onDefineTasks?: (problemId: string, projectId?: string) => void; // projectId도 전달하도록 변경
+  onMarkResolved?: (problemId: string) => void;
+  onStartRetrospective?: (problemId: string) => void;
 }
 
 export default function ProblemCard({
   problem,
+  allProjects, // props로 받기
   level = 0,
   onPress,
   onEdit,
@@ -62,15 +64,24 @@ export default function ProblemCard({
   const isDeadEnd =
     !problem.childProblemIds || problem.childProblemIds.length === 0;
   const currentStatusStyle =
-    statusStyles[problem.status] || statusStyles.active; // 기본값은 active
+    statusStyles[problem.status] || statusStyles.active;
 
-  // 문제 상태에 따른 액션 버튼 렌더링 로직
+  // 현재 Problem에 연결된 Project 찾기
+  const associatedProject = problem.projectId
+    ? allProjects.find((p) => p.id === problem.projectId)
+    : null;
+
+  // 연결된 Project의 Task 개수
+  const projectTaskCount = associatedProject
+    ? associatedProject.taskIds.length
+    : 0;
+
   const renderActionButtons = () => {
     const canBeResolved =
       problem.status === "active" || problem.status === "evaluating";
     const canStartRetrospective = problem.status === "resolved";
     const canAddSubproblem =
-      problem.status !== "resolved" && problem.status !== "archived"; // 해결/아카이브된 문제에는 하위 문제 추가 X
+      problem.status !== "resolved" && problem.status !== "archived";
 
     return (
       <View style={styles.actionsContainer}>
@@ -90,12 +101,16 @@ export default function ProblemCard({
             <Text style={styles.actionButtonText}>Add Sub-problem</Text>
           </TouchableOpacity>
         )}
+        {/* 'Define Tasks' 버튼은 이제 Project 관리/생성으로 이어질 수 있음 */}
         {isDeadEnd && canBeResolved && onDefineTasks && (
           <TouchableOpacity
             style={[styles.actionButton, styles.defineTasksButton]}
-            onPress={() => onDefineTasks(problem.id)}
+            // onDefineTasks 호출 시 problem.id와 함께 problem.projectId도 전달
+            onPress={() => onDefineTasks(problem.id, problem.projectId)}
           >
-            <Text style={styles.actionButtonText}>Define Tasks</Text>
+            <Text style={styles.actionButtonText}>
+              {problem.projectId ? "Manage Project" : "Start Project"}
+            </Text>
           </TouchableOpacity>
         )}
         {canBeResolved && onMarkResolved && (
@@ -131,7 +146,7 @@ export default function ProblemCard({
             marginLeft: level * 15,
             borderColor: currentStatusStyle.borderColor,
             borderWidth: 1,
-          }, // 들여쓰기 및 상태별 테두리 색상
+          },
           Platform.OS === "ios" ? styles.shadowIOS : styles.shadowAndroid,
         ]}
       >
@@ -175,13 +190,17 @@ export default function ProblemCard({
               Sub-problems: {problem.childProblemIds.length}
             </Text>
           )}
-          {isDeadEnd &&
-            problem.associatedTaskIds &&
-            problem.associatedTaskIds.length > 0 && (
-              <Text style={styles.metaText}>
-                Tasks: {problem.associatedTaskIds.length}
-              </Text>
-            )}
+          {/* 종점 문제(isDeadEnd)일 경우 Project 및 Task 정보 표시 */}
+          {isDeadEnd && problem.projectId && associatedProject && (
+            <Text style={styles.metaText}>
+              Project Tasks: {projectTaskCount}
+            </Text>
+          )}
+          {isDeadEnd && !problem.projectId && (
+            <Text style={styles.metaText}>
+              (Project to solve this not yet started)
+            </Text>
+          )}
         </View>
 
         {renderActionButtons()}
@@ -190,6 +209,7 @@ export default function ProblemCard({
   );
 }
 
+// 스타일 정의는 이전과 동일
 const styles = StyleSheet.create({
   touchableWrapper: {
     marginVertical: 6,
@@ -198,7 +218,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     padding: 16,
-    // marginVertical과 marginHorizontal은 TouchableWrapper로 이동
   },
   shadowIOS: {
     shadowColor: "#000",
@@ -212,46 +231,46 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start", // 제목이 여러 줄일 경우를 대비
+    alignItems: "flex-start",
     marginBottom: 8,
   },
   title: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#2c3e50", // 좀 더 부드러운 검은색
-    flex: 1, // 제목이 길어질 경우 공간 차지
-    marginRight: 8, // 상태 배지와의 간격
+    color: "#2c3e50",
+    flex: 1,
+    marginRight: 8,
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 12, // 좀 더 둥근 배지
+    borderRadius: 12,
   },
   statusText: {
     fontSize: 11,
     fontWeight: "600",
-    textTransform: "uppercase", // 대문자화
+    textTransform: "uppercase",
   },
   description: {
     fontSize: 14,
-    color: "#34495e", // 내용 텍스트 색상
-    lineHeight: 20, // 가독성 향상
+    color: "#34495e",
+    lineHeight: 20,
     marginBottom: 10,
   },
   metaContainer: {
     borderTopWidth: 1,
-    borderTopColor: "#ecf0f1", // 구분선 색상
+    borderTopColor: "#ecf0f1",
     paddingTop: 8,
     marginTop: 8,
   },
   metaText: {
     fontSize: 12,
-    color: "#7f8c8d", // 메타 정보 텍스트 색상
+    color: "#7f8c8d",
     marginBottom: 2,
   },
   actionsContainer: {
     flexDirection: "row",
-    flexWrap: "wrap", // 버튼이 많을 경우 다음 줄로
+    flexWrap: "wrap",
     justifyContent: "flex-start",
     marginTop: 12,
     paddingTop: 12,
@@ -263,16 +282,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     marginRight: 8,
-    marginBottom: 8, // 줄바꿈 시 아래 버튼과의 간격
+    marginBottom: 8,
   },
   actionButtonText: {
     fontSize: 13,
     color: "#fff",
     fontWeight: "500",
   },
-  editButton: { backgroundColor: "#3498db" /* Peter River */ },
-  addSubproblemButton: { backgroundColor: "#2ecc71" /* Emerald */ },
-  defineTasksButton: { backgroundColor: "#1abc9c" /* Turquoise */ },
-  resolveButton: { backgroundColor: "#f39c12" /* Orange */ },
-  retrospectiveButton: { backgroundColor: "#9b59b6" /* Amethyst */ },
+  editButton: { backgroundColor: "#3498db" },
+  addSubproblemButton: { backgroundColor: "#2ecc71" },
+  defineTasksButton: { backgroundColor: "#1abc9c" }, // 이제 "Manage/Start Project" 버튼
+  resolveButton: { backgroundColor: "#f39c12" },
+  retrospectiveButton: { backgroundColor: "#9b59b6" },
 });

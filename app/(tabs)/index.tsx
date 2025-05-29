@@ -9,19 +9,24 @@ import { useShallow } from "zustand/react/shallow";
 export default function HomeScreen() {
   const router = useRouter();
 
+  // 스토어에서 projects 및 fetchProjects 추가
   const {
     problems,
     tasks,
+    projects, // projects 상태 추가
     fetchProblems,
     fetchTasks,
+    fetchProjects, // fetchProjects 액션 추가
     isLoadingProblems,
     deleteProblem,
   } = useAppStore(
     useShallow((state) => ({
       problems: state.problems,
       tasks: state.tasks,
+      projects: state.projects, // 스토어에서 projects 선택
       fetchProblems: state.fetchProblems,
       fetchTasks: state.fetchTasks,
+      fetchProjects: state.fetchProjects, // 스토어에서 fetchProjects 선택
       isLoadingProblems: state.isLoadingProblems,
       deleteProblem: state.deleteProblem,
     }))
@@ -30,40 +35,37 @@ export default function HomeScreen() {
   useEffect(() => {
     fetchProblems();
     fetchTasks();
-  }, [fetchProblems, fetchTasks]);
+    fetchProjects();
+  }, [fetchProblems, fetchTasks, fetchProjects]);
 
   const handleNavigateToEditor = (problemId?: string) => {
     if (problemId) {
       router.push({ pathname: "/ProblemEditorScreen", params: { problemId } });
     } else {
-      // "Add Problem" 버튼 클릭 시 problemId 없이 호출됨 (새 최상위 문제)
       router.push({ pathname: "/ProblemEditorScreen" });
     }
   };
 
   const handleDeleteProblem = async (problemId: string) => {
-    Alert.alert(
-      // 스토어 액션 호출 전에 여기서 최종 확인하거나, ProblemListItem에서 바로 스토어 액션 호출도 가능
-      "삭제 확인",
-      "이 문제를 정말 삭제하시겠습니까?",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "삭제",
-          onPress: async () => {
-            const success = await deleteProblem(problemId);
-            if (success) {
-              // fetchProblems(); // 목록을 다시 로드하거나, Zustand가 상태를 업데이트하므로 필요 없을 수 있음
-              Alert.alert("성공", "문제가 삭제되었습니다.");
-            } else {
-              Alert.alert("오류", "문제 삭제에 실패했습니다.");
-            }
-          },
-          style: "destructive",
+    Alert.alert("삭제 확인", "이 문제를 정말 삭제하시겠습니까?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        onPress: async () => {
+          const success = await deleteProblem(problemId);
+          if (success) {
+            Alert.alert("성공", "문제가 삭제되었습니다.");
+          } else {
+            Alert.alert("오류", "문제 삭제에 실패했습니다.");
+          }
         },
-      ]
-    );
+        style: "destructive",
+      },
+    ]);
   };
+
+  // ProblemGraph 관련 로직 제거됨
+  // const rootProblemForGraph = problems.find((p) => p.parentId === null);
 
   return (
     <SafeAreaView style={styles.screenContainer}>
@@ -72,10 +74,11 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollViewContentContainer}
       >
         <ProblemList
-          problems={problems}
+          problems={problems} // 모든 problems 전달
           tasks={tasks}
+          projects={projects}
           isLoading={isLoadingProblems}
-          onPressProblem={(problemId) => handleNavigateToEditor(problemId)}
+          onPressProblem={handleNavigateToEditor}
           onPressAddProblem={() => handleNavigateToEditor()}
           allProblemsForContext={problems}
           onDeleteProblem={handleDeleteProblem}
@@ -94,7 +97,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContentContainer: {
-    paddingVertical: 16, // ScrollView 전체 내용의 상하 여백
-    flexGrow: 1, // 내용이 적을 때도 ProblemList의 messageContainer가 중앙에 올 수 있도록
+    paddingVertical: 16,
+    flexGrow: 1,
   },
+  // graphSectionContainer 및 sectionTitle 스타일 제거됨
 });
