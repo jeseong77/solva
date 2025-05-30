@@ -1,11 +1,11 @@
 // app/ProjectEditorScreen.tsx
-import DoItemList from '@/components/DoItemList';
-import DontItemList from '@/components/DontItemList';
+import RuleList from '@/components/RuleList';
+import TaskList from '@/components/TaskList'; // TaskList import 추가
 import { useAppStore } from '@/store/store';
-import { Problem, Project } from '@/types';
+import { Problem, Project } from '@/types'; // Task 타입 import 확인
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react'; // useMemo 추가
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -31,9 +31,14 @@ export default function ProjectEditorScreen() {
         addProject,
         updateProject,
         allDoItems,
-        allDontItems,
         fetchDoItems,
-        isLoadingDoItems // 로딩 상태 추가
+        isLoadingDoItems,
+        allDontItems,
+        fetchDontItems,
+        isLoadingDontItems,
+        allTasks,         // Task 관련 상태 및 액션 추가
+        fetchTasks,       // Task 관련 상태 및 액션 추가
+        isLoadingTasks,   // Task 관련 상태 및 액션 추가
     } = useAppStore(
         useShallow((state) => ({
             getProblemById: state.getProblemById,
@@ -41,16 +46,21 @@ export default function ProjectEditorScreen() {
             addProject: state.addProject,
             updateProject: state.updateProject,
             allDoItems: state.doItems,
-            allDontItems: state.dontItems,
             fetchDoItems: state.fetchDoItems,
-            isLoadingDoItems: state.isLoadingDoItems, // 추가
+            isLoadingDoItems: state.isLoadingDoItems,
+            allDontItems: state.dontItems,
+            fetchDontItems: state.fetchDontItems,
+            isLoadingDontItems: state.isLoadingDontItems,
+            allTasks: state.tasks, // 스토어에서 tasks 가져오기
+            fetchTasks: state.fetchTasks, // 스토어에서 fetchTasks 가져오기
+            isLoadingTasks: state.isLoadingTasks, // 스토어에서 isLoadingTasks 가져오기
         }))
     );
 
     const [linkedProblem, setLinkedProblem] = useState<Problem | null | undefined>(undefined);
     const [currentProject, setCurrentProject] = useState<Project | null | undefined>(undefined);
     const [projectTitle, setProjectTitle] = useState<string>('');
-    const [isLoading, setIsLoading] = useState(true); // 화면 전체 로딩 상태
+    const [isLoading, setIsLoading] = useState(true);
 
     const loadData = useCallback(() => {
         setIsLoading(true);
@@ -65,7 +75,9 @@ export default function ProjectEditorScreen() {
                 titleForHeader = projectToLoad.title || `Edit Project`;
                 setProjectTitle(projectToLoad.title);
                 setCurrentProject(projectToLoad);
-                fetchDoItems(projectToLoad.id); // 해당 프로젝트의 DoItem 로드
+                fetchDoItems(projectToLoad.id);
+                fetchDontItems(projectToLoad.id);
+                fetchTasks(projectToLoad.id); // Tasks도 로드
             } else {
                 Alert.alert("Error", "Project not found.");
                 titleForHeader = "Error";
@@ -82,44 +94,50 @@ export default function ProjectEditorScreen() {
 
         setLinkedProblem(problemForProject || null);
         setIsLoading(false);
-    }, [projectIdToEdit, problemIdFromParams, getProblemById, getProjectById, fetchDoItems]);
+    }, [projectIdToEdit, problemIdFromParams, getProblemById, getProjectById, fetchDoItems, fetchDontItems, fetchTasks]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
-    // useFocusEffect(useCallback(() => { loadData(); return () => {}; }, [loadData]));
 
-
-    // 현재 프로젝트에 해당하는 DoItem들만 필터링
     const projectSpecificDoItems = useMemo(() => {
-        if (currentProject?.id) {
-            return allDoItems.filter(di => di.projectId === currentProject.id);
-        }
-        return [];
+        return currentProject?.id ? allDoItems.filter(di => di.projectId === currentProject.id) : [];
     }, [currentProject, allDoItems]);
 
     const projectSpecificDontItems = useMemo(() => {
-        if (currentProject?.id) {
-            return allDontItems.filter(di => di.projectId === currentProject.id);
+        return currentProject?.id ? allDontItems.filter(di => di.projectId === currentProject.id) : [];
+    }, [currentProject, allDontItems]);
+
+    const projectSpecificTasks = useMemo(() => { // Tasks 필터링 추가
+        return currentProject?.id ? allTasks.filter(task => task.projectId === currentProject.id) : [];
+    }, [currentProject, allTasks]);
+
+
+    const handleAddRule = () => {
+        const targetProjectId = currentProject?.id;
+        if (targetProjectId) {
+            Alert.alert("Add Rule", `Maps to Rule Editor for Project: ${targetProjectId}`);
+        } else {
+            Alert.alert("Info", "Please save the project first to add rules.");
         }
-        return [];
-    }
-        , [currentProject, allDontItems]);
-
-
-    const handleAddDoItem = (pId: string) => {
-        Alert.alert("Add Do Rule", `Maps to screen for adding 'Do' rule to project: ${pId}`);
-        // router.push({ pathname: "/DoItemEditorScreen", params: { projectId: pId } });
     };
+    const handleEditDoItem = (doItemId: string) => { Alert.alert("Edit Do Rule", `Maps to Edit Do Rule: ${doItemId}`); };
+    const handleEditDontItem = (dontItemId: string) => { Alert.alert("Edit Don't Rule", `Maps to Edit Don't Rule: ${dontItemId}`); };
 
-    const handleEditDoItem = (doItemId: string) => {
-        Alert.alert("Edit Do Rule", `Maps to screen for editing 'Do' rule: ${doItemId}`);
-        // router.push({ pathname: "/DoItemEditorScreen", params: { doItemId } });
+    const handleAddTask = () => { // Task 추가 핸들러
+        const targetProjectId = currentProject?.id;
+        if (targetProjectId) {
+            Alert.alert("Add Task", `Maps to Task Editor for Project: ${targetProjectId}`);
+            // router.push({ pathname: "/TaskEditorScreen", params: { projectId: targetProjectId } });
+        } else {
+            Alert.alert("Info", "Please save the project first to add tasks.");
+        }
     };
-
-    const handleDeleteDoItem = async (doItemId: string) => {
-        Alert.alert("Delete Do Rule", `DoItem ${doItemId} deletion initiated (placeholder).`);
+    const handleEditTask = (taskId: string) => { // Task 편집 핸들러
+        Alert.alert("Edit Task", `Maps to Edit Task: ${taskId}`);
+        // router.push({ pathname: "/TaskEditorScreen", params: { taskId: taskId } });
     };
+    // onDeleteDoItem, onDeleteDontItem, onDeleteTask 핸들러는 필요시 추가
 
 
     if (isLoading) {
@@ -139,7 +157,6 @@ export default function ProjectEditorScreen() {
             </SafeAreaView>
         );
     }
-
 
     return (
         <SafeAreaView style={styles.container}>
@@ -172,30 +189,32 @@ export default function ProjectEditorScreen() {
                     />
 
                     <View style={styles.sectionContainer}>
-                            <DoItemList
+                        {(currentProject?.id || problemIdFromParams) ? (
+                            <RuleList
                                 doItems={projectSpecificDoItems}
-                                // 새 프로젝트이고 아직 ID가 없다면 problemIdFromParams를 사용, 아니면 currentProject.id
-                                projectId={currentProject?.id || problemIdFromParams!}
-                                isLoading={isLoadingDoItems}
-                                onPressDoItem={handleEditDoItem}
-                                onPressAddDoItem={handleAddDoItem}
-                                onDeleteDoItem={handleDeleteDoItem}
-                            />
-                            <DontItemList
                                 dontItems={projectSpecificDontItems}
-                                projectId={currentProject?.id || problemIdFromParams!}
-                                isLoading={isLoadingDoItems}
-                                onPressDontItem={handleEditDoItem}
-                                onPressAddDontItem={handleAddDoItem}
-                                onDeleteDontItem={handleDeleteDoItem}
+                                onPressDoItem={handleEditDoItem}
+                                onPressDontItem={handleEditDontItem}
+                                onPressAddRule={handleAddRule}
                             />
+                        ) : (
+                            <Text style={styles.infoText}>Save the project to add rules.</Text>
+                        )}
                     </View>
 
                     <View style={styles.placeholderSection}>
                         <Text style={styles.placeholderText}>Project Description, Criteria, Target fields will be here.</Text>
                     </View>
-                    <View style={styles.placeholderSection}>
-                        <Text style={styles.placeholderText}>Tasks (One-off) management will be here.</Text>
+                    <View style={styles.sectionContainer}>
+                        {(currentProject?.id || problemIdFromParams) ? (
+                            <TaskList
+                                tasks={projectSpecificTasks}
+                                onPressTaskItem={handleEditTask}
+                                onPressAddTask={handleAddTask}
+                            />
+                        ) : (
+                            <Text style={styles.infoText}>Save the project to add tasks.</Text>
+                        )}
                     </View>
                 </View>
             </ScrollView>
@@ -203,6 +222,7 @@ export default function ProjectEditorScreen() {
     );
 }
 
+// 스타일 정의는 이전과 동일
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#f8f9fa" },
     scrollViewContainer: { flex: 1 },
@@ -211,9 +231,20 @@ const styles = StyleSheet.create({
     linkedProblemInfoContainer: { padding: 12, backgroundColor: "#e9ecef", borderRadius: 8, marginBottom: 16 },
     linkedProblemLabel: { fontSize: 13, color: "#495057", marginBottom: 4, fontWeight: '500' },
     linkedProblemTitle: { fontSize: 16, color: "#212529", fontWeight: 'bold' },
-    projectTitleInput: { fontSize: 22, fontWeight: 'bold', padding: 10, borderWidth: 1, borderColor: '#ced4da', borderRadius: 8, marginBottom: 16, backgroundColor: '#fff' },
-    sectionContainer: { backgroundColor: '#ffffff', borderRadius: 8, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#dee2e6' },
+    projectTitleInput: {
+        fontSize: 22, fontWeight: 'bold', paddingVertical: 10, paddingHorizontal: 10,
+        borderWidth: 1, borderColor: '#ced4da', borderRadius: 8, marginBottom: 16, backgroundColor: '#fff'
+    },
+    sectionContainer: {
+        backgroundColor: '#ffffff', borderRadius: 8,
+        // padding: 16, // RuleList/TaskList가 자체 패딩을 가짐
+        marginBottom: 16, borderWidth: 1, borderColor: '#dee2e6'
+    },
     infoText: { fontSize: 14, color: '#6c757d', textAlign: 'center', marginVertical: 20 },
-    placeholderSection: { padding: 12, backgroundColor: "#ffffff", borderRadius: 8, marginBottom: 16, borderWidth: 1, borderColor: '#dee2e6' },
-    placeholderText: { fontSize: 16, color: '#adb5bd', textAlign: 'center' }
+    placeholderSection: {
+        padding: 16, backgroundColor: "#ffffff", borderRadius: 8,
+        marginBottom: 16, borderWidth: 1, borderColor: '#dee2e6',
+        alignItems: 'center', justifyContent: 'center',
+    },
+    placeholderText: { fontSize: 14, color: '#6c757d', fontStyle: 'italic' }
 });
