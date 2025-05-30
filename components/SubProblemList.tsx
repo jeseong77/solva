@@ -121,9 +121,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   subProblemTitle: {
     fontSize: 16,
