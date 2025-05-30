@@ -5,9 +5,12 @@ import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
 import { Alert, SafeAreaView, ScrollView, StyleSheet } from "react-native";
 import { useShallow } from "zustand/react/shallow";
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
 
   // 스토어에서 projects 및 fetchProjects 추가
   const {
@@ -91,13 +94,13 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f0f0f0",
   },
   scrollView: {
     flex: 1,
   },
   scrollViewContentContainer: {
-    paddingVertical: 16,
+    padding: 16,
     flexGrow: 1,
   },
   // graphSectionContainer 및 sectionTitle 스타일 제거됨

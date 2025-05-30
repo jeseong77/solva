@@ -218,7 +218,6 @@ export default function ProblemListItem({
 const styles = StyleSheet.create({
   swipeableOuterContainer: {
     backgroundColor: "white",
-    marginVertical: 6,
   },
   deleteActionContainer: {
     position: "absolute",
@@ -247,8 +246,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   infoContainer: {
     flex: 1,

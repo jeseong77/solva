@@ -5,42 +5,55 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  // FlatList, // 항목이 매우 많아질 경우 FlatList 고려 가능
 } from "react-native";
 import { Problem } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 
-// HomeScreen 등에서 사용된 버튼 스타일 (재사용 또는 props로 전달 가능)
-const basicButtonStyle = {
-  paddingVertical: 10,
-  paddingHorizontal: 15,
-  borderWidth: 1,
-  borderColor: "#000",
-  alignItems: "center" as "center",
-  marginVertical: 5,
-  flexDirection: "row" as "row",
-  justifyContent: "center" as "center",
-  backgroundColor: "#f0f0f0", // 기본 버튼 배경색
-  marginTop: 16,
-};
-const basicButtonTextStyle = {
-  color: "#000",
-  fontSize: 16,
-  marginLeft: 5, // 아이콘과 텍스트 간격
-};
+// 버튼 스타일 정의 (기본, 비활성화)
+const getButtonStyles = (isDisabled: boolean) => ({
+  button: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: isDisabled ? "#ccc" : "#000", // 비활성화 시 테두리 색 변경
+    alignItems: "center" as "center",
+    marginVertical: 5,
+    flexDirection: "row" as "row",
+    justifyContent: "center" as "center",
+    backgroundColor: isDisabled ? "#f5f5f5" : "#f0f0f0", // 비활성화 시 배경색 변경
+    marginTop: 16,
+    opacity: isDisabled ? 0.5 : 1, // 비활성화 시 투명도 조절
+  },
+  text: {
+    color: isDisabled ? "#aaa" : "#000", // 비활성화 시 텍스트 색 변경
+    fontSize: 16,
+    marginLeft: 5,
+  },
+  icon: {
+    color: isDisabled ? "#aaa" : "#000", // 비활성화 시 아이콘 색 변경
+  }
+});
 
 interface SubProblemListProps {
-  subProblems: Problem[]; // 현재 문제의 하위 문제 객체 배열
-  currentProblemId: string; // 새 하위 문제 추가 시 부모가 될 현재 문제의 ID
-  onPressSubProblemItem: (problemId: string) => void; // 목록의 하위 문제 항목 클릭 시
-  onPressAddSubProblem: (parentId: string) => void; // "Add Sub-problem" 버튼 클릭 시
+  subProblems: Problem[];
+  currentProblemId: string; // 새 하위 문제 추가 시 부모가 될 현재 문제의 ID (유효한 ID 또는 빈 문자열/null)
+  isParentProblemSaved: boolean; // 부모 문제가 저장된 상태인지 여부 (버튼 활성화 제어용)
+  onPressSubProblemItem: (problemId: string) => void;
+  onPressAddSubProblem: (parentId: string) => void;
 }
 
-const SubProblemList: React.FC<SubProblemListProps> = ({
+// 함수 선언 방식으로 변경 및 React.FC 제거
+export default function SubProblemList({
   subProblems,
   currentProblemId,
+  isParentProblemSaved, // 새로운 prop
   onPressSubProblemItem,
   onPressAddSubProblem,
-}) => {
+}: SubProblemListProps) { // props 타입 명시
+
+  const buttonCurrentStyles = getButtonStyles(!isParentProblemSaved); // isParentProblemSaved가 false면 disabled
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>하위 문제 (Sub-problems)</Text>
@@ -56,32 +69,30 @@ const SubProblemList: React.FC<SubProblemListProps> = ({
               style={styles.subProblemItem}
               onPress={() => onPressSubProblemItem(sub.id)}
             >
-              <Text
-                style={styles.subProblemTitle}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {sub.title}
-              </Text>
+              <Text style={styles.subProblemTitle} numberOfLines={1} ellipsizeMode="tail">{sub.title}</Text>
               <Ionicons name="chevron-forward-outline" size={20} color="#ccc" />
             </TouchableOpacity>
           ))}
         </View>
       )}
       <TouchableOpacity
-        style={basicButtonStyle}
-        onPress={() => onPressAddSubProblem(currentProblemId)}
+        style={buttonCurrentStyles.button}
+        onPress={() => {
+          if (isParentProblemSaved && currentProblemId) { // 유효한 currentProblemId도 확인
+            onPressAddSubProblem(currentProblemId);
+          }
+        }}
+        disabled={!isParentProblemSaved || !currentProblemId} // currentProblemId 유효성도 체크
       >
-        <Ionicons name="add-outline" size={18} color="#000" />
-        <Text style={basicButtonTextStyle}>Add Sub-problem</Text>
+        <Ionicons name="add-outline" size={18} style={buttonCurrentStyles.icon} />
+        <Text style={buttonCurrentStyles.text}>Add Sub-problem</Text>
       </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
-    // ProblemEditorScreen의 <View style={styles.section}> 스타일과 유사하게
     marginBottom: 20,
     padding: 10,
     borderWidth: 1,
@@ -116,8 +127,6 @@ const styles = StyleSheet.create({
   },
   subProblemTitle: {
     fontSize: 16,
-    flex: 1, // 제목이 길 경우 말줄임표 처리를 위해
+    flex: 1,
   },
 });
-
-export default SubProblemList;

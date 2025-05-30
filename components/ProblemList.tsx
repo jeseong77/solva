@@ -18,7 +18,7 @@ const basicButtonStyle = {
   borderColor: "#000000",
   alignItems: "center" as "center",
   backgroundColor: "#f7f7f7",
-  borderRadius: 0,
+  borderRadius: 8,
   marginTop: 16,
 };
 const basicButtonTextStyle = {
@@ -92,7 +92,9 @@ export default function ProblemList({
 
 const styles = StyleSheet.create({
   listOuterContainer: {
-    paddingHorizontal: 16,
+    padding: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
   },
   messageContainer: {
     flex: 1,
@@ -116,19 +118,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: "#000000",
-    backgroundColor: "#f7f7f7",
-    borderRadius: 0,
-    marginTop: 20,
-    marginBottom: 10,
+    backgroundColor: "#a8cbe8",
+    borderRadius: 8,
+    marginTop: 16,
   },
   addButtonIcon: {
     marginRight: 8,
+    color: "#232f48",
   },
   addButtonText: {
-    color: "#000000",
+    color: "#232f48",
     fontSize: 16,
     fontWeight: "500",
   },
