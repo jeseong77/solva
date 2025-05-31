@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Dimensions,
 } from "react-native";
 import { Problem, Task, Project } from "@/types";
@@ -85,41 +84,8 @@ export default function ProblemListItem({
   const translateX = useSharedValue(0);
   const isSwipedOpen = useSharedValue(false);
 
-  const showDeleteConfirmation = () => {
-    Alert.alert(
-      "문제 삭제",
-      `"${problem.title}" 문제를 정말 삭제하시겠습니까?`,
-      [
-        {
-          text: "취소",
-          onPress: () => {
-            translateX.value = withTiming(0);
-            isSwipedOpen.value = false;
-          },
-          style: "cancel",
-        },
-        {
-          text: "삭제",
-          onPress: () => {
-            onDelete(problem.id);
-            isSwipedOpen.value = false;
-            translateX.value = withTiming(0);
-          },
-          style: "destructive",
-        },
-      ],
-      {
-        cancelable: true,
-        onDismiss: () => {
-          translateX.value = withTiming(0);
-          isSwipedOpen.value = false;
-        },
-      }
-    );
-  };
-
   const handleDeletePress = () => {
-    runOnJS(showDeleteConfirmation)();
+    onDelete(problem.id);
   };
 
   const panGesture = Gesture.Pan()
@@ -212,9 +178,8 @@ export default function ProblemListItem({
       </GestureDetector>
     </View>
   );
-} // 함수 선언 방식의 끝
+}
 
-// 스타일 정의는 이전과 동일
 const styles = StyleSheet.create({
   swipeableOuterContainer: {
     backgroundColor: "white",

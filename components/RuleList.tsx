@@ -20,7 +20,6 @@ export default function RuleList({
 }: RuleListProps) {
     return (
         <View>
-            {/* Do Items Section */}
             <View>
                 <Text>Do</Text>
                 {doItems.length === 0 ? (
@@ -53,7 +52,6 @@ export default function RuleList({
                         >
                             <View>
                                 <Text>{item.title}{item.isLocked ? " (잠김)" : ""}</Text>
-                                {/* 필요시 여기에 item.observancePeriod, item.successCount 등 표시 */}
                             </View>
                         </TouchableOpacity>
                     ))

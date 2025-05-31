@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Task } from "@/types";
+import { Ionicons } from "@expo/vector-icons";
 // import { Ionicons } from "@expo/vector-icons"; // 아이콘은 일단 제외
 
 interface TaskListProps {
@@ -17,8 +18,7 @@ export default function TaskList({
 }: TaskListProps) {
     return (
         <View>
-            {/* Tasks Section */}
-            <View style={{ marginBottom: 10 }}> {/* 최소한의 섹션 구분을 위한 margin */}
+            <View style={{ marginBottom: 10 }}>
                 <Text style={{ fontSize: 17, fontWeight: 'bold', marginBottom: 5 }}>Tasks (해야 할 일들)</Text>
                 {tasks.length === 0 ? (
                     <Text style={{ fontStyle: 'italic', color: 'gray' }}>설정된 Task가 없습니다.</Text>
@@ -28,7 +28,7 @@ export default function TaskList({
                             key={task.id}
                             onPress={() => onPressTaskItem?.(task.id)}
                             disabled={!onPressTaskItem || task.isLocked}
-                            style={{ paddingVertical: 4 }} // 항목 간 최소 간격
+                            style={{ paddingVertical: 4 }}
                         >
                             <View>
                                 <Text style={task.isLocked ? { textDecorationLine: 'line-through', color: '#b0b0b0' } : {}}>
@@ -36,19 +36,17 @@ export default function TaskList({
                                     <Text style={{ fontSize: 12, color: '#777' }}> (상태: {task.status})</Text>
                                     {task.isLocked ? " (잠김)" : ""}
                                 </Text>
-                                {/* {task.description && <Text style={{ fontSize: 12, color: 'gray' }}> - {task.description}</Text>} */}
                             </View>
                         </TouchableOpacity>
                     ))
                 )}
             </View>
 
-            {/* Add Task Button */}
             <TouchableOpacity
                 onPress={onPressAddTask}
-                style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderColor: '#e0e0e0' }} // 버튼과 목록 구분선 및 간격
+                style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderColor: '#e0e0e0', flexDirection: 'row', alignItems: 'center' }}
             >
-                {/* <Ionicons name="add-circle-outline" size={20} /> */}
+                <Ionicons name="add-circle-outline" size={20} />
                 <Text style={{ color: '#007AFF', fontSize: 16 }}>Add Task</Text>
             </TouchableOpacity>
         </View>

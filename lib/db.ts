@@ -24,12 +24,12 @@ const initDatabase = async () => {
         title TEXT NOT NULL,
         description TEXT,
         parentId TEXT,
-        childProblemIds TEXT,      -- JSON string for string[]
-        status TEXT NOT NULL,      -- ProblemStatus
+        childProblemIds TEXT,
+        status TEXT NOT NULL,
         path TEXT,
-        projectId TEXT,            -- Replaces associatedTaskIds, links to Projects table
+        projectId TEXT,
         retrospectiveReportId TEXT,
-        createdAt TEXT NOT NULL,   -- ISO 8601 string
+        createdAt TEXT NOT NULL,
         resolvedAt TEXT,
         archivedAt TEXT,
         FOREIGN KEY (projectId) REFERENCES Projects(id) ON DELETE SET NULL -- 프로젝트 삭제 시 Problem의 projectId는 NULL로

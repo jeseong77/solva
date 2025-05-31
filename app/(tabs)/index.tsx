@@ -26,10 +26,10 @@ export default function HomeScreen() {
     useShallow((state) => ({
       problems: state.problems,
       tasks: state.tasks,
-      projects: state.projects, // 스토어에서 projects 선택
+      projects: state.projects,
       fetchProblems: state.fetchProblems,
       fetchTasks: state.fetchTasks,
-      fetchProjects: state.fetchProjects, // 스토어에서 fetchProjects 선택
+      fetchProjects: state.fetchProjects,
       isLoadingProblems: state.isLoadingProblems,
       deleteProblem: state.deleteProblem,
     }))
@@ -43,9 +43,9 @@ export default function HomeScreen() {
 
   const handleNavigateToEditor = (problemId?: string) => {
     if (problemId) {
-      router.push({ pathname: "/ProblemEditorScreen", params: { problemId } });
+      router.push({ pathname: "/ProblemEditor.Screen", params: { problemId } });
     } else {
-      router.push({ pathname: "/ProblemEditorScreen" });
+      router.push({ pathname: "/ProblemEditor.Screen" });
     }
   };
 
@@ -77,7 +77,7 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollViewContentContainer}
       >
         <ProblemList
-          problems={problems} // 모든 problems 전달
+          problems={problems}
           tasks={tasks}
           projects={projects}
           isLoading={isLoadingProblems}
