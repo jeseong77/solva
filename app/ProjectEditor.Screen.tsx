@@ -4,11 +4,12 @@ import TaskList from '@/components/TaskList';
 import { useAppStore } from '@/store/store';
 import { Problem, Project } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'; // Added useFocusEffect
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'; // Added useRef
 import {
     ActivityIndicator,
     Alert,
+    Platform, // Added Platform for headerRight spacing
     SafeAreaView,
     ScrollView,
     Text,
@@ -17,7 +18,7 @@ import {
     View
 } from 'react-native';
 import { useShallow } from 'zustand/react/shallow';
-import { styles } from './ProjectEditor.Style'; // 스타일 import
+import { styles } from '@/styles/ProjectEditor.Style';
 
 export default function ProjectEditorScreen() {
     const router = useRouter();
@@ -32,13 +33,13 @@ export default function ProjectEditorScreen() {
         updateProject,
         allDoItems,
         fetchDoItems,
-        isLoadingDoItems,
+        // isLoadingDoItems, // Removed as per instruction (not in original RuleList use)
         allDontItems,
         fetchDontItems,
-        isLoadingDontItems,
+        // isLoadingDontItems, // Removed
         allTasks,
         fetchTasks,
-        isLoadingTasks,
+        // isLoadingTasks, // Removed
     } = useAppStore(
         useShallow((state) => ({
             getProblemById: state.getProblemById,
@@ -47,13 +48,13 @@ export default function ProjectEditorScreen() {
             updateProject: state.updateProject,
             allDoItems: state.doItems,
             fetchDoItems: state.fetchDoItems,
-            isLoadingDoItems: state.isLoadingDoItems,
+            // isLoadingDoItems: state.isLoadingDoItems,
             allDontItems: state.dontItems,
             fetchDontItems: state.fetchDontItems,
-            isLoadingDontItems: state.isLoadingDontItems,
+            // isLoadingDontItems: state.isLoadingDontItems,
             allTasks: state.tasks,
             fetchTasks: state.fetchTasks,
-            isLoadingTasks: state.isLoadingTasks,
+            // isLoadingTasks: state.isLoadingTasks,
         }))
     );
 
@@ -61,18 +62,22 @@ export default function ProjectEditorScreen() {
     const [currentProject, setCurrentProject] = useState<Project | null | undefined>(undefined);
     const [projectTitle, setProjectTitle] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasUnsavedChanges = useRef(false);
+    const isEditingInitially = !!params.projectId;
+
 
     const loadData = useCallback(() => {
         setIsLoading(true);
         let problemForProject: Problem | undefined | null = null;
         let projectToLoad: Project | undefined | null = null;
-        let titleForHeader = "";
 
         if (projectIdToEdit) {
             projectToLoad = getProjectById(projectIdToEdit);
             if (projectToLoad) {
                 problemForProject = getProblemById(projectToLoad.problemId);
-                titleForHeader = projectToLoad.title || `Edit Project`;
                 setProjectTitle(projectToLoad.title);
                 setCurrentProject(projectToLoad);
                 fetchDoItems(projectToLoad.id);
@@ -80,64 +85,213 @@ export default function ProjectEditorScreen() {
                 fetchTasks(projectToLoad.id);
             } else {
                 Alert.alert("Error", "Project not found.");
-                titleForHeader = "Error";
+                setProjectTitle("Error: Project Not Found");
+                setCurrentProject(null);
             }
         } else if (problemIdFromParams) {
             problemForProject = getProblemById(problemIdFromParams);
-            titleForHeader = `New Project for "${problemForProject?.title || 'Problem'}"`;
-            setProjectTitle(titleForHeader);
+            if (problemForProject) {
+                setProjectTitle(`New Project for "${problemForProject.title}"`);
+            } else {
+                Alert.alert("Error", "Associated problem not found. Cannot create new project.");
+                setProjectTitle("Error: Linked Problem Not Found");
+            }
             setCurrentProject(null);
         } else {
             Alert.alert("Error", "No Problem ID or Project ID provided.");
-            titleForHeader = "Error";
+            setProjectTitle("Error: Invalid Parameters");
+            setCurrentProject(null);
         }
 
         setLinkedProblem(problemForProject || null);
         setIsLoading(false);
+        hasUnsavedChanges.current = false;
     }, [projectIdToEdit, problemIdFromParams, getProblemById, getProjectById, fetchDoItems, fetchDontItems, fetchTasks]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
+    useFocusEffect(
+        useCallback(() => {
+            loadData(); // Reload data on focus, as in reference
+            return () => {
+                if (debounceTimeout.current) {
+                    clearTimeout(debounceTimeout.current);
+                }
+            };
+        }, [loadData])
+    );
+
+    const autoSaveProject = useCallback(async (newTitle: string): Promise<Project | null> => {
+        const trimmedTitle = newTitle.trim();
+
+        if (!currentProject?.id && !trimmedTitle && problemIdFromParams) {
+            setIsSaving(false);
+            return null;
+        }
+        if (currentProject?.id && !trimmedTitle) {
+            Alert.alert("Info", "Project title cannot be empty.");
+            setProjectTitle(currentProject.title);
+            setIsSaving(false);
+            return null;
+        }
+
+        setIsSaving(true);
+        hasUnsavedChanges.current = false;
+        let resultProject: Project | null = null;
+
+        if (currentProject?.id) {
+            if (trimmedTitle === currentProject.title) {
+                setIsSaving(false);
+                return currentProject;
+            }
+            const projectToUpdate: Project = { ...currentProject, title: trimmedTitle };
+            resultProject = await updateProject(projectToUpdate);
+            if (resultProject) {
+                setCurrentProject(resultProject);
+            } else {
+                hasUnsavedChanges.current = true;
+                Alert.alert("Error", "Failed to update project.");
+            }
+        } else if (problemIdFromParams && linkedProblem) {
+            const defaultNewTitle = `New Project for "${linkedProblem.title}"`;
+            if (trimmedTitle === defaultNewTitle && !hasUnsavedChanges.current && !isEditingInitially) { // Added !isEditingInitially
+                setIsSaving(false);
+                return null;
+            }
+            const projectData = { problemId: problemIdFromParams, title: trimmedTitle };
+            resultProject = await addProject(projectData);
+            if (resultProject) {
+                setCurrentProject(resultProject);
+                setProjectTitle(resultProject.title);
+                fetchDoItems(resultProject.id);
+                fetchDontItems(resultProject.id);
+                fetchTasks(resultProject.id);
+            } else {
+                hasUnsavedChanges.current = true;
+                Alert.alert("Error", "Failed to create project.");
+            }
+        } else if (!linkedProblem && problemIdFromParams) {
+            Alert.alert("Error", "Cannot save project: Linked problem data is missing.");
+            hasUnsavedChanges.current = true;
+        }
+        setIsSaving(false);
+        return resultProject;
+    }, [currentProject, problemIdFromParams, linkedProblem, addProject, updateProject, fetchDoItems, fetchDontItems, fetchTasks, isEditingInitially]);
+
+
+    useEffect(() => {
+        if (isLoading) return;
+
+        if (!isEditingInitially && problemIdFromParams && !linkedProblem) {
+            return;
+        }
+
+        if (!currentProject?.id && problemIdFromParams && linkedProblem) {
+            const defaultNewTitle = `New Project for "${linkedProblem.title}"`;
+            if (projectTitle === defaultNewTitle && !hasUnsavedChanges.current) {
+                return;
+            }
+        }
+
+        if (!currentProject?.id && !projectTitle.trim() && !isEditingInitially) {
+            return;
+        }
+        if (currentProject?.id && !projectTitle.trim()) {
+            return;
+        }
+
+        if (debounceTimeout.current) {
+            clearTimeout(debounceTimeout.current);
+        }
+
+        debounceTimeout.current = setTimeout(() => {
+            const titleChangedFromPersisted = projectTitle.trim() !== (currentProject?.title || "");
+
+            const shouldSaveExisting = currentProject?.id && (hasUnsavedChanges.current || titleChangedFromPersisted);
+            let shouldSaveNew = false;
+            if (!currentProject?.id && problemIdFromParams && linkedProblem) {
+                const defaultNewTitle = `New Project for "${linkedProblem.title}"`;
+                if (projectTitle.trim() && (projectTitle !== defaultNewTitle || hasUnsavedChanges.current)) {
+                    shouldSaveNew = true;
+                }
+            }
+
+            if (shouldSaveExisting || shouldSaveNew) {
+                autoSaveProject(projectTitle);
+            }
+        }, 1200);
+
+        return () => {
+            if (debounceTimeout.current) {
+                clearTimeout(debounceTimeout.current);
+            }
+        };
+    }, [projectTitle, autoSaveProject, isLoading, currentProject, isEditingInitially, problemIdFromParams, linkedProblem]);
+
+    const handleProjectTitleChange = (newText: string) => {
+        setProjectTitle(newText);
+        hasUnsavedChanges.current = true;
+    };
+
     const projectSpecificDoItems = useMemo(() => {
         return currentProject?.id ? allDoItems.filter(di => di.projectId === currentProject.id) : [];
-    }, [currentProject, allDoItems]);
+    }, [currentProject?.id, allDoItems]);
 
     const projectSpecificDontItems = useMemo(() => {
         return currentProject?.id ? allDontItems.filter(di => di.projectId === currentProject.id) : [];
-    }, [currentProject, allDontItems]);
+    }, [currentProject?.id, allDontItems]);
 
     const projectSpecificTasks = useMemo(() => {
         return currentProject?.id ? allTasks.filter(task => task.projectId === currentProject.id) : [];
-    }, [currentProject, allTasks]);
+    }, [currentProject?.id, allTasks]);
 
-    const handleAddRule = () => {
-        const targetProjectId = currentProject?.id;
-        if (targetProjectId) {
-            Alert.alert("Add Rule", `Maps to Rule Editor for Project: ${targetProjectId}`);
+    const ensureProjectSaved = async (): Promise<Project | null> => {
+        if (currentProject?.id) return currentProject;
+
+        if (projectTitle.trim() && problemIdFromParams && linkedProblem) {
+            if (isSaving) {
+                Alert.alert("Info", "Saving in progress. Please wait a moment and try again.");
+                return null;
+            }
+            // Alert.alert("Info", "Project needs to be saved first. Attempting to save now...");
+            const savedProject = await autoSaveProject(projectTitle);
+            if (!savedProject?.id) {
+                Alert.alert("Save Failed", "Could not save the project. Please ensure the title is valid and try again.");
+                return null;
+            }
+            return savedProject;
         } else {
-            Alert.alert("Info", "Please save the project first to add rules.");
+            Alert.alert("Info", "Please enter a project title. The project will be saved automatically.");
+            return null;
         }
     };
+
+    const handleAddRule = async () => {
+        const projectForAction = await ensureProjectSaved();
+        if (projectForAction?.id) {
+            router.push({
+                pathname: "/RuleEditor.Screen",
+                params: { projectId: projectForAction.id, ruleTypeInitial: 'Do' }
+            });
+        }
+    };
+
     const handleEditDoItem = (doItemId: string) => { Alert.alert("Edit Do Rule", `Maps to Edit Do Rule: ${doItemId}`); };
     const handleEditDontItem = (dontItemId: string) => { Alert.alert("Edit Don't Rule", `Maps to Edit Don't Rule: ${dontItemId}`); };
 
-    const handleAddTask = () => {
-        const targetProjectId = currentProject?.id;
-        if (targetProjectId) {
-            Alert.alert("Add Task", `Maps to Task Editor for Project: ${targetProjectId}`);
-            // router.push({ pathname: "/TaskEditorScreen", params: { projectId: targetProjectId } });
-        } else {
-            Alert.alert("Info", "Please save the project first to add tasks.");
+    const handleAddTask = async () => {
+        const projectForAction = await ensureProjectSaved();
+        if (projectForAction?.id) {
+            Alert.alert("Add Task", `Maps to Task Editor for Project: ${projectForAction.id}`);
+            // router.push({ pathname: "/TaskEditorScreen", params: { projectId: projectForAction.id } });
         }
     };
     const handleEditTask = (taskId: string) => {
         Alert.alert("Edit Task", `Maps to Edit Task: ${taskId}`);
         // router.push({ pathname: "/TaskEditorScreen", params: { taskId: taskId } });
     };
-    // onDeleteDoItem, onDeleteDontItem, onDeleteTask 핸들러는 필요시 추가
-
 
     if (isLoading) {
         return (
@@ -148,32 +302,44 @@ export default function ProjectEditorScreen() {
         );
     }
 
-    if ((!currentProject && !problemIdFromParams) || (!linkedProblem && problemIdFromParams && !projectIdToEdit)) {
+    // Error state: if we expected to load a project/problem but didn't find one (after loading is complete)
+    if ((projectIdToEdit && !currentProject && !isLoading) || (problemIdFromParams && !linkedProblem && !isLoading)) {
         return (
             <SafeAreaView style={styles.container}>
                 <Stack.Screen options={{ title: "Error" }} />
-                <View style={styles.content}><Text style={styles.infoText}>Could not load project or linked problem data.</Text></View>
+                <View style={styles.content}><Text style={styles.infoText}>Could not load project or linked problem data. Please go back and try again.</Text></View>
             </SafeAreaView>
         );
     }
+
+    const getHeaderTitle = () => {
+        if (isSaving) return "Saving...";
+        return currentProject?.title || projectTitle || (isEditingInitially ? "Edit Project" : "New Project");
+    };
 
     return (
         <SafeAreaView style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: projectTitle || (projectIdToEdit ? "Edit Project" : "New Project"),
+                    title: getHeaderTitle(),
                     headerRight: () => (
-                        <TouchableOpacity onPress={() => Alert.alert("More Options", "More options here.")} style={{ marginRight: 16 }}>
-                            <Ionicons name="ellipsis-horizontal" size={24} color="#007AFF" />
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            {isSaving && <ActivityIndicator size="small" color="#007AFF" style={{ marginRight: 10 }} />}
+                            <TouchableOpacity onPress={() => Alert.alert("More Options", "More options here.")} style={{ marginRight: Platform.OS === 'ios' ? 0 : 16 }}>
+                                <Ionicons name="ellipsis-horizontal" size={24} color="#007AFF" />
+                            </TouchableOpacity>
+                        </View>
                     ),
                 }}
             />
-            <ScrollView style={styles.scrollViewContainer}>
+            <ScrollView
+                style={styles.scrollViewContainer}
+                keyboardShouldPersistTaps="handled" // Added from reference for better UX with inputs
+            >
                 <View style={styles.content}>
                     {linkedProblem && (
                         <View style={styles.linkedProblemInfoContainer}>
-                            <Text style={styles.linkedProblemLabel}>Linked Problem:</Text>
+                            <Text style={styles.linkedProblemLabel}>Project to solve:</Text>
                             <Text style={styles.linkedProblemTitle} numberOfLines={1} ellipsizeMode="tail">
                                 {linkedProblem.title}
                             </Text>
@@ -183,36 +349,47 @@ export default function ProjectEditorScreen() {
                     <TextInput
                         style={styles.projectTitleInput}
                         value={projectTitle}
-                        onChangeText={setProjectTitle}
+                        onChangeText={handleProjectTitleChange}
                         placeholder="Enter Project Title"
+                        placeholderTextColor="#999" // Added for consistency with reference
                     />
 
                     <View style={styles.sectionContainer}>
-                        {(currentProject?.id || problemIdFromParams) ? ( // 프로젝트가 저장되었거나, 생성 중인 상태(problemIdFromParams가 있을 때)
+                        {(currentProject?.id || problemIdFromParams) ? (
                             <RuleList
                                 doItems={projectSpecificDoItems}
                                 dontItems={projectSpecificDontItems}
                                 onPressDoItem={handleEditDoItem}
                                 onPressDontItem={handleEditDontItem}
                                 onPressAddRule={handleAddRule}
+                            // No isLoading prop as it wasn't in original
                             />
                         ) : (
                             <Text style={styles.infoText}>Save the project to add rules.</Text>
+                        )}
+                        {/* Guidance text for new, unsaved projects */}
+                        {!currentProject?.id && problemIdFromParams && linkedProblem && (
+                            <Text style={styles.infoText}>Type a project title above. It will auto-save, enabling rule additions.</Text>
                         )}
                     </View>
 
                     <View style={styles.placeholderSection}>
                         <Text style={styles.placeholderText}>Project Description, Criteria, Target fields will be here.</Text>
                     </View>
+
                     <View style={styles.sectionContainer}>
                         {(currentProject?.id || problemIdFromParams) ? (
                             <TaskList
                                 tasks={projectSpecificTasks}
                                 onPressTaskItem={handleEditTask}
                                 onPressAddTask={handleAddTask}
+                            // No isLoading prop
                             />
                         ) : (
                             <Text style={styles.infoText}>Save the project to add tasks.</Text>
+                        )}
+                        {!currentProject?.id && problemIdFromParams && linkedProblem && (
+                            <Text style={styles.infoText}>Type a project title above. It will auto-save, enabling task additions.</Text>
                         )}
                     </View>
                 </View>

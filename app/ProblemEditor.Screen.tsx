@@ -15,12 +15,12 @@ import {
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useAppStore } from "@/store/store";
 import { Problem, ProblemStatus } from "@/types";
-import { useShallow } from "zustand/react/shallow";
+import { useShallow } from "zustand/react/shallow"; 
 import { Ionicons } from "@expo/vector-icons";
 import SubProblemList from "@/components/SubProblemList";
-import { styles } from './ProblemEditor.Style'; // 스타일 import
+import { styles } from '@/styles/ProblemEditor.Style';
 
-const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null); // React.createRef 대신 useRef 사용
+const debounceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 export default function ProblemEditorScreen() {
   const router = useRouter();
@@ -396,8 +396,6 @@ export default function ProblemEditorScreen() {
             </Text>
           </View>
         </ScrollView>
-        {/* isSaving 인디케이터는 헤더로 옮겼으므로 여기서는 제거 또는 조건부로 다른 위치에 표시 가능 */}
-        {/* {isSaving && <ActivityIndicator style={styles.savingIndicator} size="small" color="#007AFF" />} */}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

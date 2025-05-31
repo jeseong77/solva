@@ -50,13 +50,9 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          {/* ProblemEditorScreen 선언은 이전 답변에서 추가한 것을 유지하거나,
-              사용자님의 RootLayout에 이미 있다면 그 위치를 따릅니다.
-              여기서는 사용자님이 제공한 RootLayout 구조를 따릅니다.
-          */}
           <Stack.Screen name="+not-found" />
           <Stack.Screen
-            name="ProblemEditorScreen" // 파일명 ProblemEditorScreen.tsx와 일치
+            name="ProblemEditor.Screen" // 파일명 ProblemEditorScreen.tsx와 일치
             options={{
               title: "Problem Editor", // 헤더 제목 설정
               headerShown: true, // 헤더를 보여줄지 여부
