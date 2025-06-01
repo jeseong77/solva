@@ -1,29 +1,21 @@
 // src/components/SubProblemList.tsx
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  // FlatList, // 항목이 매우 많아질 경우 FlatList 고려 가능
-} from "react-native";
 import { Problem } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // 버튼 스타일 정의 (기본, 비활성화)
 const getButtonStyles = (isDisabled: boolean) => ({
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: isDisabled ? "#ccc" : "#000", // 비활성화 시 테두리 색 변경
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center" as "center",
     marginVertical: 5,
     flexDirection: "row" as "row",
     justifyContent: "center" as "center",
-    backgroundColor: isDisabled ? "#f5f5f5" : "#f0f0f0", // 비활성화 시 배경색 변경
+    backgroundColor: isDisabled ? "#f5f5f5" : "#a8cbe8",
     marginTop: 16,
-    opacity: isDisabled ? 0.5 : 1, // 비활성화 시 투명도 조절
+    opacity: isDisabled ? 0.5 : 1,
   },
   text: {
     color: isDisabled ? "#aaa" : "#000", // 비활성화 시 텍스트 색 변경
@@ -32,7 +24,7 @@ const getButtonStyles = (isDisabled: boolean) => ({
   },
   icon: {
     color: isDisabled ? "#aaa" : "#000", // 비활성화 시 아이콘 색 변경
-  }
+  },
 });
 
 interface SubProblemListProps {
@@ -50,7 +42,8 @@ export default function SubProblemList({
   isParentProblemSaved, // 새로운 prop
   onPressSubProblemItem,
   onPressAddSubProblem,
-}: SubProblemListProps) { // props 타입 명시
+}: SubProblemListProps) {
+  // props 타입 명시
 
   const buttonCurrentStyles = getButtonStyles(!isParentProblemSaved); // isParentProblemSaved가 false면 disabled
 
@@ -69,7 +62,13 @@ export default function SubProblemList({
               style={styles.subProblemItem}
               onPress={() => onPressSubProblemItem(sub.id)}
             >
-              <Text style={styles.subProblemTitle} numberOfLines={1} ellipsizeMode="tail">{sub.title}</Text>
+              <Text
+                style={styles.subProblemTitle}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {sub.title}
+              </Text>
               <Ionicons name="chevron-forward-outline" size={20} color="#ccc" />
             </TouchableOpacity>
           ))}
@@ -78,13 +77,18 @@ export default function SubProblemList({
       <TouchableOpacity
         style={buttonCurrentStyles.button}
         onPress={() => {
-          if (isParentProblemSaved && currentProblemId) { // 유효한 currentProblemId도 확인
+          if (isParentProblemSaved && currentProblemId) {
+            // 유효한 currentProblemId도 확인
             onPressAddSubProblem(currentProblemId);
           }
         }}
         disabled={!isParentProblemSaved || !currentProblemId} // currentProblemId 유효성도 체크
       >
-        <Ionicons name="add-outline" size={18} style={buttonCurrentStyles.icon} />
+        <Ionicons
+          name="add-circle-outline"
+          size={18}
+          style={buttonCurrentStyles.icon}
+        />
         <Text style={buttonCurrentStyles.text}>Add Sub-problem</Text>
       </TouchableOpacity>
     </View>

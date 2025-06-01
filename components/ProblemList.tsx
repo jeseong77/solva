@@ -11,22 +11,6 @@ import {
   View,
 } from "react-native";
 
-const basicButtonStyle = {
-  paddingVertical: 12,
-  paddingHorizontal: 20,
-  borderWidth: 1,
-  borderColor: "#000000",
-  alignItems: "center" as "center",
-  backgroundColor: "#f7f7f7",
-  borderRadius: 8,
-  marginTop: 16,
-};
-const basicButtonTextStyle = {
-  color: "#000000",
-  fontSize: 16,
-  fontWeight: "500" as "500",
-};
-
 interface ProblemListProps {
   problems: Problem[];
   tasks: Task[];

@@ -94,8 +94,6 @@ export interface DoItemSlice {
   updateDoItem: (doItemToUpdate: DoItem) => Promise<DoItem | null>; // DoItem 업데이트 시 전체 객체 또는 Partial
   deleteDoItem: (doItemId: string) => Promise<boolean>;
   getDoItemById: (id: string) => DoItem | undefined;
-  // DoItem 완료/실패 처리 및 successCount/failureCount 업데이트 액션 추가
-  // recordDoItemAttempt: (doItemId: string, wasSuccessful: boolean) => Promise<void>;
 }
 
 export interface DontItemSlice {
