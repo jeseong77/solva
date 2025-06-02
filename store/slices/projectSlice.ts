@@ -1,14 +1,16 @@
 import { getDatabase } from "@/lib/db";
-import { Problem, Project, ProjectFocusStatus, ProjectStatus } from "@/types";
-import type { AppState } from "@/types/storeTypes"; // 통합 AppState 타입
+import { Project, ProjectStatus } from "@/types"; // Rule, Task 추가
+import type {
+  AppState,
+  ProjectSlice as ProjectSliceInterface,
+} from "@/types/storeTypes";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-// Project 관련 파서 함수
 const parseProjectFromDB = (dbItem: any): Project => ({
   id: dbItem.id,
-  problemId: dbItem.problemId,
+  objectiveId: dbItem.objectiveId,
   title: dbItem.title,
   completionCriteriaText:
     dbItem.completionCriteriaText === null
@@ -18,96 +20,56 @@ const parseProjectFromDB = (dbItem: any): Project => ({
     dbItem.numericalTarget === null ? undefined : dbItem.numericalTarget,
   currentNumericalProgress:
     dbItem.currentNumericalProgress === null
-      ? undefined
+      ? 0
       : dbItem.currentNumericalProgress,
   performanceScore:
-    dbItem.performanceScore === null ? undefined : dbItem.performanceScore,
+    dbItem.performanceScore === null ? 50 : dbItem.performanceScore,
   status: dbItem.status as ProjectStatus,
   isLocked: !!dbItem.isLocked,
-  focused: dbItem.focused as ProjectFocusStatus,
-  doItemIds: dbItem.doItemIds ? JSON.parse(dbItem.doItemIds) : [],
-  dontItemIds: dbItem.dontItemIds ? JSON.parse(dbItem.dontItemIds) : [],
+  ruleIds: dbItem.ruleIds ? JSON.parse(dbItem.ruleIds) : [],
   taskIds: dbItem.taskIds ? JSON.parse(dbItem.taskIds) : [],
+  timeSpent: dbItem.timeSpent || 0,
   createdAt: new Date(dbItem.createdAt),
   completedAt: dbItem.completedAt ? new Date(dbItem.completedAt) : undefined,
 });
-
-export interface ProjectSlice {
-  projects: Project[];
-  isLoadingProjects: boolean;
-  fetchProjects: (problemId?: string) => Promise<void>;
-  addProject: (
-    projectData: Omit<
-      Project,
-      | "id"
-      | "createdAt"
-      | "doItemIds"
-      | "dontItemIds"
-      | "taskIds"
-      | "currentNumericalProgress"
-      | "performanceScore"
-      | "status"
-      | "focused"
-      | "isLocked"
-    > & {
-      problemId: string;
-      status?: ProjectStatus;
-      focused?: ProjectFocusStatus;
-      isLocked?: boolean;
-    }
-  ) => Promise<Project | null>;
-  updateProject: (projectToUpdate: Project) => Promise<Project | null>;
-  deleteProject: (projectId: string) => Promise<boolean>;
-  getProjectById: (id: string) => Project | undefined;
-  setProjectFocus: (
-    projectId: string,
-    focusStatus: ProjectFocusStatus
-  ) => Promise<void>;
-}
 
 export const createProjectSlice: StateCreator<
   AppState,
   [],
   [],
-  ProjectSlice
+  ProjectSliceInterface
 > = (set, get) => ({
   projects: [],
   isLoadingProjects: false,
 
-  fetchProjects: async (problemId?: string) => {
+  fetchProjects: async (objectiveId?: string) => {
     set({ isLoadingProjects: true });
     try {
       const db = await getDatabase();
       let results;
-      if (problemId) {
-        results = await db.getAllAsync<any>(
-          "SELECT * FROM Projects WHERE problemId = ? ORDER BY createdAt DESC;",
-          [problemId]
-        );
-      } else {
-        results = await db.getAllAsync<any>(
-          "SELECT * FROM Projects ORDER BY createdAt DESC;"
-        );
+      const params: string[] = [];
+      let query = "SELECT * FROM Projects";
+
+      if (objectiveId) {
+        query += " WHERE objectiveId = ?";
+        params.push(objectiveId);
       }
+      query += " ORDER BY createdAt DESC;";
+      results = await db.getAllAsync<any>(query, params);
       const fetchedProjects = results.map(parseProjectFromDB);
-      // 기존 로직을 유지하되, problemId로 필터링된 fetch시에는 해당 problemId의 project들만 교체
-      if (problemId) {
+
+      if (objectiveId) {
         set((state) => ({
           projects: [
-            ...state.projects.filter((p) => p.problemId !== problemId),
+            ...state.projects.filter((p) => p.objectiveId !== objectiveId),
             ...fetchedProjects,
-          ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()), // 최신순 정렬
+          ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
           isLoadingProjects: false,
         }));
       } else {
         set({ projects: fetchedProjects, isLoadingProjects: false });
       }
-      console.log(
-        `[ProjectSlice] Projects fetched ${
-          problemId ? `for problem ${problemId}` : "(all)"
-        }:`,
-        fetchedProjects.length
-      );
+      // console.log(`[ProjectSlice] Projects fetched ${objectiveId ? `for objective ${objectiveId}` : '(all)'}:`, fetchedProjects.length);
     } catch (error) {
       console.error("[ProjectSlice] Error fetching projects:", error);
       set({ isLoadingProjects: false });
@@ -115,66 +77,68 @@ export const createProjectSlice: StateCreator<
   },
 
   addProject: async (projectData) => {
+    // projectData 타입은 storeTypes.ts의 ProjectSlice.addProject 시그니처를 따름
+    // Omit<Project, "id" | "createdAt" | "ruleIds" | "taskIds" | "currentNumericalProgress" | "performanceScore" | "status" | "isLocked" | "timeSpent" | "completedAt" | "focused">
+    // & { objectiveId: string; status?: ProjectStatus; isLocked?: boolean; }
+    // "focused"는 Project 타입에서 제거되었으므로 Omit에서도 제거됨.
+
     const newProject: Project = {
       id: uuidv4(),
-      problemId: projectData.problemId,
+      objectiveId: projectData.objectiveId,
       title: projectData.title,
       completionCriteriaText: projectData.completionCriteriaText,
       numericalTarget: projectData.numericalTarget,
       currentNumericalProgress: 0,
       performanceScore: 50,
-      status: projectData.status || "active",
-      isLocked: projectData.isLocked || false,
-      focused: projectData.focused || "unfocused",
-      doItemIds: [],
-      dontItemIds: [],
+      status: projectData.status || "active", // Omit되었지만 &{} 로 옵셔널하게 받음, 기본값 설정
+      isLocked: projectData.isLocked || false, // Omit되었지만 &{} 로 옵셔널하게 받음, 기본값 설정
+      ruleIds: [],
       taskIds: [],
+      timeSpent: 0,
       createdAt: new Date(),
-      completedAt: projectData.completedAt,
+      completedAt: undefined,
     };
     const db = await getDatabase();
     try {
+      // Projects 테이블 스키마: id, objectiveId, title, completionCriteriaText, numericalTarget, currentNumericalProgress, performanceScore, status, isLocked, ruleIds, taskIds, timeSpent, createdAt, completedAt
+      // 총 14개 컬럼 (focused 제거됨)
       await db.runAsync(
-        `INSERT INTO Projects (id, problemId, title, completionCriteriaText, numericalTarget, currentNumericalProgress, performanceScore, status, isLocked, focused, doItemIds, dontItemIds, taskIds, createdAt, completedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO Projects (id, objectiveId, title, completionCriteriaText, numericalTarget, currentNumericalProgress, performanceScore, status, isLocked, ruleIds, taskIds, timeSpent, createdAt, completedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, // ? 14개
         [
-          newProject.id,
-          newProject.problemId,
-          newProject.title,
+          newProject.id, // 1. string
+          newProject.objectiveId, // 2. string
+          newProject.title, // 3. string
           newProject.completionCriteriaText === undefined
             ? null
-            : newProject.completionCriteriaText,
+            : newProject.completionCriteriaText, // 4. string | null
           newProject.numericalTarget === undefined
             ? null
-            : newProject.numericalTarget,
-          newProject.currentNumericalProgress === undefined
-            ? null
-            : newProject.currentNumericalProgress,
-          newProject.performanceScore === undefined
-            ? null
-            : newProject.performanceScore,
-          newProject.status,
-          newProject.isLocked ? 1 : 0,
-          newProject.focused,
-          JSON.stringify(newProject.doItemIds),
-          JSON.stringify(newProject.dontItemIds),
-          JSON.stringify(newProject.taskIds),
-          newProject.createdAt ? newProject.createdAt.toISOString() : null,
-          newProject.completedAt ? newProject.completedAt.toISOString() : null,
+            : newProject.numericalTarget, // 5. number | null
+          newProject.currentNumericalProgress!, // 6. number (0)
+          newProject.performanceScore!, // 7. number (50)
+          newProject.status, // 8. string (ProjectStatus)
+          newProject.isLocked ? 1 : 0, // 9. number (0 or 1)
+          JSON.stringify(newProject.ruleIds), // 10. string ('[]')
+          JSON.stringify(newProject.taskIds), // 11. string ('[]')
+          newProject.timeSpent, // 12. number (0)
+          newProject.createdAt.toISOString(), // 13. string
+          newProject.completedAt ? newProject.completedAt.toISOString() : null, // 14. string | null
         ]
       );
-      // 연결된 Problem의 projectId 필드 업데이트
-      const problemToUpdate = get().problems.find(
-        (p) => p.id === newProject.problemId
-      );
-      if (problemToUpdate) {
-        const updatedProblemData: Problem = {
-          ...problemToUpdate,
-          projectId: newProject.id,
-        };
-        // ProblemSlice의 updateProblem 액션을 직접 호출 (의존성 주의)
-        // 또는 Problem 업데이트 로직을 별도 유틸/서비스로 분리하거나, 여기서 직접 DB 업데이트
-        await get().updateProblem(updatedProblemData); // AppState를 통해 다른 slice의 액션 접근
+
+      // 연결된 Objective의 fulfillingProjectId 필드 업데이트
+      // ObjectiveSlice의 updateObjective를 사용하기 위해 AppState를 통해 접근
+      const objectiveToLink = get().getObjectiveById(newProject.objectiveId);
+      if (objectiveToLink) {
+        await get().updateObjective({
+          ...objectiveToLink,
+          fulfillingProjectId: newProject.id,
+        });
+      } else {
+        console.warn(
+          `[ProjectSlice] Objective ${newProject.objectiveId} not found to link project ${newProject.id}`
+        );
       }
 
       const currentProjects = get().projects;
@@ -183,7 +147,7 @@ export const createProjectSlice: StateCreator<
       );
       set({ projects: newProjectList });
       console.log(
-        "[ProjectSlice] Project added and Problem updated:",
+        "[ProjectSlice] Project added and Objective updated:",
         newProject.title
       );
       return newProject;
@@ -194,6 +158,7 @@ export const createProjectSlice: StateCreator<
   },
 
   updateProject: async (projectToUpdate) => {
+    // projectToUpdate는 Project 타입 전체 객체
     const currentProjects = get().projects;
     const projectIndex = currentProjects.findIndex(
       (p) => p.id === projectToUpdate.id
@@ -205,16 +170,17 @@ export const createProjectSlice: StateCreator<
       );
       return null;
     }
-    // DB에 저장하기 전, 타입에 맞게 값 변환 (isLocked, Date, JSON 배열 등)
+    // 전달받은 projectToUpdate가 DB에 저장될 최종 모습이라고 가정
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE Projects SET problemId = ?, title = ?, completionCriteriaText = ?, numericalTarget = ?, 
-        currentNumericalProgress = ?, performanceScore = ?, status = ?, isLocked = ?, focused = ?, 
-        doItemIds = ?, dontItemIds = ?, taskIds = ?, completedAt = ? 
-        WHERE id = ?;`, // createdAt은 업데이트에서 제외
+        // focused 컬럼 제거, createdAt은 업데이트하지 않음
+        `UPDATE Projects SET objectiveId = ?, title = ?, completionCriteriaText = ?, numericalTarget = ?, 
+        currentNumericalProgress = ?, performanceScore = ?, status = ?, isLocked = ?, 
+        ruleIds = ?, taskIds = ?, timeSpent = ?, completedAt = ? 
+        WHERE id = ?;`,
         [
-          projectToUpdate.problemId,
+          projectToUpdate.objectiveId,
           projectToUpdate.title,
           projectToUpdate.completionCriteriaText === undefined
             ? null
@@ -230,16 +196,16 @@ export const createProjectSlice: StateCreator<
             : projectToUpdate.performanceScore,
           projectToUpdate.status,
           projectToUpdate.isLocked ? 1 : 0,
-          projectToUpdate.focused,
-          JSON.stringify(projectToUpdate.doItemIds || []),
-          JSON.stringify(projectToUpdate.dontItemIds || []),
+          JSON.stringify(projectToUpdate.ruleIds || []),
           JSON.stringify(projectToUpdate.taskIds || []),
+          projectToUpdate.timeSpent,
           projectToUpdate.completedAt
             ? projectToUpdate.completedAt.toISOString()
             : null,
           projectToUpdate.id,
         ]
       );
+
       const updatedProjects = currentProjects.map((p) =>
         p.id === projectToUpdate.id ? projectToUpdate : p
       );
@@ -257,38 +223,32 @@ export const createProjectSlice: StateCreator<
 
   deleteProject: async (projectId) => {
     const projectToDelete = get().projects.find((p) => p.id === projectId);
-    if (!projectToDelete) {
-      console.warn(
-        "[ProjectSlice] Project to delete not found in state:",
-        projectId
-      );
-      // DB에서 직접 삭제 시도 가능
-    }
 
     try {
       const db = await getDatabase();
-      // 연결된 Problem의 projectId를 null로 업데이트
+      // 연결된 Objective의 fulfillingProjectId를 null로 업데이트
       if (projectToDelete) {
-        const problemToUpdate = get().problems.find(
-          (p) => p.id === projectToDelete.problemId
+        const objectiveToUnlink = get().getObjectiveById(
+          projectToDelete.objectiveId
         );
-        if (problemToUpdate && problemToUpdate.projectId === projectId) {
-          const clearedProblemData: Problem = {
-            ...problemToUpdate,
-            projectId: undefined,
-          };
-          await get().updateProblem(clearedProblemData); // ProblemSlice의 액션 호출
+        if (
+          objectiveToUnlink &&
+          objectiveToUnlink.fulfillingProjectId === projectId
+        ) {
+          await get().updateObjective({
+            ...objectiveToUnlink,
+            fulfillingProjectId: null,
+          });
         }
       }
-      await db.runAsync(`DELETE FROM Projects WHERE id = ?;`, [projectId]); // DB CASCADE로 Do/Dont/Tasks 삭제
+      await db.runAsync(`DELETE FROM Projects WHERE id = ?;`, [projectId]); // DB CASCADE로 Rule, Task 삭제
 
       set((state) => ({
         projects: state.projects
           .filter((p) => p.id !== projectId)
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-        // CASCADE로 DB에서 삭제되므로, 로컬 상태에서도 관련 항목들 제거
-        doItems: state.doItems.filter((d) => d.projectId !== projectId),
-        dontItems: state.dontItems.filter((d) => d.projectId !== projectId),
+        // Project 삭제 시 관련된 Rule과 Task도 로컬 상태에서 제거
+        rules: state.rules.filter((r) => r.projectId !== projectId),
         tasks: state.tasks.filter((t) => t.projectId !== projectId),
       }));
       console.log(
@@ -305,132 +265,6 @@ export const createProjectSlice: StateCreator<
   getProjectById: (id: string) => {
     return get().projects.find((p) => p.id === id);
   },
-
-  setProjectFocus: async (
-    projectIdToFocus: string,
-    newFocusStatus: ProjectFocusStatus
-  ) => {
-    const allCurrentProjects = get().projects;
-    const allCurrentProblems = get().problems; // Problem 정보도 필요
-    const targetProject = allCurrentProjects.find(
-      (p) => p.id === projectIdToFocus
-    );
-
-    if (!targetProject) {
-      console.error(
-        "[ProjectSlice] Project to focus not found:",
-        projectIdToFocus
-      );
-      return;
-    }
-
-    const projectsToUpdateInDB: Project[] = [];
-
-    // 1. 새로운 superfocused 프로젝트 설정 또는 기존 superfocused 해제
-    if (newFocusStatus === "superfocused") {
-      // 기존 superfocused 프로젝트가 있다면 focused로 변경
-      const currentSuperfocused = allCurrentProjects.find(
-        (p) => p.focused === "superfocused" && p.id !== projectIdToFocus
-      );
-      if (currentSuperfocused) {
-        projectsToUpdateInDB.push({
-          ...currentSuperfocused,
-          focused: "focused",
-          isLocked: false,
-        }); // superfocus 해제 시 isLocked도 해제 시도 (구조적 잠금은 유지될 것)
-      }
-      // 대상 프로젝트를 superfocused로 설정
-      projectsToUpdateInDB.push({
-        ...targetProject,
-        focused: newFocusStatus,
-        isLocked: false,
-      }); // superfocused 프로젝트는 잠기지 않음
-    } else {
-      // 대상 프로젝트의 포커스 상태만 변경 (superfocused에서 내려오는 경우 포함)
-      projectsToUpdateInDB.push({ ...targetProject, focused: newFocusStatus });
-    }
-
-    // 2. 다른 프로젝트들의 잠금 상태 조정
-    const isLiftingSuperfocus =
-      targetProject.focused === "superfocused" &&
-      newFocusStatus !== "superfocused";
-
-    allCurrentProjects.forEach((p) => {
-      if (p.id === projectIdToFocus) return; // 대상 프로젝트는 이미 처리
-
-      let shouldBeLocked = p.isLocked; // 현재 잠금 상태 유지 시도
-      const problemOfThisProject = allCurrentProblems.find(
-        (prob) => prob.id === p.problemId
-      );
-      const isProblemTerminal = problemOfThisProject
-        ? !problemOfThisProject.childProblemIds ||
-          problemOfThisProject.childProblemIds.length === 0
-        : false;
-
-      if (newFocusStatus === "superfocused") {
-        // 새 superfocus 설정 시
-        // 다른 모든 프로젝트는 잠금 (단, isLocked 데이터 필드를 직접 변경)
-        if (!p.isLocked) {
-          // 이미 다른 이유로 잠겨있지 않은 경우에만
-          shouldBeLocked = true;
-        }
-      } else if (isLiftingSuperfocus) {
-        // 기존 superfocus 해제 시
-        // 종점 문제의 프로젝트이고, (구조적으로 잠겨있지 않다면) 잠금 해제
-        if (isProblemTerminal) {
-          shouldBeLocked = false;
-        }
-        // 구조적으로 잠겨야 하는 프로젝트는 isProblemTerminal이 false이므로, shouldBeLocked가 p.isLocked로 유지됨
-      }
-
-      if (shouldBeLocked !== p.isLocked) {
-        // 상태 변경이 필요한 경우에만 추가
-        // projectsToUpdateInDB에 이미 있는지 확인하고 추가/병합
-        const existingUpdate = projectsToUpdateInDB.find(
-          (upd) => upd.id === p.id
-        );
-        if (existingUpdate) {
-          existingUpdate.isLocked = shouldBeLocked;
-        } else {
-          projectsToUpdateInDB.push({ ...p, isLocked: shouldBeLocked });
-        }
-      }
-    });
-
-    // DB 업데이트 및 상태 반영
-    try {
-      set({ isLoadingProjects: true });
-      const db = await getDatabase();
-      // SQLite는 batch update를 직접 지원하지 않으므로, 개별적으로 업데이트
-      for (const projectToSave of projectsToUpdateInDB) {
-        await db.runAsync(
-          `UPDATE Projects SET focused = ?, isLocked = ? WHERE id = ?;`,
-          [
-            projectToSave.focused,
-            projectToSave.isLocked ? 1 : 0,
-            projectToSave.id,
-          ]
-        );
-      }
-
-      // 로컬 상태 일괄 업데이트
-      let finalProjects = [...allCurrentProjects];
-      projectsToUpdateInDB.forEach((updatedData) => {
-        finalProjects = finalProjects.map((p) =>
-          p.id === updatedData.id ? { ...p, ...updatedData } : p
-        );
-      });
-      finalProjects.sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-      );
-      set({ projects: finalProjects, isLoadingProjects: false });
-
-      console.log(
-        `[ProjectSlice] Focus status set for ${projectIdToFocus} to ${newFocusStatus}. Other projects adjusted.`
-      );
-    } catch (error) {
-      console.error("[ProjectSlice] Error setting project focus:", error);
-      set({ isLoadingProjects: false });
-    }
-  },
+  // setProjectLockStatusByFeature, updateProjectTimeSpent 등 특수 목적 함수는 제거.
+  // 이러한 변경은 updateProject를 통해 처리됩니다.
 });

@@ -1,9 +1,14 @@
-import { getDatabase } from "@/lib/db";
-import { Project, Task, TaskStatus } from "@/types";
-import type { AppState } from "@/types/storeTypes"; // 통합 AppState 타입
-import "react-native-get-random-values";
-import { v4 as uuidv4 } from "uuid";
+// store/slices/taskSlice.ts
+
 import { StateCreator } from "zustand";
+import { Task, Project, TaskStatus } from "@/types";
+import type {
+  AppState,
+  TaskSlice as TaskSliceInterface,
+} from "@/types/storeTypes";
+import { getDatabase } from "@/lib/db";
+import { v4 as uuidv4 } from "uuid";
+import "react-native-get-random-values";
 
 // Task 관련 파서 함수
 const parseTaskFromDB = (dbItem: any): Task => ({
@@ -14,31 +19,17 @@ const parseTaskFromDB = (dbItem: any): Task => ({
   isRepeatable: !!dbItem.isRepeatable, // INTEGER (0 or 1) to boolean
   status: dbItem.status as TaskStatus,
   isLocked: !!dbItem.isLocked, // INTEGER (0 or 1) to boolean
+  timeSpent: dbItem.timeSpent || 0,
   createdAt: new Date(dbItem.createdAt),
   completedAt: dbItem.completedAt ? new Date(dbItem.completedAt) : undefined,
 });
 
-export interface TaskSlice {
-  tasks: Task[];
-  isLoadingTasks: boolean;
-  fetchTasks: (projectId?: string) => Promise<void>; // 특정 프로젝트의 Task 또는 전체 Task
-  addTask: (
-    taskData: Omit<Task, "id" | "createdAt" | "status" | "isLocked"> & {
-      status?: TaskStatus;
-      isLocked?: boolean;
-    } // projectId는 Omit에 의해 포함됨
-  ) => Promise<Task | null>;
-  updateTask: (
-    updatedTaskData: Partial<Task> & { id: string }
-  ) => Promise<Task | null>;
-  deleteTask: (taskId: string) => Promise<boolean>;
-  getTaskById: (id: string) => Task | undefined;
-}
-
-export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
-  set,
-  get
-) => ({
+export const createTaskSlice: StateCreator<
+  AppState,
+  [],
+  [],
+  TaskSliceInterface
+> = (set, get) => ({
   tasks: [],
   isLoadingTasks: false,
 
@@ -46,28 +37,29 @@ export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
     set({ isLoadingTasks: true });
     try {
       const db = await getDatabase();
-      let results;
+      let query = "SELECT * FROM Tasks";
+      const params: string[] = [];
+
       if (projectId) {
-        results = await db.getAllAsync<any>(
-          "SELECT * FROM Tasks WHERE projectId = ? ORDER BY createdAt ASC;",
-          [projectId]
-        );
-      } else {
-        results = await db.getAllAsync<any>(
-          "SELECT * FROM Tasks ORDER BY createdAt ASC;"
-        );
+        query += " WHERE projectId = ?";
+        params.push(projectId);
       }
+      query += " ORDER BY createdAt ASC;"; // Tasks often viewed in creation order
+
+      const results = await db.getAllAsync<any>(query, params);
       const fetchedTasks = results.map(parseTaskFromDB);
 
       if (projectId) {
+        // Replace tasks for the specific project, keep others
         set((state) => ({
           tasks: [
-            ...state.tasks.filter((t) => t.projectId !== projectId), // 해당 프로젝트의 기존 Task 제거
-            ...fetchedTasks, // 새로 가져온 Task 추가
-          ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()), // 생성일 오름차순 정렬
+            ...state.tasks.filter((t) => t.projectId !== projectId),
+            ...fetchedTasks,
+          ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
           isLoadingTasks: false,
         }));
       } else {
+        // Replace all tasks if no specific project ID
         set({
           tasks: fetchedTasks.sort(
             (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
@@ -82,29 +74,34 @@ export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
         fetchedTasks.length
       );
     } catch (error) {
-      console.error("[TaskSlice] Error fetching tasks:", error);
+      console.error("[TaskSlice] Error fetching Tasks:", error);
       set({ isLoadingTasks: false });
     }
   },
 
   addTask: async (taskData) => {
+    // taskData structure from storeTypes.ts:
+    // Omit<Task, "id" | "createdAt" | "status" | "isLocked" | "timeSpent" | "completedAt">
+    // & { projectId: string; status?: TaskStatus; isLocked?: boolean; timeSpent?: number; }
+    const newTaskId = uuidv4();
     const newTask: Task = {
-      id: uuidv4(),
-      projectId: taskData.projectId, // taskData에 projectId가 반드시 포함되어야 함
+      id: newTaskId,
+      projectId: taskData.projectId,
       title: taskData.title,
       description: taskData.description,
       isRepeatable: taskData.isRepeatable,
-      status: taskData.status || "todo", // 기본 상태 'todo'
-      isLocked: taskData.isLocked || false, // 기본 잠금 상태 false
+      status: taskData.status || "todo", // Default status
+      isLocked: taskData.isLocked || false, // Default lock status
+      timeSpent: taskData.timeSpent || 0, // Default timeSpent
       createdAt: new Date(),
-      completedAt: taskData.completedAt,
+      completedAt: undefined, // Not completed on creation
     };
 
     const db = await getDatabase();
     try {
       await db.runAsync(
-        `INSERT INTO Tasks (id, projectId, title, description, isRepeatable, status, isLocked, createdAt, completedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO Tasks (id, projectId, title, description, isRepeatable, status, isLocked, timeSpent, createdAt, completedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newTask.id,
           newTask.projectId,
@@ -113,29 +110,30 @@ export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
           newTask.isRepeatable ? 1 : 0,
           newTask.status,
           newTask.isLocked ? 1 : 0,
+          newTask.timeSpent,
           newTask.createdAt.toISOString(),
           newTask.completedAt ? newTask.completedAt.toISOString() : null,
         ]
       );
-      console.log("[TaskSlice] New task inserted into DB:", newTask.title);
+      console.log("[TaskSlice] New Task inserted into DB:", newTask.title);
 
-      // 연결된 Project의 taskIds 업데이트
+      // Update parent Project's taskIds array
       const parentProject = get().projects.find(
         (p) => p.id === newTask.projectId
       );
       if (parentProject) {
         const updatedParentProject: Project = {
           ...parentProject,
-          taskIds: [...parentProject.taskIds, newTask.id],
+          taskIds: [...parentProject.taskIds, newTask.id].sort(), // Keep taskIds sorted if desired, or just append
         };
-        // ProjectSlice의 updateProject 액션 호출 (AppState를 통해)
+        // Assuming projectSlice.updateProject handles DB update for project
         await get().updateProject(updatedParentProject);
         console.log(
-          `[TaskSlice] Parent project ${parentProject.id} taskIds updated.`
+          `[TaskSlice] Parent project ${parentProject.id} taskIds updated for new task.`
         );
       } else {
         console.warn(
-          `[TaskSlice] Parent project with ID ${newTask.projectId} not found in local store for task linkage.`
+          `[TaskSlice] Parent project with ID ${newTask.projectId} not found for Task linkage.`
         );
       }
 
@@ -147,79 +145,79 @@ export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
       console.log("[TaskSlice] Task added to store:", newTask.title);
       return newTask;
     } catch (error) {
-      console.error("[TaskSlice] Error adding task:", error);
+      console.error("[TaskSlice] Error adding Task:", error);
       return null;
     }
   },
 
-  updateTask: async (updatedTaskData) => {
+  updateTask: async (taskToUpdate) => {
     const currentTasks = get().tasks;
-    const taskIndex = currentTasks.findIndex(
-      (t) => t.id === updatedTaskData.id
-    );
+    const taskIndex = currentTasks.findIndex((t) => t.id === taskToUpdate.id);
+
     if (taskIndex === -1) {
-      console.error(
-        "[TaskSlice] Task not found for update:",
-        updatedTaskData.id
-      );
+      console.error("[TaskSlice] Task not found for update:", taskToUpdate.id);
       return null;
     }
 
-    const taskToUpdate: Task = {
-      ...currentTasks[taskIndex],
-      ...updatedTaskData,
+    // Ensure `createdAt` is not modified from original, and `completedAt` is handled
+    const originalTask = currentTasks[taskIndex];
+    const finalTaskToUpdate: Task = {
+      ...originalTask, // Preserve original creation timestamp and other potentially non-updated fields
+      ...taskToUpdate, // Apply incoming changes
+      createdAt: originalTask.createdAt, // Explicitly keep original createdAt
+      completedAt:
+        taskToUpdate.status === "completed" && !originalTask.completedAt
+          ? new Date() // Set completedAt if task is marked completed now and wasn't before
+          : taskToUpdate.status !== "completed" && originalTask.completedAt
+          ? undefined // Clear completedAt if task is moved from completed to non-completed
+          : taskToUpdate.completedAt, // Otherwise, respect incoming completedAt (or keep original if taskToUpdate.completedAt is undefined)
     };
 
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE Tasks SET title = ?, description = ?, isRepeatable = ?, status = ?, isLocked = ?, completedAt = ?
+        `UPDATE Tasks SET title = ?, description = ?, isRepeatable = ?, status = ?, 
+         isLocked = ?, timeSpent = ?, completedAt = ?
          WHERE id = ?;`,
         [
-          taskToUpdate.title,
-          taskToUpdate.description === undefined
+          finalTaskToUpdate.title,
+          finalTaskToUpdate.description === undefined
             ? null
-            : taskToUpdate.description,
-          taskToUpdate.isRepeatable ? 1 : 0,
-          taskToUpdate.status,
-          taskToUpdate.isLocked ? 1 : 0,
-          taskToUpdate.completedAt
-            ? taskToUpdate.completedAt.toISOString()
+            : finalTaskToUpdate.description,
+          finalTaskToUpdate.isRepeatable ? 1 : 0,
+          finalTaskToUpdate.status,
+          finalTaskToUpdate.isLocked ? 1 : 0,
+          finalTaskToUpdate.timeSpent,
+          finalTaskToUpdate.completedAt
+            ? finalTaskToUpdate.completedAt.toISOString()
             : null,
-          taskToUpdate.id,
+          finalTaskToUpdate.id,
         ]
       );
 
       const updatedTasks = currentTasks.map((t) =>
-        t.id === taskToUpdate.id ? taskToUpdate : t
+        t.id === finalTaskToUpdate.id ? finalTaskToUpdate : t
       );
       updatedTasks.sort(
         (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
       );
       set({ tasks: updatedTasks });
-      console.log("[TaskSlice] Task updated:", taskToUpdate.title);
-      return taskToUpdate;
+      console.log("[TaskSlice] Task updated:", finalTaskToUpdate.title);
+      return finalTaskToUpdate;
     } catch (error) {
-      console.error("[TaskSlice] Error updating task:", error);
+      console.error("[TaskSlice] Error updating Task:", error);
       return null;
     }
   },
 
   deleteTask: async (taskId) => {
     const taskToDelete = get().tasks.find((t) => t.id === taskId);
-    if (!taskToDelete) {
-      console.warn(
-        `[TaskSlice] Task with ID ${taskId} not found in local store for deletion.`
-      );
-      // DB에서만 삭제 시도 가능
-    }
 
     const db = await getDatabase();
     try {
       await db.runAsync(`DELETE FROM Tasks WHERE id = ?;`, [taskId]);
       console.log("[TaskSlice] Task deleted from DB:", taskId);
 
-      // 연결된 Project의 taskIds 업데이트
       if (taskToDelete) {
         const parentProject = get().projects.find(
           (p) => p.id === taskToDelete.projectId
@@ -231,7 +229,7 @@ export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
           };
           await get().updateProject(updatedParentProject);
           console.log(
-            `[TaskSlice] Parent project ${parentProject.id} taskIds updated after task deletion.`
+            `[TaskSlice] Parent project ${parentProject.id} taskIds updated after Task deletion.`
           );
         }
       }
@@ -239,12 +237,12 @@ export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (
       set((state) => ({
         tasks: state.tasks
           .filter((t) => t.id !== taskId)
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()), // Keep sorted
       }));
       console.log("[TaskSlice] Task removed from store:", taskId);
       return true;
     } catch (error) {
-      console.error("[TaskSlice] Error deleting task:", error);
+      console.error("[TaskSlice] Error deleting Task:", error);
       return false;
     }
   },
