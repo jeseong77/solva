@@ -1,176 +1,209 @@
-import { StateCreator } from 'zustand';
-import { Rule, Project } from '@/types';
-import type { AppState } from '@/types/storeTypes'; // 통합 AppState 타입
-import { getDatabase } from '@/lib/db';
-import { v4 as uuidv4 } from 'uuid';
-import 'react-native-get-random-values';
+// src/lib/ruleSlice.ts
 
-// Rule 관련 파서 함수
+import { StateCreator } from "zustand";
+import { Rule, Problem } from "@/types";
+import type {
+  AppState,
+  RuleSlice as RuleSliceInterface,
+} from "@/types/storeTypes";
+import { getDatabase } from "@/lib/db";
+import { v4 as uuidv4 } from "uuid";
+import "react-native-get-random-values";
+
+// Helper to parse Rule from DB record
 const parseRuleFromDB = (dbItem: any): Rule => ({
   id: dbItem.id,
-  projectId: dbItem.projectId,
+  problemId: dbItem.problemId,
   title: dbItem.title,
-  isLocked: !!dbItem.isLocked, // INTEGER (0 or 1) to boolean
   createdAt: new Date(dbItem.createdAt),
-  // description 필드는 현재 Rule 타입에 없으므로 파싱에서 제외
 });
 
-export interface RuleSlice {
-  rules: Rule[];
-  isLoadingRules: boolean;
-  fetchRules: (projectId: string) => Promise<void>;
-  addRule: (
-    ruleData: Omit<Rule, "id" | "createdAt" | "isLocked"> & // projectId와 title이 Omit에 의해 포함됨
-              { projectId: string; isLocked?: boolean; }
-  ) => Promise<Rule | null>;
-  updateRule: (ruleToUpdate: Rule) => Promise<Rule | null>; // Rule이 단순하므로 전체 객체 전달
-  deleteRule: (ruleId: string) => Promise<boolean>;
-  getRuleById: (id: string) => Rule | undefined;
-  // 추후 Rule 달성/준수 여부 기록 액션 추가 가능
-}
-
-export const createRuleSlice: StateCreator<AppState, [], [], RuleSlice> = (set, get) => ({
+export const createRuleSlice: StateCreator<
+  AppState,
+  [],
+  [],
+  RuleSliceInterface
+> = (set, get) => ({
   rules: [],
   isLoadingRules: false,
 
-  fetchRules: async (projectId: string) => {
+  fetchRules: async (problemId: string) => {
     set({ isLoadingRules: true });
     try {
       const db = await getDatabase();
-      const results = await db.getAllAsync<any>(
-        "SELECT * FROM Rules WHERE projectId = ? ORDER BY createdAt ASC;",
-        [projectId]
-      );
+      const query =
+        "SELECT * FROM Rules WHERE problemId = ? ORDER BY createdAt ASC;";
+      const results = await db.getAllAsync<any>(query, [problemId]);
       const fetchedRules = results.map(parseRuleFromDB);
-      // 특정 projectId의 Rule들만 교체하고, 나머지는 유지 후 정렬
-      set(state => ({
-        rules: [
-          ...state.rules.filter(r => r.projectId !== projectId),
-          ...fetchedRules
-        ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
-        isLoadingRules: false
-      }));
-      console.log(`[RuleSlice] Rules fetched for project ${projectId}:`, fetchedRules.length);
+      // Sets the rules state to only the rules for the fetched problemId
+      set({ rules: fetchedRules, isLoadingRules: false });
+      // console.log(`[RuleSlice] Rules fetched for problem ${problemId}:`, fetchedRules.length);
     } catch (error) {
-      console.error("[RuleSlice] Error fetching Rules:", error);
+      console.error(
+        `[RuleSlice] Error fetching rules for problem ${problemId}:`,
+        error
+      );
       set({ isLoadingRules: false });
     }
   },
 
+  // ruleData: Omit<Rule, "id" | "createdAt">
+  // Expected to contain: problemId, title
   addRule: async (ruleData) => {
     const newRule: Rule = {
       id: uuidv4(),
-      projectId: ruleData.projectId,
+      problemId: ruleData.problemId,
       title: ruleData.title,
-      isLocked: ruleData.isLocked || false, // 기본값 false
       createdAt: new Date(),
     };
 
     const db = await getDatabase();
     try {
       await db.runAsync(
-        `INSERT INTO Rules (id, projectId, title, isLocked, createdAt)
-         VALUES (?, ?, ?, ?, ?);`,
+        `INSERT INTO Rules (id, problemId, title, createdAt)
+         VALUES (?, ?, ?, ?);`,
         [
           newRule.id,
-          newRule.projectId,
+          newRule.problemId,
           newRule.title,
-          newRule.isLocked ? 1 : 0,
           newRule.createdAt.toISOString(),
         ]
       );
-      console.log("[RuleSlice] New Rule inserted into DB:", newRule.title);
 
-      // 연결된 Project의 ruleIds 업데이트
-      const parentProject = get().projects.find(p => p.id === newRule.projectId);
-      if (parentProject) {
-        const updatedParentProject: Project = {
-          ...parentProject,
-          ruleIds: [...parentProject.ruleIds, newRule.id],
+      // Update parent Problem's ruleIds
+      const parentProblem = get().problems.find(
+        (p) => p.id === newRule.problemId
+      );
+      if (parentProblem) {
+        const updatedParentProblem: Problem = {
+          ...parentProblem,
+          ruleIds: [...(parentProblem.ruleIds || []), newRule.id],
         };
-        await get().updateProject(updatedParentProject); // ProjectSlice의 액션 호출
-        console.log(`[RuleSlice] Parent project ${parentProject.id} ruleIds updated for new rule.`);
+        await get().updateProblem(updatedParentProblem); // Assumes updateProblem in ProblemSlice handles DB and state
       } else {
-        console.warn(`[RuleSlice] Parent project with ID ${newRule.projectId} not found for Rule linkage.`);
+        console.warn(
+          `[RuleSlice] Parent problem with ID ${newRule.problemId} not found in local state during addRule.`
+        );
       }
-      
-      const currentRules = get().rules;
-      const newRuleList = [...currentRules, newRule].sort((a,b) => a.createdAt.getTime() - b.createdAt.getTime());
-      set({ rules: newRuleList });
-      console.log("[RuleSlice] Rule added to store:", newRule.title);
+
+      // Add to local state and sort
+      const updatedRules = [...get().rules, newRule].sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+      set({ rules: updatedRules });
+      console.log("[RuleSlice] Rule added:", newRule.title);
       return newRule;
     } catch (error) {
-      console.error("[RuleSlice] Error adding Rule:", error);
+      console.error("[RuleSlice] Error adding rule:", error);
       return null;
     }
   },
 
   updateRule: async (ruleToUpdate) => {
     const currentRules = get().rules;
-    const itemIndex = currentRules.findIndex(r => r.id === ruleToUpdate.id);
-    if (itemIndex === -1) {
+    const ruleIndex = currentRules.findIndex((r) => r.id === ruleToUpdate.id);
+    if (ruleIndex === -1) {
       console.error("[RuleSlice] Rule not found for update:", ruleToUpdate.id);
       return null;
     }
-    // DB에 저장하기 전, 타입에 맞게 변환 (전달된 ruleToUpdate가 이미 완전한 객체라고 가정)
-    const finalRuleToUpdate = { ...currentRules[itemIndex], ...ruleToUpdate };
+    const oldRule = currentRules[ruleIndex];
 
+    const db = await getDatabase();
     try {
-      const db = await getDatabase();
+      // Handle problemId change and update relevant Problem ruleIds
+      if (oldRule.problemId !== ruleToUpdate.problemId) {
+        // Remove from old parent Problem
+        const oldParentProblem = get().problems.find(
+          (p) => p.id === oldRule.problemId
+        );
+        if (oldParentProblem) {
+          const updatedOldParent: Problem = {
+            ...oldParentProblem,
+            ruleIds: (oldParentProblem.ruleIds || []).filter(
+              (id) => id !== ruleToUpdate.id
+            ),
+          };
+          await get().updateProblem(updatedOldParent);
+        }
+
+        // Add to new parent Problem
+        const newParentProblem = get().problems.find(
+          (p) => p.id === ruleToUpdate.problemId
+        );
+        if (newParentProblem) {
+          const updatedNewParent: Problem = {
+            ...newParentProblem,
+            ruleIds: [...(newParentProblem.ruleIds || []), ruleToUpdate.id],
+          };
+          await get().updateProblem(updatedNewParent);
+        }
+      }
+
       await db.runAsync(
-        `UPDATE Rules SET title = ?, isLocked = ?
-         WHERE id = ?;`, // projectId, createdAt은 보통 업데이트하지 않음
-        [
-          finalRuleToUpdate.title,
-          finalRuleToUpdate.isLocked ? 1 : 0,
-          finalRuleToUpdate.id,
-        ]
+        `UPDATE Rules SET title = ?, problemId = ?
+         WHERE id = ?;`,
+        [ruleToUpdate.title, ruleToUpdate.problemId, ruleToUpdate.id]
       );
 
-      const updatedRules = currentRules.map(r => r.id === finalRuleToUpdate.id ? finalRuleToUpdate : r);
-      updatedRules.sort((a,b) => a.createdAt.getTime() - b.createdAt.getTime());
+      const updatedRules = currentRules
+        .map((r) => (r.id === ruleToUpdate.id ? ruleToUpdate : r))
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       set({ rules: updatedRules });
-      console.log("[RuleSlice] Rule updated:", finalRuleToUpdate.title);
-      return finalRuleToUpdate;
+      console.log("[RuleSlice] Rule updated:", ruleToUpdate.title);
+      return ruleToUpdate;
     } catch (error) {
-      console.error("[RuleSlice] Error updating Rule:", error);
+      console.error("[RuleSlice] Error updating rule:", error);
       return null;
     }
   },
 
   deleteRule: async (ruleId) => {
-    const ruleToDelete = get().rules.find(r => r.id === ruleId);
-    
+    const ruleToDelete = get().rules.find((r) => r.id === ruleId);
+    if (!ruleToDelete) {
+      console.error("[RuleSlice] Rule not found for deletion:", ruleId);
+      return false;
+    }
+
     const db = await getDatabase();
     try {
-      await db.runAsync(`DELETE FROM Rules WHERE id = ?;`, [ruleId]);
-      console.log("[RuleSlice] Rule deleted from DB:", ruleId);
-
-      if (ruleToDelete) {
-        const parentProject = get().projects.find(p => p.id === ruleToDelete.projectId);
-        if (parentProject) {
-          const updatedParentProject: Project = {
-            ...parentProject,
-            ruleIds: parentProject.ruleIds.filter(id => id !== ruleId),
-          };
-          await get().updateProject(updatedParentProject);
-          console.log(`[RuleSlice] Parent project ${parentProject.id} ruleIds updated after Rule deletion.`);
-        }
+      // Update parent Problem's ruleIds
+      const parentProblem = get().problems.find(
+        (p) => p.id === ruleToDelete.problemId
+      );
+      if (parentProblem) {
+        const updatedParentProblem: Problem = {
+          ...parentProblem,
+          ruleIds: (parentProblem.ruleIds || []).filter((id) => id !== ruleId),
+        };
+        await get().updateProblem(updatedParentProblem);
+      } else {
+        console.warn(
+          `[RuleSlice] Parent problem with ID ${ruleToDelete.problemId} not found in local state during deleteRule.`
+        );
       }
-      
-      set(state => ({
-        rules: state.rules.filter(r => r.id !== ruleId)
-            .sort((a,b) => a.createdAt.getTime() - b.createdAt.getTime())
-      }));
-      console.log("[RuleSlice] Rule removed from store:", ruleId);
+
+      await db.runAsync(`DELETE FROM Rules WHERE id = ?;`, [ruleId]);
+
+      const updatedRules = get()
+        .rules.filter((r) => r.id !== ruleId)
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      set({ rules: updatedRules });
+      console.log("[RuleSlice] Rule deleted:", ruleId);
       return true;
     } catch (error) {
-      console.error("[RuleSlice] Error deleting Rule:", error);
+      console.error("[RuleSlice] Error deleting rule:", error);
       return false;
     }
   },
 
   getRuleById: (id: string) => {
-    return get().rules.find(r => r.id === id);
+    return get().rules.find((r) => r.id === id);
   },
 });

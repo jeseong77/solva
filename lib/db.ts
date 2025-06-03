@@ -1,5 +1,5 @@
 // src/lib/db.ts
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from "expo-sqlite";
 
 const DATABASE_NAME = "Solva.db";
 let _dbInstance: SQLite.SQLiteDatabase | null = null;
@@ -19,82 +19,75 @@ const initDatabase = async () => {
     await db.execAsync("PRAGMA foreign_keys = ON;");
 
     await db.execAsync(`
-      CREATE TABLE IF NOT EXISTS Objectives (
+      CREATE TABLE IF NOT EXISTS Problems (
         id TEXT PRIMARY KEY NOT NULL,
         title TEXT NOT NULL,
         description TEXT,
-        isBottleneck INTEGER NOT NULL DEFAULT 0,
-        bottleneckAnalysis TEXT,
-        parentId TEXT,
-        childObjectiveIds TEXT NOT NULL DEFAULT '[]',
-        status TEXT NOT NULL,
-        deadline TEXT,
-        isFeatured INTEGER NOT NULL DEFAULT 0,
-        fulfillingProjectId TEXT,
+        status TEXT NOT NULL, -- e.g., "active", "onHold", "resolved", "archived"
+        priority TEXT NOT NULL, -- e.g., "high", "medium", "low"
+        resolutionCriteriaText TEXT,
+        resolutionNumericalTarget INTEGER,
+        currentNumericalProgress INTEGER DEFAULT 0,
+        objectiveIds TEXT NOT NULL DEFAULT '[]', -- JSON string array
+        ruleIds TEXT NOT NULL DEFAULT '[]', -- JSON string array
+        tagIds TEXT DEFAULT '[]', -- JSON string array
         timeSpent INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        completedAt TEXT,
-        "order" INTEGER, -- 여기가 수정된 부분입니다.
-        FOREIGN KEY (parentId) REFERENCES Objectives(id) ON DELETE CASCADE,
-        FOREIGN KEY (fulfillingProjectId) REFERENCES Projects(id) ON DELETE SET NULL
+        createdAt TEXT NOT NULL, -- ISO8601 datetime string
+        resolvedAt TEXT, -- ISO8601 datetime string
+        archivedAt TEXT, -- ISO8601 datetime string
+        starReportId TEXT UNIQUE, -- Optional link to a specific StarReport
+        FOREIGN KEY (starReportId) REFERENCES StarReports(id) ON DELETE SET NULL
       );
 
-      CREATE TABLE IF NOT EXISTS Projects (
+      CREATE TABLE IF NOT EXISTS Objectives (
         id TEXT PRIMARY KEY NOT NULL,
-        objectiveId TEXT NOT NULL,
+        problemId TEXT NOT NULL, -- Foreign key to Problems table
         title TEXT NOT NULL,
-        completionCriteriaText TEXT,
-        numericalTarget INTEGER,
-        currentNumericalProgress INTEGER NOT NULL DEFAULT 0,
-        performanceScore INTEGER NOT NULL DEFAULT 50,
-        status TEXT NOT NULL,
-        isLocked INTEGER NOT NULL DEFAULT 0,
-        ruleIds TEXT NOT NULL DEFAULT '[]',
-        taskIds TEXT NOT NULL DEFAULT '[]',
+        description TEXT,
+        parentId TEXT, -- Self-referential for sub-objectives
+        childObjectiveIds TEXT NOT NULL DEFAULT '[]', -- JSON string array
+        blockingProblemIds TEXT NOT NULL DEFAULT '[]', -- JSON string array
+        status TEXT NOT NULL, -- e.g., "todo", "inProgress", "completed"
+        deadline TEXT, -- ISO8601 datetime string
         timeSpent INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        completedAt TEXT,
-        FOREIGN KEY (objectiveId) REFERENCES Objectives(id) ON DELETE CASCADE
+        createdAt TEXT NOT NULL, -- ISO8601 datetime string
+        completedAt TEXT, -- ISO8601 datetime string
+        "order" INTEGER,
+        FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE,
+        FOREIGN KEY (parentId) REFERENCES Objectives(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS Rules (
         id TEXT PRIMARY KEY NOT NULL,
-        projectId TEXT NOT NULL,
+        problemId TEXT NOT NULL, -- Foreign key to Problems table
         title TEXT NOT NULL,
-        isLocked INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        FOREIGN KEY (projectId) REFERENCES Projects(id) ON DELETE CASCADE
-      );
-
-      CREATE TABLE IF NOT EXISTS Tasks (
-        id TEXT PRIMARY KEY NOT NULL,
-        projectId TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT,
-        isRepeatable INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL,
-        isLocked INTEGER NOT NULL DEFAULT 0,
-        timeSpent INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,
-        completedAt TEXT,
-        FOREIGN KEY (projectId) REFERENCES Projects(id) ON DELETE CASCADE
+        createdAt TEXT NOT NULL, -- ISO8601 datetime string
+        FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS StarReports (
         id TEXT PRIMARY KEY NOT NULL,
-        objectiveId TEXT NOT NULL,
+        problemId TEXT NOT NULL, -- Foreign key to Problems table
         situation TEXT NOT NULL,
         task TEXT NOT NULL,
         action TEXT NOT NULL,
         result TEXT NOT NULL,
         learnings TEXT,
         timeSpent INTEGER,
-        createdAt TEXT NOT NULL,
-        FOREIGN KEY (objectiveId) REFERENCES Objectives(id) ON DELETE CASCADE
+        createdAt TEXT NOT NULL, -- ISO8601 datetime string
+        FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS Tags (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL UNIQUE,
+        color TEXT,
+        createdAt TEXT NOT NULL -- ISO8601 datetime string
       );
     `);
+    // Projects and Tasks tables are removed as per new types.
     console.log(
-      "[DB] Database tables (Objectives, Projects, Rules, Tasks, StarReports) initialized successfully or already exist."
+      "[DB] Database tables (Problems, Objectives, Rules, StarReports, Tags) initialized successfully or already exist."
     );
   } catch (error) {
     console.error("[DB] Error initializing database tables: ", error);

@@ -1,19 +1,19 @@
-// store/slices/starReportSlice.ts
+// src/lib/starReportSlice.ts
 
-import { StateCreator } from "zustand";
-import { StarReport } from "@/types"; // Assuming Objective type is not directly needed for updates here
+import { getDatabase } from "@/lib/db";
+import { Problem, StarReport } from "@/types";
 import type {
   AppState,
   StarReportSlice as StarReportSliceInterface,
 } from "@/types/storeTypes";
-import { getDatabase } from "@/lib/db";
-import { v4 as uuidv4 } from "uuid";
 import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+import { StateCreator } from "zustand";
 
-// StarReport 관련 파서 함수
+// Helper to parse StarReport from DB record
 const parseStarReportFromDB = (dbItem: any): StarReport => ({
   id: dbItem.id,
-  objectiveId: dbItem.objectiveId,
+  problemId: dbItem.problemId,
   situation: dbItem.situation,
   task: dbItem.task,
   action: dbItem.action,
@@ -32,59 +32,39 @@ export const createStarReportSlice: StateCreator<
   starReports: [],
   isLoadingStarReports: false,
 
-  fetchStarReports: async (objectiveId?: string) => {
+  fetchStarReports: async (problemId?: string) => {
     set({ isLoadingStarReports: true });
     try {
       const db = await getDatabase();
       let query = "SELECT * FROM StarReports";
       const params: string[] = [];
-
-      if (objectiveId) {
-        query += " WHERE objectiveId = ?";
-        params.push(objectiveId);
+      if (problemId) {
+        query += " WHERE problemId = ?";
+        params.push(problemId);
       }
-      query += " ORDER BY createdAt DESC;"; // Most recent reports first
+      query += " ORDER BY createdAt DESC;"; // Newest reports first
 
       const results = await db.getAllAsync<any>(query, params);
       const fetchedStarReports = results.map(parseStarReportFromDB);
-
-      if (objectiveId) {
-        // Replace reports for the specific objective, keep others
-        set((state) => ({
-          starReports: [
-            ...state.starReports.filter((sr) => sr.objectiveId !== objectiveId),
-            ...fetchedStarReports,
-          ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()), // Ensure overall sort
-          isLoadingStarReports: false,
-        }));
-      } else {
-        // Replace all reports if no specific objective ID
-        set({
-          starReports: fetchedStarReports.sort(
-            (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-          ),
-          isLoadingStarReports: false,
-        });
-      }
-      console.log(
-        `[StarReportSlice] StarReports fetched ${
-          objectiveId ? `for objective ${objectiveId}` : "(all)"
-        }:`,
-        fetchedStarReports.length
-      );
+      set({ starReports: fetchedStarReports, isLoadingStarReports: false });
     } catch (error) {
-      console.error("[StarReportSlice] Error fetching StarReports:", error);
+      console.error(
+        `[StarReportSlice] Error fetching star reports${
+          problemId ? ` for problem ${problemId}` : ""
+        }:`,
+        error
+      );
       set({ isLoadingStarReports: false });
     }
   },
 
+  // reportData: Omit<StarReport, "id" | "createdAt">
+  // Expected to contain: problemId, situation, task, action, result
+  // Optional: learnings, timeSpent
   addStarReport: async (reportData) => {
-    // reportData structure from storeTypes.ts:
-    // Omit<StarReport, "id" | "createdAt">
-    const newStarReportId = uuidv4();
     const newStarReport: StarReport = {
-      id: newStarReportId,
-      objectiveId: reportData.objectiveId,
+      id: uuidv4(),
+      problemId: reportData.problemId,
       situation: reportData.situation,
       task: reportData.task,
       action: reportData.action,
@@ -97,11 +77,11 @@ export const createStarReportSlice: StateCreator<
     const db = await getDatabase();
     try {
       await db.runAsync(
-        `INSERT INTO StarReports (id, objectiveId, situation, task, action, result, learnings, timeSpent, createdAt)
+        `INSERT INTO StarReports (id, problemId, situation, task, action, result, learnings, timeSpent, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newStarReport.id,
-          newStarReport.objectiveId,
+          newStarReport.problemId,
           newStarReport.situation,
           newStarReport.task,
           newStarReport.action,
@@ -115,23 +95,35 @@ export const createStarReportSlice: StateCreator<
           newStarReport.createdAt.toISOString(),
         ]
       );
-      console.log(
-        "[StarReportSlice] New StarReport inserted into DB for objective:",
-        newStarReport.objectiveId
-      );
 
-      const currentStarReports = get().starReports;
-      const newStarReportList = [...currentStarReports, newStarReport].sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      // Update parent Problem's starReportId
+      const parentProblem = get().problems.find(
+        (p) => p.id === newStarReport.problemId
       );
-      set({ starReports: newStarReportList });
+      if (parentProblem) {
+        const updatedParentProblem: Problem = {
+          ...parentProblem,
+          starReportId: newStarReport.id, // Link this new report
+        };
+        await get().updateProblem(updatedParentProblem); // Assumes updateProblem in ProblemSlice handles DB and state
+      } else {
+        console.warn(
+          `[StarReportSlice] Parent problem with ID ${newStarReport.problemId} not found in local state during addStarReport.`
+        );
+      }
+
+      const updatedStarReports = [...get().starReports, newStarReport].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ); // Keep sorted newest first
+      set({ starReports: updatedStarReports });
       console.log(
-        "[StarReportSlice] StarReport added to store for objective:",
-        newStarReport.objectiveId
+        "[StarReportSlice] StarReport added for problem:",
+        newStarReport.problemId
       );
       return newStarReport;
     } catch (error) {
-      console.error("[StarReportSlice] Error adding StarReport:", error);
+      console.error("[StarReportSlice] Error adding star report:", error);
       return null;
     }
   },
@@ -141,7 +133,6 @@ export const createStarReportSlice: StateCreator<
     const reportIndex = currentStarReports.findIndex(
       (sr) => sr.id === reportToUpdate.id
     );
-
     if (reportIndex === -1) {
       console.error(
         "[StarReportSlice] StarReport not found for update:",
@@ -149,71 +140,128 @@ export const createStarReportSlice: StateCreator<
       );
       return null;
     }
+    const oldStarReport = currentStarReports[reportIndex];
 
-    // Preserve original objectiveId and createdAt
-    const originalReport = currentStarReports[reportIndex];
-    const finalReportToUpdate: StarReport = {
-      ...originalReport, // Base with original immutable fields
-      ...reportToUpdate, // Apply incoming changes
-      objectiveId: originalReport.objectiveId, // Ensure objectiveId is not changed
-      createdAt: originalReport.createdAt, // Ensure createdAt is not changed
-    };
-
+    const db = await getDatabase();
     try {
-      const db = await getDatabase();
-      // objectiveId and createdAt are not updated.
+      // Handle problemId change and update relevant Problem.starReportId
+      if (oldStarReport.problemId !== reportToUpdate.problemId) {
+        // 1. Clear starReportId from old parent Problem if it was this report
+        const oldParentProblem = get().problems.find(
+          (p) => p.id === oldStarReport.problemId
+        );
+        if (
+          oldParentProblem &&
+          oldParentProblem.starReportId === reportToUpdate.id
+        ) {
+          const updatedOldParent: Problem = {
+            ...oldParentProblem,
+            starReportId: null,
+          };
+          await get().updateProblem(updatedOldParent);
+        }
+
+        // 2. Set starReportId on new parent Problem
+        const newParentProblem = get().problems.find(
+          (p) => p.id === reportToUpdate.problemId
+        );
+        if (newParentProblem) {
+          const updatedNewParent: Problem = {
+            ...newParentProblem,
+            starReportId: reportToUpdate.id,
+          };
+          await get().updateProblem(updatedNewParent);
+        }
+      } else {
+        // If problemId hasn't changed, ensure the parent problem's starReportId still points to this report
+        // This handles cases where it might have been null and now this updated report is being explicitly linked,
+        // or ensures the link remains if it was already set.
+        const parentProblem = get().problems.find(
+          (p) => p.id === reportToUpdate.problemId
+        );
+        if (parentProblem && parentProblem.starReportId !== reportToUpdate.id) {
+          // If this report is being made THE report for the problem
+          const updatedParentProblem: Problem = {
+            ...parentProblem,
+            starReportId: reportToUpdate.id,
+          };
+          await get().updateProblem(updatedParentProblem);
+        }
+      }
+
       await db.runAsync(
-        `UPDATE StarReports SET situation = ?, task = ?, action = ?, result = ?, 
-         learnings = ?, timeSpent = ?
+        `UPDATE StarReports SET problemId = ?, situation = ?, task = ?, action = ?, result = ?, learnings = ?, timeSpent = ?
          WHERE id = ?;`,
         [
-          finalReportToUpdate.situation,
-          finalReportToUpdate.task,
-          finalReportToUpdate.action,
-          finalReportToUpdate.result,
-          finalReportToUpdate.learnings === undefined
+          reportToUpdate.problemId,
+          reportToUpdate.situation,
+          reportToUpdate.task,
+          reportToUpdate.action,
+          reportToUpdate.result,
+          reportToUpdate.learnings === undefined
             ? null
-            : finalReportToUpdate.learnings,
-          finalReportToUpdate.timeSpent === undefined
+            : reportToUpdate.learnings,
+          reportToUpdate.timeSpent === undefined
             ? null
-            : finalReportToUpdate.timeSpent,
-          finalReportToUpdate.id,
+            : reportToUpdate.timeSpent,
+          reportToUpdate.id,
         ]
       );
 
-      const updatedStarReports = currentStarReports.map((sr) =>
-        sr.id === finalReportToUpdate.id ? finalReportToUpdate : sr
-      );
-      updatedStarReports.sort(
-        (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-      );
+      const updatedStarReports = currentStarReports
+        .map((sr) => (sr.id === reportToUpdate.id ? reportToUpdate : sr))
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       set({ starReports: updatedStarReports });
-      console.log(
-        "[StarReportSlice] StarReport updated:",
-        finalReportToUpdate.id
-      );
-      return finalReportToUpdate;
+      console.log("[StarReportSlice] StarReport updated:", reportToUpdate.id);
+      return reportToUpdate;
     } catch (error) {
-      console.error("[StarReportSlice] Error updating StarReport:", error);
+      console.error("[StarReportSlice] Error updating star report:", error);
       return null;
     }
   },
 
   deleteStarReport: async (reportId) => {
+    const reportToDelete = get().starReports.find((sr) => sr.id === reportId);
+    if (!reportToDelete) {
+      console.error(
+        "[StarReportSlice] StarReport not found for deletion:",
+        reportId
+      );
+      return false;
+    }
+
     const db = await getDatabase();
     try {
       await db.runAsync(`DELETE FROM StarReports WHERE id = ?;`, [reportId]);
-      console.log("[StarReportSlice] StarReport deleted from DB:", reportId);
 
-      set((state) => ({
-        starReports: state.starReports
-          .filter((sr) => sr.id !== reportId)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()), // Keep sorted
-      }));
-      console.log("[StarReportSlice] StarReport removed from store:", reportId);
+      // Update parent Problem's starReportId if it was linked to this report
+      // The DB FOREIGN KEY with ON DELETE SET NULL handles this on the DB side.
+      // This client-side update keeps the Zustand state consistent.
+      const parentProblem = get().problems.find(
+        (p) => p.id === reportToDelete.problemId
+      );
+      if (parentProblem && parentProblem.starReportId === reportId) {
+        const updatedParentProblem: Problem = {
+          ...parentProblem,
+          starReportId: null,
+        };
+        await get().updateProblem(updatedParentProblem);
+      }
+
+      const updatedStarReports = get()
+        .starReports.filter((sr) => sr.id !== reportId)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      set({ starReports: updatedStarReports });
+      console.log("[StarReportSlice] StarReport deleted:", reportId);
       return true;
     } catch (error) {
-      console.error("[StarReportSlice] Error deleting StarReport:", error);
+      console.error("[StarReportSlice] Error deleting star report:", error);
       return false;
     }
   },
@@ -222,13 +270,13 @@ export const createStarReportSlice: StateCreator<
     return get().starReports.find((sr) => sr.id === id);
   },
 
-  getStarReportByObjectiveId: (objectiveId: string) => {
-    // Assumes reports are sorted by createdAt DESC in the store,
-    // so find will return the most recent one for the objectiveId.
-    // If multiple reports per objective are stored and a specific one (not necessarily latest)
-    // is needed, or if order isn't guaranteed, this might need adjustment
-    // or the calling code might need to handle multiple results.
-    // Given the type signature returns StarReport | undefined, finding the first match is standard.
-    return get().starReports.find((sr) => sr.objectiveId === objectiveId);
+  getStarReportByProblemId: (problemId: string) => {
+    // This will return the first report found for the problemId, or the one linked via Problem.starReportId if desired.
+    // Given Problem.starReportId is a direct link, it might be better to fetch based on that if available.
+    // However, this implementation simply finds any report matching the problemId from the local list.
+    // If a problem is only meant to have one StarReport (the one in Problem.starReportId),
+    // this getter could be refined to look up the Problem and then its starReportId.
+    // For now, following the simple find pattern:
+    return get().starReports.find((sr) => sr.problemId === problemId);
   },
 });
