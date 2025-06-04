@@ -51,13 +51,6 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
-          <Stack.Screen
-            name="ProblemEditor.Screen" // 파일명 ProblemEditorScreen.tsx와 일치
-            options={{
-              title: "Problem Editor", // 헤더 제목 설정
-              headerShown: true, // 헤더를 보여줄지 여부
-            }}
-          />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
