@@ -11,7 +11,7 @@ export type ObjectiveStatus =
   | "onHold"
   | "cancelled";
 
-export type Priority = "high" | "medium" | "low";
+export type Priority = "high" | "medium" | "low" | "none";
 
 // --- 새로운 엔티티 타입: Tag ---
 /**

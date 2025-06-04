@@ -18,7 +18,7 @@ export type PriorityPickerModalProps = {
   currentPriority?: Priority;
 };
 
-const priorityOptions: Priority[] = ["high", "medium", "low"];
+const priorityOptions: Priority[] = ["high", "medium", "low", "none"];
 
 export default function PriorityPickerModal({
   visible,
@@ -27,7 +27,7 @@ export default function PriorityPickerModal({
   currentPriority,
 }: PriorityPickerModalProps) {
   const [selectedPriority, setSelectedPriority] = useState<Priority>(
-    currentPriority || "medium"
+    currentPriority || "none"
   );
 
   useEffect(() => {

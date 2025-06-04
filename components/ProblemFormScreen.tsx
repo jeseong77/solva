@@ -12,15 +12,16 @@ import React, {
 import {
   Alert,
   Button,
-  Platform,
+  Platform, // Corrected import from react-native
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  TextInput, // Corrected import from react-native
-  ScrollView, // Added ScrollView for potentially long forms
 } from "react-native";
 import PriorityPickerModal from "./PriorityPickerModal"; // Assuming this path is correct
+import RequirementInputModal from "./RequirementInputModal";
 
 export default function ProblemFormScreen() {
   const navigation = useNavigation();
@@ -36,7 +37,7 @@ export default function ProblemFormScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<ProblemStatus>("active");
-  const [priority, setPriority] = useState<Priority>("medium"); // Main priority state for the form
+  const [priority, setPriority] = useState<Priority>("none");
   const [resolutionCriteriaText, setResolutionCriteriaText] = useState<
     string | undefined
   >(undefined);
@@ -50,6 +51,9 @@ export default function ProblemFormScreen() {
 
   // State for PriorityPickerModal visibility
   const [isPriorityModalVisible, setIsPriorityModalVisible] = useState(false);
+  const [isRequirementModalVisible, setIsRequirementModalVisible] =
+    useState(false);
+  const [requirements, setRequirements] = useState<string[]>([]); // Or initialize from existingProblem.requirements if available
 
   useEffect(() => {
     if (isEditing && problemId) {
@@ -72,7 +76,7 @@ export default function ProblemFormScreen() {
       setTitle("");
       setDescription(undefined);
       setStatus("active");
-      setPriority("medium"); // Default for main priority state
+      setPriority("none");
       setResolutionCriteriaText(undefined);
       setResolutionNumericalTarget(undefined);
       setCurrentNumericalProgress(undefined);
@@ -105,7 +109,6 @@ export default function ProblemFormScreen() {
   }, [problemId, deleteProblemFromStore]);
 
   const handleSaveProblem = useCallback(async () => {
-    // ... (keep your existing handleSaveProblem logic, ensuring it uses the 'priority' state)
     if (!title.trim()) {
       Alert.alert("Validation Error", "Title cannot be empty.");
       return;
@@ -118,7 +121,7 @@ export default function ProblemFormScreen() {
           title: title.trim(),
           description: description?.trim() || undefined,
           status,
-          priority, // Use the main priority state here
+          priority,
           resolutionCriteriaText: resolutionCriteriaText?.trim() || undefined,
           resolutionNumericalTarget,
           currentNumericalProgress,
@@ -162,7 +165,7 @@ export default function ProblemFormScreen() {
     title,
     description,
     status,
-    priority, // Use main priority state
+    priority,
     resolutionCriteriaText,
     resolutionNumericalTarget,
     currentNumericalProgress,
@@ -180,6 +183,12 @@ export default function ProblemFormScreen() {
   // Function to open the priority modal
   const openPriorityModal = () => {
     setIsPriorityModalVisible(true);
+  };
+
+  const handleAddNewRequirement = (requirementText: string) => {
+    setRequirements((prev) => [...prev, requirementText]);
+    // This `requirements` state would then be saved as part of your Problem object
+    // (e.g., by adding a 'requirements: string[]' field to your Problem type and DB schema)
   };
 
   useLayoutEffect(() => {
@@ -240,17 +249,53 @@ export default function ProblemFormScreen() {
         textAlignVertical="top"
         placeholderTextColor="#999"
       />
-      <View>
-        
+      <View
+        style={{
+          backgroundColor: "#f0f0f0",
+          borderRadius: 8,
+          padding: 16,
+          gap: 16,
+        }}
+      >
+        <View style={{ flexDirection: "row" }}>
+          <Text style={{ flex: 1, fontSize: 12 }}>소요 시간: </Text>
+          <Text style={{ flex: 1, fontSize: 12 }}>4시간 21분</Text>
+        </View>
+        <View style={{ flexDirection: "row" }}>
+          <Text style={{ flex: 1, fontSize: 12 }}>중요도: </Text>
+          <TouchableOpacity
+            onPress={openPriorityModal}
+            style={[styles.priorityTouchable, { flex: 1 }]}
+          >
+            <Text style={styles.priorityValue}>{displayPriorityText}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <TouchableOpacity
-        onPress={openPriorityModal}
-        style={styles.priorityTouchable}
-      >
-        <Text style={styles.priorityLabel}>중요도: </Text>
-        <Text style={styles.priorityValue}>{displayPriorityText}</Text>
-      </TouchableOpacity>
+      <Text style={styles.titleInput}>Requirements</Text>
+      {requirements.map((req, index) => (
+        <View key={index} style={styles.requirementListItem}>
+          <Text>• {req}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setRequirements((prev) => prev.filter((_, i) => i !== index));
+            }}
+          >
+            <Text style={{ color: "red", marginLeft: 10 }}>Remove</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      <Button
+        title="Add Requirement"
+        onPress={() => setIsRequirementModalVisible(true)}
+      />
+
+      <RequirementInputModal
+        visible={isRequirementModalVisible}
+        onClose={() => setIsRequirementModalVisible(false)}
+        onAddRequirement={handleAddNewRequirement}
+      />
 
       <Button
         title={isEditing ? "Save Changes" : "Create Problem"}
@@ -260,8 +305,8 @@ export default function ProblemFormScreen() {
       <PriorityPickerModal
         visible={isPriorityModalVisible}
         onClose={() => setIsPriorityModalVisible(false)}
-        onPrioritySelect={handlePrioritySelected} // Connects to the updated handler
-        currentPriority={priority} // Uses the main priority state
+        onPrioritySelect={handlePrioritySelected}
+        currentPriority={priority}
       />
     </ScrollView>
   );
@@ -288,24 +333,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   priorityTouchable: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12, // Adjusted padding
-    backgroundColor: "#f7f7f7", // Slightly different background to distinguish
     borderRadius: 8,
-    borderWidth: 1,
     borderColor: "#e0e0e0",
-    marginBottom: 20, // Space before next section
   },
   priorityLabel: {
-    fontSize: 16,
-    color: "#555", // Darker gray for label
-    marginRight: 8,
+    fontSize: 12,
+    color: "#555",
   },
   priorityValue: {
-    fontSize: 16,
-    fontWeight: "600", // Semi-bold
+    fontSize: 12,
     color: "#007AFF",
   },
   questionText: {
@@ -316,10 +352,21 @@ const styles = StyleSheet.create({
   descriptionInput: {
     fontSize: 16,
     textAlignVertical: "top",
+    marginBottom: 16,
   },
   customHeaderLeftContainer: {
-    marginLeft: Platform.OS === "ios" ? 10 : 0,
+    marginLeft: Platform.OS === "ios" ? -10 : 0,
     paddingRight: 10,
     paddingVertical: 5,
+  },
+  requirementListItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    marginBottom: 4,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 6,
   },
 });
