@@ -15,7 +15,6 @@ const COLORS = {
   background: "#FFFFFF",
   sectionBackground: "#F5F5F5",
   cardBackground: "#EEEEEE",
-  // addCardBackground: '#E0E0E0', // 이전 추가 카드 배경색, 버튼에 맞게 조정 가능
   newProblemButtonBackground: "#E0E0E0", // 새 Problem 추가 버튼 배경색
   fabBackground: "#000000",
   textPrimary: "#000000",
