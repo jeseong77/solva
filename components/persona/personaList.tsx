@@ -1,3 +1,4 @@
+// src/components/PersonaList.tsx
 import React, { useEffect } from "react";
 import {
   View,
@@ -12,7 +13,6 @@ import { useShallow } from "zustand/react/shallow";
 import { Ionicons } from "@expo/vector-icons";
 import PersonaCard from "./personaCard";
 
-// 컴포넌트에 전달될 Props 타입 정의
 interface PersonaListProps {
   onPressPersona: (personaId: string) => void;
   onPressAddPersona: () => void;
@@ -22,7 +22,6 @@ export default function PersonaList({
   onPressPersona,
   onPressAddPersona,
 }: PersonaListProps) {
-  // 스토어에서 페르소나 목록, 로딩 상태, fetch 액션을 가져옵니다.
   const { personas, isLoadingPersonas, fetchPersonas } = useAppStore(
     useShallow((state) => ({
       personas: state.personas,
@@ -31,7 +30,6 @@ export default function PersonaList({
     }))
   );
 
-  // 컴포넌트가 마운트될 때 페르소나 목록을 가져옵니다.
   useEffect(() => {
     fetchPersonas();
   }, [fetchPersonas]);
@@ -39,15 +37,26 @@ export default function PersonaList({
   return (
     <View style={styles.container}>
       <ScrollView
-        horizontal={true} // 수평 스크롤 활성화
-        showsHorizontalScrollIndicator={false} // 스크롤바 숨김
+        horizontal={true}
+        showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContainer}
       >
+        <View style={styles.addCardContainer}>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={onPressAddPersona}
+          >
+            <Ionicons name="add" size={28} color="#007AFF" />
+          </TouchableOpacity>
+          <Text style={styles.addTitle} numberOfLines={1} ellipsizeMode="tail">
+            페르소나 추가
+          </Text>
+        </View>
+
         {isLoadingPersonas && personas.length === 0 && (
           <ActivityIndicator size="small" style={styles.loadingIndicator} />
         )}
 
-        {/* 스토어에서 가져온 personas 배열을 순회하며 PersonaCard 렌더링 */}
         {personas.map((persona) => (
           <TouchableOpacity
             key={persona.id}
@@ -56,16 +65,6 @@ export default function PersonaList({
             <PersonaCard personaId={persona.id} />
           </TouchableOpacity>
         ))}
-
-        {/* 페르소나 추가 버튼 */}
-        <TouchableOpacity
-          style={styles.addButtonContainer}
-          onPress={onPressAddPersona}
-        >
-          <View style={styles.addButton}>
-            <Ionicons name="add" size={32} color="#007AFF" />
-          </View>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -73,36 +72,37 @@ export default function PersonaList({
 
 const styles = StyleSheet.create({
   container: {
-    // 이 컴포넌트가 배치될 곳의 스타일에 따라 높이 등이 결정됩니다.
-    // 예: height: 100, paddingVertical: 10
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-    backgroundColor: "#f8f9fa",
+    borderBottomColor: "#eef0f2",
+    backgroundColor: "#ffffff",
   },
   scrollContainer: {
-    flexDirection: "row", // 항목들을 가로로 배열
-    alignItems: "center", // 세로 중앙 정렬
-    paddingHorizontal: 16, // 좌우 여백
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingHorizontal: 8,
   },
   loadingIndicator: {
     marginHorizontal: 10,
   },
-  addButtonContainer: {
-    justifyContent: "center",
+  addCardContainer: {
     alignItems: "center",
-    marginLeft: 8, // 마지막 페르소나 카드와의 간격
-    padding: 10, // 터치 영역 확보
+    width: 72,
   },
   addButton: {
-    width: 48, // PersonaCard의 아바타와 유사한 크기
-    height: 48,
-    borderRadius: 24, // 원형
-    backgroundColor: "#e9ecef", // 약간의 배경색
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#f0f2f5",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#dee2e6",
-    borderStyle: "dashed", // 점선 테두리
+    marginBottom: 6, // 제목과의 간격을 여기로 이동
+  },
+  addTitle: {
+    fontSize: 12,
+    color: "#555555",
+    textAlign: "center",
   },
 });

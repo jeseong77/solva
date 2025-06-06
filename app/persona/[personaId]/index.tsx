@@ -2,21 +2,23 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
   TextInput,
+  TouchableOpacity,
   SafeAreaView,
-  ActivityIndicator,
+  StyleSheet,
+  Alert,
   Platform,
+  ScrollView,
+  KeyboardAvoidingView,
+  Image,
+  ActivityIndicator,
 } from "react-native";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useAppStore } from "@/store/store";
 import { Persona } from "@/types";
 import { useShallow } from "zustand/react/shallow";
 import { Ionicons } from "@expo/vector-icons";
-// import * as ImagePicker from 'expo-image-picker'; // 이미지 선택 기능 구현 시 필요
+import { pickAndSaveImage } from "@/lib/imageUtils";
 
 const debounceTimeout = React.createRef<ReturnType<typeof setTimeout> | null>();
 
@@ -24,31 +26,36 @@ export default function PersonaDetailScreen() {
   const router = useRouter();
   const { personaId } = useLocalSearchParams<{ personaId: string }>();
 
-  const { getPersonaById, updatePersona } = useAppStore(
+  // deletePersona 액션을 스토어에서 가져옵니다.
+  const { getPersonaById, updatePersona, deletePersona } = useAppStore(
     useShallow((state) => ({
       getPersonaById: state.getPersonaById,
       updatePersona: state.updatePersona,
+      deletePersona: state.deletePersona, // 추가
     }))
   );
 
-  // 컴포넌트 상태
   const [persona, setPersona] = useState<Persona | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [personaGoals, setPersonaGoals] = useState("");
+  const [avatarImageUri, setAvatarImageUri] = useState<string | undefined>(
+    undefined
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const hasUnsavedChanges = useRef(false);
 
-  // 데이터 로딩
-  useEffect(() => {
+  const loadData = useCallback(() => {
+    // ... (loadData 로직은 이전과 동일) ...
     const personaData = getPersonaById(personaId);
     if (personaData) {
       setPersona(personaData);
       setTitle(personaData.title);
       setDescription(personaData.description || "");
       setPersonaGoals(personaData.personaGoals || "");
-    } else {
+      setAvatarImageUri(personaData.avatarImageUri);
+    } else if (!isLoading) {
       Alert.alert("오류", "페르소나 정보를 찾을 수 없습니다.");
       if (router.canGoBack()) router.back();
     }
@@ -56,42 +63,51 @@ export default function PersonaDetailScreen() {
     hasUnsavedChanges.current = false;
   }, [personaId, getPersonaById]);
 
-  // 자동 저장 로직
-  const autoSave = useCallback(async () => {
-    if (!hasUnsavedChanges.current || !persona) return;
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
+  const autoSave = useCallback(async () => {
+    // ... (autoSave 로직은 이전과 동일) ...
+    if (!hasUnsavedChanges.current || !persona) return;
     setIsSaving(true);
     hasUnsavedChanges.current = false;
-
     const updatedPersona: Persona = {
       ...persona,
       title: title.trim(),
       description: description.trim(),
       personaGoals: personaGoals.trim(),
+      avatarImageUri: avatarImageUri,
     };
-
     const result = await updatePersona(updatedPersona);
     if (result) {
-      console.log(`[PersonaEditor] Persona auto-updated: ${result.title}`);
+      setPersona(result);
     } else {
-      console.error("[PersonaEditor] Auto-update failed");
       hasUnsavedChanges.current = true;
     }
     setIsSaving(false);
-  }, [persona, title, description, personaGoals, updatePersona]);
+  }, [
+    persona,
+    title,
+    description,
+    personaGoals,
+    avatarImageUri,
+    updatePersona,
+  ]);
 
   useEffect(() => {
+    // ... (자동 저장 useEffect는 이전과 동일) ...
     if (isLoading || !hasUnsavedChanges.current) return;
-
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     debounceTimeout.current = setTimeout(() => {
       autoSave();
-    }, 1500); // 1.5초 디바운스
-
+    }, 1500);
     return () => {
       if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     };
-  }, [title, description, personaGoals, isLoading, autoSave]);
+  }, [title, description, personaGoals, avatarImageUri, isLoading, autoSave]);
 
   const createFieldChangeHandler =
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
@@ -102,28 +118,81 @@ export default function PersonaDetailScreen() {
   const handleTitleChange = createFieldChangeHandler(setTitle);
   const handleDescriptionChange = createFieldChangeHandler(setDescription);
   const handleGoalsChange = createFieldChangeHandler(setPersonaGoals);
-
-  // 이미지/아이콘 변경 핸들러 (추후 구현)
-  const handleAvatarPress = () => {
-    Alert.alert(
-      "프로필 사진 변경",
-      "이미지 또는 아이콘을 선택하는 기능은 준비 중입니다."
-    );
-    // ImagePicker.launchImageLibraryAsync(...) 로직 추가 가능
+  const handleAvatarPress = async () => {
+    /* ... (이전과 동일) ... */
+    const newImageUri = await pickAndSaveImage();
+    if (newImageUri) {
+      setAvatarImageUri(newImageUri);
+      hasUnsavedChanges.current = true;
+    }
   };
 
-  // 로딩 중 UI
+  // --- 삭제 로직 시작 ---
+  // "더보기" 메뉴 클릭 시 실행될 함수
+  const handleMoreOptions = () => {
+    Alert.alert(
+      "추가 작업",
+      "이 페르소나에 대해 어떤 작업을 하시겠습니까?",
+      [
+        {
+          text: "페르소나 삭제",
+          onPress: () => showDeleteConfirmation(), // 삭제 확인 Alert 호출
+          style: "destructive", // iOS에서 빨간색으로 표시
+        },
+        {
+          text: "취소",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // 삭제 최종 확인 Alert
+  const showDeleteConfirmation = () => {
+    if (!persona) return;
+    Alert.alert(
+      `"${persona.title}" 삭제`,
+      "이 페르소나와 연결된 모든 문제(Problem), 목표(Objective), 규칙(Rule) 등이 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          onPress: () => handleDeletePersona(), // 실제 삭제 함수 호출
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
+  // 실제 삭제 액션을 실행하는 함수
+  const handleDeletePersona = async () => {
+    if (!persona) return;
+    const success = await deletePersona(persona.id);
+    if (success) {
+      Alert.alert("성공", "페르소나가 삭제되었습니다.");
+      // 삭제 후 홈 화면 등으로 이동
+      router.replace("/(tabs)");
+    } else {
+      Alert.alert("오류", "페르소나 삭제에 실패했습니다.");
+    }
+  };
+  // --- 삭제 로직 끝 ---
+
   if (isLoading) {
+    // ... (로딩 UI는 이전과 동일) ...
     return (
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: "Loading..." }} />
-        <ActivityIndicator style={{ flex: 1 }} size="large" />
+        <View style={styles.centeredMessageContainer}>
+          <ActivityIndicator size="large" />
+        </View>
       </SafeAreaView>
     );
   }
 
-  // 페르소나 못 찾았을 때 UI
   if (!persona) {
+    // ... (페르소나 없음 UI는 이전과 동일) ...
     return (
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ title: "Error" }} />
@@ -138,12 +207,12 @@ export default function PersonaDetailScreen() {
     <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
-          title: title, // 헤더 제목을 동적으로 설정
+          title: title,
           headerRight: () => (
             <View style={styles.headerRightContainer}>
               {isSaving && <ActivityIndicator size="small" color="#007AFF" />}
               <TouchableOpacity
-                onPress={() => Alert.alert("More Options")}
+                onPress={handleMoreOptions} // "더보기" 메뉴 핸들러 연결
                 style={styles.moreButton}
               >
                 <Ionicons
@@ -156,81 +225,78 @@ export default function PersonaDetailScreen() {
           ),
         }}
       />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.contentContainer}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <View style={styles.avatarSection}>
-          <TouchableOpacity
-            style={styles.avatarTouchable}
-            onPress={handleAvatarPress}
-          >
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: persona.color || "#cccccc" },
-              ]}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+        >
+          {/* ... (아바타 및 입력 필드 JSX는 이전과 동일) ... */}
+          <View style={styles.avatarSection}>
+            <TouchableOpacity
+              style={styles.avatarTouchable}
+              onPress={handleAvatarPress}
             >
-              {persona.avatarImageUri ? (
-                // <Image source={{ uri: persona.avatarImageUri }} style={styles.avatarImage} />
-                <Text>IMG</Text> // 실제 Image 컴포넌트로 대체
-              ) : persona.icon ? (
-                <Ionicons
-                  name={persona.icon as any}
-                  size={40}
-                  color={"#ffffff"}
-                />
-              ) : (
-                <Ionicons name="person" size={40} color={"#ffffff"} />
-              )}
-              <View style={styles.editIconContainer}>
-                <Ionicons name="camera" size={16} color="#333" />
+              <View
+                style={[
+                  styles.avatar,
+                  { backgroundColor: persona.color || "#e9ecef" },
+                ]}
+              >
+                {avatarImageUri ? (
+                  <Image
+                    source={{ uri: avatarImageUri }}
+                    style={styles.avatarImage}
+                  />
+                ) : persona.icon ? (
+                  <Ionicons
+                    name={persona.icon as any}
+                    size={48}
+                    color={"#495057"}
+                  />
+                ) : (
+                  <Ionicons name="person" size={48} color={"#495057"} />
+                )}
               </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.label}>Persona Title</Text>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={handleTitleChange}
-          placeholder="페르소나의 이름을 입력하세요"
-        />
-
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={description}
-          onChangeText={handleDescriptionChange}
-          placeholder="이 페르소나에 대한 설명을 적어주세요"
-          multiline
-        />
-
-        <Text style={styles.label}>Goals as this Persona</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={personaGoals}
-          onChangeText={handleGoalsChange}
-          placeholder="이 페르소나로서 이루고 싶은 목표들을 자유롭게 적어보세요"
-          multiline
-        />
-      </ScrollView>
+              <View style={styles.editIconContainer}>
+                <Ionicons name="camera" size={16} color="#343a40" />
+              </View>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.label}>Persona Title</Text>
+          <TextInput
+            style={styles.input}
+            value={title}
+            onChangeText={handleTitleChange}
+          />
+          <Text style={styles.label}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={description}
+            onChangeText={handleDescriptionChange}
+            multiline
+          />
+          <Text style={styles.label}>Goals as this Persona</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={personaGoals}
+            onChangeText={handleGoalsChange}
+            multiline
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8f9fa",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-  },
+  // ... (스타일 정의는 이전과 동일)
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
+  scrollView: { flex: 1 },
+  contentContainer: { padding: 20 },
   centeredMessageContainer: {
     flex: 1,
     justifyContent: "center",
@@ -241,29 +307,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 16,
   },
-  moreButton: {
-    marginLeft: 10,
-  },
-  avatarSection: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  avatarTouchable: {
-    position: "relative",
-  },
+  moreButton: { marginLeft: 10 },
+  avatarSection: { alignItems: "center", marginBottom: 24 },
+  avatarTouchable: { position: "relative" },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#e0e0e0",
+    borderWidth: 1,
+    borderColor: "#dee2e6",
   },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 50,
-  },
+  avatarImage: { width: "100%", height: "100%", borderRadius: 50 },
   editIconContainer: {
     position: "absolute",
     bottom: 0,
@@ -273,25 +329,22 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
     borderColor: "#eee",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#495057",
-    marginBottom: 8,
-  },
+  label: { fontSize: 16, fontWeight: "600", color: "#495057", marginBottom: 8 },
   input: {
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#dee2e6",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: Platform.OS === "ios" ? 12 : 8,
+    paddingVertical: Platform.OS === "ios" ? 12 : 10,
     fontSize: 16,
     marginBottom: 20,
   },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
+  textArea: { minHeight: 100, textAlignVertical: "top" },
 });
