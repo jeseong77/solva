@@ -6,6 +6,7 @@ import { createObjectiveSlice } from "./slices/objectiveSlice";
 import { createRuleSlice } from "./slices/ruleSlice";
 import { createStarReportSlice } from "./slices/starReportSlice";
 import { createTagSlice } from "./slices/tagSlice";
+import { createPersonaSlice } from "./slices/personaSlice";
 
 export const useAppStore = create<AppState>()((...a) => ({
   ...createProblemSlice(...a),
@@ -13,4 +14,5 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createRuleSlice(...a),
   ...createStarReportSlice(...a),
   ...createTagSlice(...a),
+  ...createPersonaSlice(...a),
 }));
