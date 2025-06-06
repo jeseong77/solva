@@ -105,7 +105,7 @@ export const createProblemSlice: StateCreator<
         // resolutionCriteriaText, resolutionNumericalTarget, currentNumericalProgress 컬럼 제거
         // personaId 컬럼 추가
         `INSERT INTO Problems (id, personaId, title, description, status, priority, objectiveIds, ruleIds, tagIds, timeSpent, createdAt, resolvedAt, archivedAt, starReportId)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`, // 14개 ?
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newProblem.id,
           newProblem.personaId,
