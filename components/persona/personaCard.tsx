@@ -1,20 +1,28 @@
 import React from "react";
-import { StyleSheet, Text, View, Image } from "react-native"; // react-native에서 Image 컴포넌트 import
+import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
 import { useAppStore } from "@/store/store";
 import { Ionicons } from "@expo/vector-icons";
 import { Persona } from "@/types";
 
+// 컴포넌트에 전달될 Props 타입 정의 업데이트
 interface PersonaCardProps {
   personaId: string;
+  isSelected: boolean; // 이 카드가 현재 선택되었는지 여부
+  onPress: (personaId: string) => void; // 짧게 탭했을 때의 동작
+  onLongPress: (personaId: string) => void; // 길게 눌렀을 때의 동작
 }
 
-export default function PersonaCard({ personaId }: PersonaCardProps) {
+export default function PersonaCard({
+  personaId,
+  isSelected,
+  onPress,
+  onLongPress,
+}: PersonaCardProps) {
   const persona = useAppStore((state) =>
     state.personas.find((p) => p.id === personaId)
   );
 
   if (!persona) {
-    // 데이터 로딩 중이거나 없을 때를 위한 플레이스홀더
     return (
       <View style={styles.cardContainer}>
         <View style={styles.avatarContainer} />
@@ -22,11 +30,22 @@ export default function PersonaCard({ personaId }: PersonaCardProps) {
     );
   }
 
+  // 선택되었을 때 적용될 동적 스타일
+  const avatarContainerStyle = [
+    styles.avatarContainer,
+    isSelected && styles.selectedAvatarContainer, // isSelected가 true이면 녹색 띠 스타일 적용
+  ];
+
   return (
-    <View style={styles.cardContainer}>
-      <View style={styles.avatarContainer}>
+    // TouchableOpacity가 탭과 길게 누르기 이벤트를 모두 처리
+    <TouchableOpacity
+      style={styles.cardContainer}
+      onPress={() => onPress(persona.id)}
+      onLongPress={() => onLongPress(persona.id)}
+      delayLongPress={200} // 길게 누르기 감지 시간 (ms)
+    >
+      <View style={avatarContainerStyle}>
         {persona.avatarImageUri ? (
-          // <Text>IMG</Text> 대신 실제 Image 컴포넌트 사용
           <Image
             source={{ uri: persona.avatarImageUri }}
             style={styles.avatarImage}
@@ -34,7 +53,6 @@ export default function PersonaCard({ personaId }: PersonaCardProps) {
         ) : persona.icon ? (
           <Ionicons name={persona.icon as any} size={28} color={"#ffffff"} />
         ) : (
-          // 아이콘도 없을 경우 기본 배경색만 표시
           <View
             style={[
               styles.avatar,
@@ -44,17 +62,20 @@ export default function PersonaCard({ personaId }: PersonaCardProps) {
         )}
       </View>
 
-      <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+      <Text
+        style={[styles.title, isSelected && styles.selectedTitle]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {persona.title}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   cardContainer: {
     alignItems: "center",
-    marginRight: 0,
     width: 72,
   },
   avatarContainer: {
@@ -64,10 +85,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f2f5",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    overflow: "hidden", // 이미지가 원 밖으로 나가지 않도록
+    borderWidth: 1.5, // 기본 테두리 두께
+    borderColor: "transparent", // 기본 테두리는 투명하게
+    overflow: "hidden",
     marginBottom: 6,
+  },
+  selectedAvatarContainer: {
+    borderColor: "#2ecc71", // 녹색 띠
+    borderWidth: 2, // 약간 더 두꺼운 테두리
   },
   avatar: {
     width: "100%",
@@ -75,15 +100,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // Image 컴포넌트를 위한 스타일 추가
   avatarImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 28, // 부모의 borderRadius와 일치시켜 원형 유지
+    borderRadius: 28,
   },
   title: {
     fontSize: 12,
     color: "#555555",
     textAlign: "center",
+  },
+  // 선택되었을 때 텍스트 스타일 추가
+  selectedTitle: {
+    color: "#2ecc71", // 녹색
+    fontWeight: "bold",
   },
 });

@@ -102,13 +102,23 @@ export interface StarReportSlice {
   getStarReportByProblemId: (problemId: string) => StarReport | undefined;
 }
 
-// --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---
+// --- 새로 추가될 UI 상태 Slice 인터페이스 정의 ---
+export interface UIStateSlice {
+  selectedPersonaId: string | null; // 현재 선택된 페르소나의 ID
+  isLoading: boolean; // 앱의 전반적인 UI 로딩 상태 (선택적)
+  setSelectedPersonaId: (personaId: string | null) => void; // 선택된 페르소나 ID를 변경하는 액션
+  setGlobalLoading: (isLoading: boolean) => void; // 로딩 상태 변경 액션
+}
+
+
+// --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 (수정) ---
 export interface AppState
-  extends PersonaSlice,   // 신규 추가
-  ProblemSlice,
-  ObjectiveSlice,
-  RuleSlice,
-  TagSlice,         // 신규 추가
-  StarReportSlice {
-  // ProjectSlice 및 TaskSlice 제거됨
+  extends PersonaSlice,
+    ProblemSlice,
+    ObjectiveSlice,
+    RuleSlice,
+    TagSlice,
+    StarReportSlice,
+    UIStateSlice { // 새로 추가
+  // 전역 상태는 여기에 추가
 }

@@ -1,45 +1,123 @@
-// src/app/(tabs)/index.tsx
 import PersonaList from "@/components/persona/personaList";
 import { useAppStore } from "@/store/store";
 import { useRouter } from "expo-router";
-import React, { useEffect } from "react";
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useCallback } from "react";
+import {
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  Alert,
+} from "react-native";
+import { useShallow } from "zustand/react/shallow";
+import { useFocusEffect } from "expo-router"; // useFocusEffect 추가
 
 export default function HomeScreen() {
   const router = useRouter();
 
-  // HomeScreen은 앱의 메인 화면으로서, PersonaList가 표시할 데이터를
-  // 미리 로드하는 책임을 가집니다.
-  const fetchPersonas = useAppStore((state) => state.fetchPersonas);
+  // PersonaList 및 그와 연동되는 기능에 필요한 모든 상태와 액션을 가져옵니다.
+  const {
+    personas,
+    fetchPersonas,
+    selectedPersonaId,
+    setSelectedPersonaId,
+    deletePersona,
+  } = useAppStore(
+    useShallow((state) => ({
+      personas: state.personas, // 길게 눌렀을 때 메뉴에 페르소나 이름을 표시하기 위해 필요
+      fetchPersonas: state.fetchPersonas,
+      selectedPersonaId: state.selectedPersonaId, // 현재 선택된 페르소나 ID
+      setSelectedPersonaId: state.setSelectedPersonaId, // 페르소나를 선택하는 액션
+      deletePersona: state.deletePersona, // 페르소나 삭제 액션
+    }))
+  );
 
-  useEffect(() => {
-    fetchPersonas();
-  }, [fetchPersonas]);
+  // 화면이 포커스될 때마다 페르소나 목록을 다시 가져와
+  // 다른 화면에서 추가/삭제/수정된 내용이 즉시 반영되도록 합니다.
+  useFocusEffect(
+    useCallback(() => {
+      fetchPersonas();
+    }, [fetchPersonas])
+  );
 
-  // PersonaList의 카드 클릭 시 호출될 핸들러
-  const handleNavigateToPersonaDetail = (personaId: string) => {
-    // 동적 라우트인 /persona/[personaId]로 이동합니다.
-    router.push(`/persona/${personaId}`);
+  // 짧게 탭했을 때: 선택된 페르소나 ID를 스토어에 저장하는 핸들러
+  const handleSelectPersona = (personaId: string) => {
+    // 이미 선택된 페르소나를 다시 탭하면 선택 해제 (선택적 기능)
+    const newSelectedId = selectedPersonaId === personaId ? null : personaId;
+    setSelectedPersonaId(newSelectedId);
+    console.log("Selected Persona ID:", newSelectedId);
   };
 
-  // PersonaList의 '+' 버튼 클릭 시 호출될 핸들러
+  // 길게 눌렀을 때: 컨텍스트 메뉴(Alert)를 표시하는 핸들러
+  const handleLongPressPersona = (personaId: string) => {
+    const persona = personas.find((p) => p.id === personaId);
+    if (!persona) return;
+
+    Alert.alert(
+      `"${persona.title}"`, // 메뉴 제목
+      "어떤 작업을 하시겠습니까?", // 메뉴 설명
+      [
+        {
+          text: "편집하기",
+          onPress: () => router.push(`/persona/${personaId}`),
+        },
+        {
+          text: "삭제하기",
+          onPress: () => showDeleteConfirmation(personaId, persona.title),
+          style: "destructive", // iOS에서 빨간색으로 표시
+        },
+        {
+          text: "취소",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // 삭제 최종 확인 Alert
+  const showDeleteConfirmation = (personaId: string, title: string) => {
+    Alert.alert(
+      `"${title}" 페르소나 삭제`,
+      "이 페르소나와 연결된 모든 문제(Problem)들이 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          onPress: async () => {
+            const success = await deletePersona(personaId);
+            if (success) {
+              Alert.alert("성공", "페르소나가 삭제되었습니다.");
+            } else {
+              Alert.alert("오류", "페르소나 삭제에 실패했습니다.");
+            }
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
+  // '+' 버튼 클릭 시 호출될 핸들러
   const handleNavigateToCreatePersona = () => {
-    // 새 페르소나 생성을 위한 정적 라우트 /persona/create로 이동합니다.
     router.push("/persona/create");
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 화면 상단에 페르소나 목록 표시 */}
       <PersonaList
-        onPressPersona={handleNavigateToPersonaDetail}
+        selectedPersonaId={selectedPersonaId}
+        onSelectPersona={handleSelectPersona}
+        onLongPressPersona={handleLongPressPersona}
         onPressAddPersona={handleNavigateToCreatePersona}
       />
-      {/* ScrollView는 페르소나에 따라 선택된 ProblemList 등을 보여줄 메인 컨텐츠 영역 */}
       <ScrollView style={styles.mainContentContainer}>
         <View style={styles.placeholderContainer}>
           <Text style={styles.placeholderText}>
-            Select a persona to see related problems.
+            {selectedPersonaId
+              ? "선택된 페르소나의 문제 목록이 여기에 표시됩니다."
+              : "페르소나를 선택하여 관련 문제들을 확인하세요."}
           </Text>
         </View>
       </ScrollView>
@@ -50,17 +128,15 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa", // 전체 배경색
+    backgroundColor: "#ffffff", // 흰색 배경
   },
   mainContentContainer: {
     flex: 1,
+    backgroundColor: "#f8f9fa", // 메인 컨텐츠 영역 배경색
   },
   placeholderContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
     padding: 20,
-    minHeight: 200, // 내용이 없을 때도 최소 높이 유지
+    marginTop: 20,
   },
   placeholderText: {
     fontSize: 16,
