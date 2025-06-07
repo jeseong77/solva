@@ -13,6 +13,7 @@ const parseObjectiveFromDB = (dbItem: any): Objective => ({
   parentId: dbItem.parentId === null ? null : dbItem.parentId, // DB null을 TS null로 유지
   childObjectiveIds: dbItem.childObjectiveIds ? JSON.parse(dbItem.childObjectiveIds) : [],
   blockingProblemIds: dbItem.blockingProblemIds ? JSON.parse(dbItem.blockingProblemIds) : [],
+  workSessionIds: dbItem.workSessionIds,
   status: dbItem.status as ObjectiveStatus,
   deadline: dbItem.deadline ? new Date(dbItem.deadline) : undefined,
   timeSpent: dbItem.timeSpent || 0,
@@ -109,8 +110,9 @@ export const createObjectiveSlice: StateCreator<AppState, [], [], ObjectiveSlice
       description: objectiveData.description,
       parentId: objectiveData.parentId || null,
       childObjectiveIds: [],
-      blockingProblemIds: [], // 새 Objective는 blockingProblems 없이 시작
-      status: objectiveData.status || "todo", // 기본 상태 'todo'
+      blockingProblemIds: [],
+      workSessionIds: [],
+      status: objectiveData.status || "todo",
       deadline: objectiveData.deadline,
       timeSpent: 0,
       completionCriteriaText: objectiveData.completionCriteriaText,

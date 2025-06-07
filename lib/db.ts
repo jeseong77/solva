@@ -1,4 +1,3 @@
-// src/lib/db.ts
 import * as SQLite from "expo-sqlite";
 
 const DATABASE_NAME = "Solva.db";
@@ -64,6 +63,7 @@ const initDatabase = async () => {
         status TEXT NOT NULL,
         deadline TEXT,
         timeSpent INTEGER NOT NULL DEFAULT 0,
+        workSessionIds TEXT NOT NULL DEFAULT '[]',
         completionCriteriaText TEXT,
         numericalTarget INTEGER,
         currentNumericalProgress INTEGER DEFAULT 0,
@@ -72,6 +72,18 @@ const initDatabase = async () => {
         "order" INTEGER,
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE,
         FOREIGN KEY (parentId) REFERENCES Objectives(id) ON DELETE CASCADE
+      );
+
+      -- WorkSession 테이블 추가 --
+      CREATE TABLE IF NOT EXISTS WorkSessions (
+          id TEXT PRIMARY KEY NOT NULL,
+          objectiveId TEXT NOT NULL,
+          startTime TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          notes TEXT,
+          isPomodoro INTEGER NOT NULL DEFAULT 0, -- 0 for false, 1 for true
+          createdAt TEXT NOT NULL,
+          FOREIGN KEY (objectiveId) REFERENCES Objectives(id) ON DELETE CASCADE
       );
 
       CREATE TABLE IF NOT EXISTS Rules (
@@ -102,21 +114,20 @@ const initDatabase = async () => {
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
       );
 
-      -- WeeklyProblem 테이블 추가 --
       CREATE TABLE IF NOT EXISTS WeeklyProblems (
         id TEXT PRIMARY KEY NOT NULL,
         personaId TEXT NOT NULL,
         problemId TEXT NOT NULL,
-        weekIdentifier TEXT NOT NULL, -- 예: "2025-W23"
+        weekIdentifier TEXT NOT NULL,
         notes TEXT,
-        createdAt TEXT NOT NULL,      -- ISO8601 datetime string
+        createdAt TEXT NOT NULL,
         FOREIGN KEY (personaId) REFERENCES Personas(id) ON DELETE CASCADE,
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
       );
     `);
 
     console.log(
-      "[DB] Database tables (Personas, Problems, Objectives, Rules, Tags, StarReports, WeeklyProblems) initialized successfully or already exist."
+      "[DB] Database tables (Personas, Problems, Objectives, WorkSessions, Rules, Tags, StarReports, WeeklyProblems) initialized successfully or already exist."
     );
   } catch (error) {
     console.error("[DB] Error initializing database tables: ", error);

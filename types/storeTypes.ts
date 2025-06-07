@@ -2,15 +2,18 @@
 
 // @/types (즉, types/index.ts) 에서 모든 엔티티 및 상태 타입들을 가져옵니다.
 import {
-  Persona, // Persona 추가
-  Problem, ProblemStatus, Priority,
-  Objective, ObjectiveStatus,
+  Objective,
+  ObjectiveStatus,
+  Persona,
+  Priority,
+  Problem,
+  ProblemStatus,
   Rule,
-  Tag,
   StarReport,
-  WeeklyProblem
-  // Project, Task 등은 types/index.ts 최신 버전에서 제거됨
-} from '@/types';
+  Tag,
+  WeeklyProblem,
+  WorkSession,
+} from "@/types";
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
 
@@ -19,7 +22,9 @@ export interface PersonaSlice {
   isLoadingPersonas: boolean;
   fetchPersonas: () => Promise<void>;
   addPersona: (
-    personaData: Omit<Persona, "id" | "createdAt" | "problemIds" | "order"> & { order?: number }
+    personaData: Omit<Persona, "id" | "createdAt" | "problemIds" | "order"> & {
+      order?: number;
+    }
   ) => Promise<Persona | null>;
   updatePersona: (personaToUpdate: Persona) => Promise<Persona | null>;
   deletePersona: (personaId: string) => Promise<boolean>;
@@ -37,8 +42,26 @@ export interface ProblemSlice {
     // Omit: id, createdAt, objectiveIds, ruleIds, tagIds, timeSpent, currentNumericalProgress, resolvedAt, archivedAt, starReportId
     // 필수: personaId, title, status, priority
     // 옵션: description, resolutionCriteriaText, resolutionNumericalTarget
-    problemData: Omit<Problem, "id" | "createdAt" | "objectiveIds" | "ruleIds" | "tagIds" | "timeSpent" | "currentNumericalProgress" | "resolvedAt" | "archivedAt" | "starReportId" | "status" | "priority"> &
-    { personaId: string; title: string; status?: ProblemStatus; priority?: Priority; }
+    problemData: Omit<
+      Problem,
+      | "id"
+      | "createdAt"
+      | "objectiveIds"
+      | "ruleIds"
+      | "tagIds"
+      | "timeSpent"
+      | "currentNumericalProgress"
+      | "resolvedAt"
+      | "archivedAt"
+      | "starReportId"
+      | "status"
+      | "priority"
+    > & {
+      personaId: string;
+      title: string;
+      status?: ProblemStatus;
+      priority?: Priority;
+    }
   ) => Promise<Problem | null>;
   updateProblem: (problemToUpdate: Problem) => Promise<Problem | null>;
   deleteProblem: (problemId: string) => Promise<boolean>;
@@ -50,13 +73,31 @@ export interface ObjectiveSlice {
   objectives: Objective[];
   isLoadingObjectives: boolean;
   // Problem ID로 해당 Problem의 최상위 Objective 로드, 또는 parent Objective ID로 하위 Objective 로드
-  fetchObjectives: (options: { problemId: string; parentObjectiveId?: string | null } | { parentObjectiveId: string; problemId?: string }) => Promise<void>;
+  fetchObjectives: (
+    options:
+      | { problemId: string; parentObjectiveId?: string | null }
+      | { parentObjectiveId: string; problemId?: string }
+  ) => Promise<void>;
   addObjective: (
     // Omit: id, createdAt, childObjectiveIds, blockingProblemIds, status, timeSpent, completedAt
     // 필수: problemId, title
     // 옵션: description, parentId, deadline, order, completionCriteriaText, numericalTarget, currentNumericalProgress, status
-    objectiveData: Omit<Objective, "id" | "createdAt" | "childObjectiveIds" | "blockingProblemIds" | "status" | "timeSpent" | "completedAt"> &
-    { problemId: string; title: string; parentId?: string | null; status?: ObjectiveStatus; }
+    objectiveData: Omit<
+      Objective,
+      | "id"
+      | "createdAt"
+      | "childObjectiveIds"
+      | "blockingProblemIds"
+      | "status"
+      | "timeSpent"
+      | "completedAt"
+      | "workSessionIds"
+    > & {
+      problemId: string;
+      title: string;
+      parentId?: string | null;
+      status?: ObjectiveStatus;
+    }
   ) => Promise<Objective | null>;
   updateObjective: (objectiveToUpdate: Objective) => Promise<Objective | null>;
   deleteObjective: (objectiveId: string) => Promise<boolean>;
@@ -69,8 +110,10 @@ export interface RuleSlice {
   isLoadingRules: boolean;
   fetchRules: (problemId: string) => Promise<void>;
   addRule: (
-    ruleData: Omit<Rule, "id" | "createdAt"> &
-    { problemId: string; title: string; }
+    ruleData: Omit<Rule, "id" | "createdAt"> & {
+      problemId: string;
+      title: string;
+    }
   ) => Promise<Rule | null>;
   updateRule: (ruleToUpdate: Rule) => Promise<Rule | null>;
   deleteRule: (ruleId: string) => Promise<boolean>;
@@ -116,13 +159,30 @@ export interface WeeklyProblemSlice {
   weeklyProblems: WeeklyProblem[];
   isLoadingWeeklyProblems: boolean;
   // 특정 페르소나의 특정 주간 문제, 또는 전체 기록을 가져오는 액션
-  fetchWeeklyProblems: (options?: { personaId?: string; weekIdentifier?: string; }) => Promise<void>;
+  fetchWeeklyProblems: (options?: {
+    personaId?: string;
+    weekIdentifier?: string;
+  }) => Promise<void>;
   addWeeklyProblem: (
-      data: Omit<WeeklyProblem, "id" | "createdAt">
+    data: Omit<WeeklyProblem, "id" | "createdAt">
   ) => Promise<WeeklyProblem | null>;
   updateWeeklyProblem: (item: WeeklyProblem) => Promise<WeeklyProblem | null>;
   deleteWeeklyProblem: (id: string) => Promise<boolean>;
   getWeeklyProblemById: (id: string) => WeeklyProblem | undefined;
+}
+
+export interface WorkSessionSlice {
+  workSessions: WorkSession[];
+  isLoadingWorkSessions: boolean;
+  fetchWorkSessions: (objectiveId: string) => Promise<void>;
+  addWorkSession: (
+    sessionData: Omit<WorkSession, "id" | "createdAt">
+  ) => Promise<WorkSession | null>;
+  updateWorkSession: (
+    sessionToUpdate: WorkSession
+  ) => Promise<WorkSession | null>;
+  deleteWorkSession: (sessionId: string) => Promise<boolean>;
+  getWorkSessionById: (id: string) => WorkSession | undefined;
 }
 
 // --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 (수정) ---
@@ -134,7 +194,8 @@ export interface AppState
     TagSlice,
     StarReportSlice,
     UIStateSlice,
-    WeeklyProblemSlice {
+    WeeklyProblemSlice,
+    WorkSessionSlice {
   // 새로 추가
   // 전역 상태는 여기에 추가
 }
