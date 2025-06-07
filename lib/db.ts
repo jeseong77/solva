@@ -1,5 +1,5 @@
 // src/lib/db.ts
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from "expo-sqlite";
 
 const DATABASE_NAME = "Solva.db";
 let _dbInstance: SQLite.SQLiteDatabase | null = null;
@@ -27,31 +27,27 @@ const initDatabase = async () => {
         avatarImageUri TEXT,
         icon TEXT,
         color TEXT,
-        problemIds TEXT NOT NULL DEFAULT '[]', -- JSON string for string[]
-        createdAt TEXT NOT NULL,              -- ISO8601 datetime string
+        problemIds TEXT NOT NULL DEFAULT '[]',
+        createdAt TEXT NOT NULL,
         "order" INTEGER
       );
 
       CREATE TABLE IF NOT EXISTS Problems (
         id TEXT PRIMARY KEY NOT NULL,
-        personaId TEXT NOT NULL,                 -- FK to Personas table
-        originatingObjectiveId TEXT,           -- Nullable, FK to Objectives table (for bottlenecks)
+        personaId TEXT NOT NULL,
+        originatingObjectiveId TEXT,
         title TEXT NOT NULL,
         description TEXT,
-        status TEXT NOT NULL,                    -- ProblemStatus
-        priority TEXT NOT NULL DEFAULT 'medium', -- Priority (default medium)
-        
-        -- resolutionCriteriaText, resolutionNumericalTarget, currentNumericalProgress REMOVED
-        
-        objectiveIds TEXT NOT NULL DEFAULT '[]', -- JSON string for string[]
-        ruleIds TEXT NOT NULL DEFAULT '[]',      -- JSON string for string[]
-        tagIds TEXT DEFAULT '[]',                -- JSON string for string[]
-        
+        status TEXT NOT NULL,
+        priority TEXT NOT NULL DEFAULT 'medium',
+        objectiveIds TEXT NOT NULL DEFAULT '[]',
+        ruleIds TEXT NOT NULL DEFAULT '[]',
+        tagIds TEXT DEFAULT '[]',
         timeSpent INTEGER NOT NULL DEFAULT 0,
-        createdAt TEXT NOT NULL,                 -- ISO8601 datetime string
-        resolvedAt TEXT,                         -- ISO8601 datetime string
-        archivedAt TEXT,                         -- ISO8601 datetime string
-        starReportId TEXT UNIQUE,                -- Nullable, FK to StarReports table
+        createdAt TEXT NOT NULL,
+        resolvedAt TEXT,
+        archivedAt TEXT,
+        starReportId TEXT UNIQUE,
         FOREIGN KEY (personaId) REFERENCES Personas(id) ON DELETE CASCADE,
         FOREIGN KEY (originatingObjectiveId) REFERENCES Objectives(id) ON DELETE SET NULL,
         FOREIGN KEY (starReportId) REFERENCES StarReports(id) ON DELETE SET NULL 
@@ -59,23 +55,20 @@ const initDatabase = async () => {
 
       CREATE TABLE IF NOT EXISTS Objectives (
         id TEXT PRIMARY KEY NOT NULL,
-        problemId TEXT NOT NULL,                 -- FK to Problems table
+        problemId TEXT NOT NULL,
         title TEXT NOT NULL,
         description TEXT,
-        parentId TEXT,                           -- Self-referential FK to Objectives table
-        childObjectiveIds TEXT NOT NULL DEFAULT '[]', -- JSON string for string[]
-        blockingProblemIds TEXT NOT NULL DEFAULT '[]', -- JSON string for string[] (IDs of Problem entities)
-        status TEXT NOT NULL,                    -- ObjectiveStatus
-        deadline TEXT,                           -- ISO8601 datetime string, Nullable
+        parentId TEXT,
+        childObjectiveIds TEXT NOT NULL DEFAULT '[]',
+        blockingProblemIds TEXT NOT NULL DEFAULT '[]',
+        status TEXT NOT NULL,
+        deadline TEXT,
         timeSpent INTEGER NOT NULL DEFAULT 0,
-        
-        -- Completion criteria fields MOVED HERE from Problem
         completionCriteriaText TEXT,
         numericalTarget INTEGER,
         currentNumericalProgress INTEGER DEFAULT 0,
-
-        createdAt TEXT NOT NULL,                 -- ISO8601 datetime string
-        completedAt TEXT,                        -- ISO8601 datetime string, Nullable
+        createdAt TEXT NOT NULL,
+        completedAt TEXT,
         "order" INTEGER,
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE,
         FOREIGN KEY (parentId) REFERENCES Objectives(id) ON DELETE CASCADE
@@ -83,36 +76,47 @@ const initDatabase = async () => {
 
       CREATE TABLE IF NOT EXISTS Rules (
         id TEXT PRIMARY KEY NOT NULL,
-        problemId TEXT NOT NULL,                 -- FK to Problems table
+        problemId TEXT NOT NULL,
         title TEXT NOT NULL,
-        createdAt TEXT NOT NULL,                 -- ISO8601 datetime string
+        createdAt TEXT NOT NULL,
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
-        -- isLocked 필드 제거됨
       );
 
       CREATE TABLE IF NOT EXISTS Tags (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL UNIQUE,
         color TEXT,
-        createdAt TEXT NOT NULL                  -- ISO8601 datetime string
+        createdAt TEXT NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS StarReports (
         id TEXT PRIMARY KEY NOT NULL,
-        problemId TEXT NOT NULL,                 -- FK to Problems table
+        problemId TEXT NOT NULL,
         situation TEXT NOT NULL,
         task TEXT NOT NULL,
         action TEXT NOT NULL,
         result TEXT NOT NULL,
         learnings TEXT,
-        timeSpent INTEGER,                       -- Nullable
-        createdAt TEXT NOT NULL,                 -- ISO8601 datetime string
+        timeSpent INTEGER,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
+      );
+
+      -- WeeklyProblem 테이블 추가 --
+      CREATE TABLE IF NOT EXISTS WeeklyProblems (
+        id TEXT PRIMARY KEY NOT NULL,
+        personaId TEXT NOT NULL,
+        problemId TEXT NOT NULL,
+        weekIdentifier TEXT NOT NULL, -- 예: "2025-W23"
+        notes TEXT,
+        createdAt TEXT NOT NULL,      -- ISO8601 datetime string
+        FOREIGN KEY (personaId) REFERENCES Personas(id) ON DELETE CASCADE,
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
       );
     `);
-    // Projects 및 Tasks 테이블은 제거됨
+
     console.log(
-      "[DB] Database tables (Personas, Problems, Objectives, Rules, Tags, StarReports) initialized successfully or already exist."
+      "[DB] Database tables (Personas, Problems, Objectives, Rules, Tags, StarReports, WeeklyProblems) initialized successfully or already exist."
     );
   } catch (error) {
     console.error("[DB] Error initializing database tables: ", error);

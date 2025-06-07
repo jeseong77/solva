@@ -11,12 +11,11 @@ import {
   Alert,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-import { useFocusEffect } from "expo-router"; // useFocusEffect 추가
+import { useFocusEffect } from "expo-router";
 
 export default function HomeScreen() {
   const router = useRouter();
 
-  // PersonaList 및 그와 연동되는 기능에 필요한 모든 상태와 액션을 가져옵니다.
   const {
     personas,
     fetchPersonas,
@@ -128,11 +127,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff", // 흰색 배경
+    backgroundColor: "#ffffff",
   },
   mainContentContainer: {
     flex: 1,
-    backgroundColor: "#f8f9fa", // 메인 컨텐츠 영역 배경색
+    backgroundColor: "#f8f9fa",
   },
   placeholderContainer: {
     padding: 20,

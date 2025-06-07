@@ -7,7 +7,8 @@ import {
   Objective, ObjectiveStatus,
   Rule,
   Tag,
-  StarReport
+  StarReport,
+  WeeklyProblem
   // Project, Task 등은 types/index.ts 최신 버전에서 제거됨
 } from '@/types';
 
@@ -110,6 +111,19 @@ export interface UIStateSlice {
   setGlobalLoading: (isLoading: boolean) => void; // 로딩 상태 변경 액션
 }
 
+// --- WeeklyProblem Slice 인터페이스 정의 ---
+export interface WeeklyProblemSlice {
+  weeklyProblems: WeeklyProblem[];
+  isLoadingWeeklyProblems: boolean;
+  // 특정 페르소나의 특정 주간 문제, 또는 전체 기록을 가져오는 액션
+  fetchWeeklyProblems: (options?: { personaId?: string; weekIdentifier?: string; }) => Promise<void>;
+  addWeeklyProblem: (
+      data: Omit<WeeklyProblem, "id" | "createdAt">
+  ) => Promise<WeeklyProblem | null>;
+  updateWeeklyProblem: (item: WeeklyProblem) => Promise<WeeklyProblem | null>;
+  deleteWeeklyProblem: (id: string) => Promise<boolean>;
+  getWeeklyProblemById: (id: string) => WeeklyProblem | undefined;
+}
 
 // --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 (수정) ---
 export interface AppState
@@ -119,6 +133,8 @@ export interface AppState
     RuleSlice,
     TagSlice,
     StarReportSlice,
-    UIStateSlice { // 새로 추가
+    UIStateSlice,
+    WeeklyProblemSlice {
+  // 새로 추가
   // 전역 상태는 여기에 추가
 }

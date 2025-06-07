@@ -16,6 +16,18 @@ export type Priority = "high" | "medium" | "low" | "none";
 // --- 주요 엔티티 타입 정의 ---
 
 /**
+ * 특정 주에 집중하여 해결할 Problem을 지정하는 기록
+ */
+export interface WeeklyProblem {
+  id: string;              // 이 기록의 고유 ID
+  personaId: string;       // 어떤 페르소나에 대한 주간 문제인지
+  problemId: string;       // 주간 문제로 지정된 Problem의 ID
+  weekIdentifier: string;  // 해당 주를 식별하는 값 (예: "2025-W23")
+  notes?: string;           // 해당 주 목표에 대한 간단한 메모 (선택 사항)
+  createdAt: Date;         // 이 기록이 생성된 시간
+}
+
+/**
  * Persona: 사용자의 다양한 역할이나 삶의 영역을 나타내는 최상위 분류.
  * 각 Persona는 여러 Problem을 가질 수 있음.
  */
