@@ -1,10 +1,20 @@
-import { StateCreator } from 'zustand';
-import { WeeklyProblem } from '@/types';
-import type { AppState, WeeklyProblemSlice as WeeklyProblemSliceInterface } from '@/types/storeTypes';
-import { getDatabase } from '@/lib/db';
-import { v4 as uuidv4 } from 'uuid';
-import 'react-native-get-random-values';
+// src/store/slices/weeklyProblemSlice.ts
 
+import { getDatabase } from "@/lib/db";
+import { WeeklyProblem } from "@/types";
+import type {
+  AppState,
+  WeeklyProblemSlice as WeeklyProblemSliceInterface,
+} from "@/types/storeTypes";
+import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+import { StateCreator } from "zustand";
+
+/**
+ * 데이터베이스에서 가져온 데이터를 WeeklyProblem 타입으로 변환합니다.
+ * @param dbItem - 데이터베이스의 row 아이템
+ * @returns WeeklyProblem 타입 객체
+ */
 const parseWeeklyProblemFromDB = (dbItem: any): WeeklyProblem => ({
   id: dbItem.id,
   personaId: dbItem.personaId,
@@ -14,11 +24,20 @@ const parseWeeklyProblemFromDB = (dbItem: any): WeeklyProblem => ({
   createdAt: new Date(dbItem.createdAt),
 });
 
-export const createWeeklyProblemSlice: StateCreator<AppState, [], [], WeeklyProblemSliceInterface> = (set, get) => ({
+export const createWeeklyProblemSlice: StateCreator<
+  AppState,
+  [],
+  [],
+  WeeklyProblemSliceInterface
+> = (set, get) => ({
   weeklyProblems: [],
   isLoadingWeeklyProblems: false,
 
-  fetchWeeklyProblems: async (options?: { personaId?: string; weekIdentifier?: string; }) => {
+  /**
+   * 데이터베이스에서 주간 문제 목록을 가져옵니다.
+   * 페르소나 ID 또는 주간 식별자로 필터링할 수 있습니다.
+   */
+  fetchWeeklyProblems: async (options) => {
     set({ isLoadingWeeklyProblems: true });
     try {
       const db = await getDatabase();
@@ -26,140 +45,151 @@ export const createWeeklyProblemSlice: StateCreator<AppState, [], [], WeeklyProb
       const params: string[] = [];
       const conditions: string[] = [];
 
-      if (options?.personaId) {
+      if (options.personaId) {
         conditions.push("personaId = ?");
         params.push(options.personaId);
       }
-      if (options?.weekIdentifier) {
+      if (options.weekIdentifier) {
         conditions.push("weekIdentifier = ?");
         params.push(options.weekIdentifier);
       }
 
       if (conditions.length > 0) {
-        query += " WHERE " + conditions.join(" AND ");
+        query += ` WHERE ${conditions.join(" AND ")}`;
       }
       query += " ORDER BY createdAt DESC;";
 
       const results = await db.getAllAsync<any>(query, params);
-      const fetchedWeeklyProblems = results.map(parseWeeklyProblemFromDB);
+      const fetchedProblems = results.map(parseWeeklyProblemFromDB);
 
-      // fetch는 보통 전체 또는 일부를 교체하는 방식으로 작동
-      // 여기서는 가져온 데이터를 기존 데이터와 병합하여 중복을 제거하고 업데이트
-      set(state => {
-          const existingIds = new Set(fetchedWeeklyProblems.map(wp => wp.id));
-          const otherWeeklyProblems = state.weeklyProblems.filter(wp => !existingIds.has(wp.id));
-          const newWeeklyProblemList = [...otherWeeklyProblems, ...fetchedWeeklyProblems]
-            .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
-          return { weeklyProblems: newWeeklyProblemList, isLoadingWeeklyProblems: false };
+      // 기존 상태와 병합하여 중복 방지
+      const existingIds = new Set(fetchedProblems.map((p) => p.id));
+      const filteredOldProblems = get().weeklyProblems.filter(
+        (p) => !existingIds.has(p.id)
+      );
+
+      set({
+        weeklyProblems: [...filteredOldProblems, ...fetchedProblems],
+        isLoadingWeeklyProblems: false,
       });
-      console.log(`[WeeklyProblemSlice] WeeklyProblems fetched with options: ${JSON.stringify(options)}`);
+
+      console.log(
+        `[WeeklyProblemSlice] ${fetchedProblems.length} weekly problems fetched.`
+      );
     } catch (error) {
-      console.error("[WeeklyProblemSlice] Error fetching weekly problems:", error);
+      console.error(
+        "[WeeklyProblemSlice] Error fetching weekly problems:",
+        error
+      );
       set({ isLoadingWeeklyProblems: false });
     }
   },
 
-  addWeeklyProblem: async (data) => {
-    // 이 액션은 사실상 "해당 주의 문제 설정/변경(Set or Update)"의 역할을 함
-    const { personaId, problemId, weekIdentifier, notes } = data;
-    const db = await getDatabase();
+  /**
+   * 새로운 주간 문제를 추가합니다.
+   */
+  addWeeklyProblem: async (weeklyProblemData) => {
+    const newWeeklyProblem: WeeklyProblem = {
+      id: uuidv4(),
+      createdAt: new Date(),
+      ...weeklyProblemData,
+    };
 
-    try {
-      // 해당 페르소나의 해당 주에 이미 설정된 문제가 있는지 확인
-      const existingEntry = await db.getFirstAsync<any>(
-        `SELECT * FROM WeeklyProblems WHERE personaId = ? AND weekIdentifier = ?;`,
-        [personaId, weekIdentifier]
-      );
-
-      if (existingEntry) {
-        // 이미 있으면, problemId와 notes를 업데이트
-        const updatedEntry: WeeklyProblem = {
-          ...parseWeeklyProblemFromDB(existingEntry),
-          problemId: problemId, // 새 Problem ID로 교체
-          notes: notes,
-        };
-        await db.runAsync(
-          `UPDATE WeeklyProblems SET problemId = ?, notes = ? WHERE id = ?;`,
-          [
-            updatedEntry.problemId,
-            updatedEntry.notes === undefined ? null : updatedEntry.notes,
-            updatedEntry.id
-          ]
-        );
-        set(state => ({
-          weeklyProblems: state.weeklyProblems.map(wp => wp.id === updatedEntry.id ? updatedEntry : wp)
-        }));
-        console.log(`[WeeklyProblemSlice] WeeklyProblem for ${weekIdentifier} updated.`);
-        return updatedEntry;
-      } else {
-        // 없으면, 새로 추가
-        const newEntry: WeeklyProblem = {
-          id: uuidv4(),
-          createdAt: new Date(),
-          ...data,
-        };
-        await db.runAsync(
-          `INSERT INTO WeeklyProblems (id, personaId, problemId, weekIdentifier, notes, createdAt) 
-           VALUES (?, ?, ?, ?, ?, ?);`,
-          [
-            newEntry.id, newEntry.personaId, newEntry.problemId,
-            newEntry.weekIdentifier,
-            newEntry.notes === undefined ? null : newEntry.notes,
-            newEntry.createdAt.toISOString()
-          ]
-        );
-        set(state => ({ weeklyProblems: [...state.weeklyProblems, newEntry] }));
-        console.log(`[WeeklyProblemSlice] WeeklyProblem for ${weekIdentifier} added.`);
-        return newEntry;
-      }
-    } catch (error) {
-      console.error("[WeeklyProblemSlice] Error in add/update weekly problem:", error);
-      return null;
-    }
-  },
-
-  updateWeeklyProblem: async (itemToUpdate) => {
-    const currentItems = get().weeklyProblems;
-    const itemIndex = currentItems.findIndex(i => i.id === itemToUpdate.id);
-    if (itemIndex === -1) return null;
-    
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE WeeklyProblems SET problemId = ?, weekIdentifier = ?, notes = ? WHERE id = ?;`,
+        `INSERT INTO WeeklyProblems (id, personaId, problemId, weekIdentifier, notes, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?);`,
         [
-          itemToUpdate.problemId,
-          itemToUpdate.weekIdentifier,
-          itemToUpdate.notes === undefined ? null : itemToUpdate.notes,
-          itemToUpdate.id
+          newWeeklyProblem.id,
+          newWeeklyProblem.personaId,
+          newWeeklyProblem.problemId,
+          newWeeklyProblem.weekIdentifier,
+          newWeeklyProblem.notes ?? null, // undefined를 null로 변환
+          newWeeklyProblem.createdAt.toISOString(),
         ]
       );
-      const updatedItems = currentItems.map(i => i.id === itemToUpdate.id ? itemToUpdate : i);
-      set({ weeklyProblems: updatedItems });
-      console.log("[WeeklyProblemSlice] WeeklyProblem updated:", itemToUpdate.id);
-      return itemToUpdate;
+
+      set((state) => ({
+        weeklyProblems: [...state.weeklyProblems, newWeeklyProblem],
+      }));
+
+      console.log(
+        "[WeeklyProblemSlice] Weekly problem added:",
+        newWeeklyProblem.id
+      );
+      return newWeeklyProblem;
     } catch (error) {
-      console.error("[WeeklyProblemSlice] Error updating weekly problem:", error);
+      console.error("[WeeklyProblemSlice] Error adding weekly problem:", error);
       return null;
     }
   },
 
-  deleteWeeklyProblem: async (id) => {
+  /**
+   * 기존 주간 문제를 업데이트합니다. (주로 notes 필드 수정에 사용)
+   */
+  updateWeeklyProblem: async (weeklyProblemToUpdate) => {
     try {
       const db = await getDatabase();
-      await db.runAsync(`DELETE FROM WeeklyProblems WHERE id = ?;`, [id]);
-      set(state => ({
-        weeklyProblems: state.weeklyProblems.filter(wp => wp.id !== id)
+      await db.runAsync(`UPDATE WeeklyProblems SET notes = ? WHERE id = ?;`, [
+        weeklyProblemToUpdate.notes ?? null,
+        weeklyProblemToUpdate.id,
+      ]);
+
+      set((state) => ({
+        weeklyProblems: state.weeklyProblems.map((wp) =>
+          wp.id === weeklyProblemToUpdate.id ? weeklyProblemToUpdate : wp
+        ),
       }));
-      console.log("[WeeklyProblemSlice] WeeklyProblem deleted:", id);
+
+      console.log(
+        "[WeeklyProblemSlice] Weekly problem updated:",
+        weeklyProblemToUpdate.id
+      );
+      return weeklyProblemToUpdate;
+    } catch (error) {
+      console.error(
+        "[WeeklyProblemSlice] Error updating weekly problem:",
+        error
+      );
+      return null;
+    }
+  },
+
+  /**
+   * 특정 주간 문제를 ID로 삭제합니다.
+   */
+  deleteWeeklyProblem: async (weeklyProblemId) => {
+    try {
+      const db = await getDatabase();
+      await db.runAsync(`DELETE FROM WeeklyProblems WHERE id = ?;`, [
+        weeklyProblemId,
+      ]);
+
+      set((state) => ({
+        weeklyProblems: state.weeklyProblems.filter(
+          (wp) => wp.id !== weeklyProblemId
+        ),
+      }));
+
+      console.log(
+        "[WeeklyProblemSlice] Weekly problem deleted:",
+        weeklyProblemId
+      );
       return true;
     } catch (error) {
-      console.error("[WeeklyProblemSlice] Error deleting weekly problem:", error);
+      console.error(
+        "[WeeklyProblemSlice] Error deleting weekly problem:",
+        error
+      );
       return false;
     }
   },
 
+  /**
+   * ID로 특정 주간 문제를 동기적으로 조회합니다.
+   */
   getWeeklyProblemById: (id: string) => {
-    return get().weeklyProblems.find(wp => wp.id === id);
+    return get().weeklyProblems.find((wp) => wp.id === id);
   },
 });

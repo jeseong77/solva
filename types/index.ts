@@ -1,48 +1,24 @@
 // types/index.ts
 
 // --- 상태(Status) 및 우선순위(Priority) 타입 정의 ---
-export type ProblemStatus = "active" | "onHold" | "resolved" | "archived";
 
-export type ObjectiveStatus =
-  | "todo"
-  | "inProgress"
-  | "completed"
-  | "blocked"
-  | "onHold"
-  | "cancelled";
+export type ProblemStatus = "active" | "onHold" | "resolved" | "archived";
 
 export type Priority = "high" | "medium" | "low" | "none";
 
-// --- 새로운 엔티티 타입: WorkSession ---
-/**
- * Objective에 대한 작업 시간 기록 (뽀모도로 또는 수동 입력)
- */
-export interface WorkSession {
-  id: string;
-  objectiveId: string; // 이 작업 세션이 속한 Objective의 ID
-  startTime: Date; // 작업 시작 시간
-  duration: number; // 작업 시간 (분 또는 초 단위)
-  notes?: string; // 해당 작업 세션에 대한 간단한 메모 (선택 사항)
-  isPomodoro: boolean; // 뽀모도로 타이머를 사용했는지 여부
-  createdAt: Date; // 이 레코드 생성 시간
-}
+export type ThreadItemType =
+  | "General"
+  | "Bottleneck"
+  | "Task"
+  | "Action"
+  | "Session";
+
+export type ActionStatus = "todo" | "inProgress" | "completed" | "cancelled";
 
 // --- 주요 엔티티 타입 정의 ---
 
 /**
- * 특정 주에 집중하여 해결할 Problem을 지정하는 기록
- */
-export interface WeeklyProblem {
-  id: string;
-  personaId: string;
-  problemId: string;
-  weekIdentifier: string; // 예: "2025-W23"
-  notes?: string;
-  createdAt: Date;
-}
-
-/**
- * Persona: 사용자의 다양한 역할이나 삶의 영역을 나타내는 최상위 분류.
+ * Persona: 사용자의 다양한 역할이나 삶의 영역을 나타내는 최상위 분류
  */
 export interface Persona {
   id: string;
@@ -58,19 +34,31 @@ export interface Persona {
 }
 
 /**
- * Problem: 사용자가 해결하고자 하는 구체적인 문제 또는 달성하고자 하는 주요 과제.
+ * WeeklyProblem: 특정 주에 집중하여 해결할 Problem을 지정하는 기록
+ */
+export interface WeeklyProblem {
+  id: string; // 이 기록의 고유 ID
+  personaId: string; // 어떤 페르소나에 대한 주간 문제인지
+  problemId: string; // 주간 문제로 지정된 Problem의 ID
+  weekIdentifier: string; // 해당 주를 식별하는 값 (예: "2025-W23")
+  notes?: string; // 해당 주 목표에 대한 간단한 메모 (선택 사항)
+  createdAt: Date; // 이 기록이 생성된 시간
+}
+
+/**
+ * Problem: 사용자가 해결하고자 하는 구체적인 문제 또는 과제
  */
 export interface Problem {
   id: string;
   personaId: string;
-  originatingObjectiveId?: string;
   title: string;
   description?: string;
   status: ProblemStatus;
   priority: Priority;
-  objectiveIds: string[];
-  ruleIds: string[];
-  tagIds?: string[];
+  urgency?: number;
+  importance?: number;
+  tags?: string[];
+  childThreadIds: string[];
   timeSpent: number;
   createdAt: Date;
   resolvedAt?: Date;
@@ -79,45 +67,69 @@ export interface Problem {
 }
 
 /**
- * Objective: Problem 해결을 위한 구체적인 목표, 과업, 또는 하위 목표.
+ * BaseThreadItem: 모든 스레드 아이템의 공통 속성을 정의하는 기본 타입
  */
-export interface Objective {
+export interface BaseThreadItem {
   id: string;
   problemId: string;
-  title: string;
-  description?: string;
   parentId: string | null;
-  childObjectiveIds: string[];
-  blockingProblemIds: string[];
-  status: ObjectiveStatus;
-  deadline?: Date;
+  childThreadIds: string[];
+  type: ThreadItemType;
+  content: string;
+  isImportant?: boolean;
+  resultIds: string[];
+  createdAt: Date;
+  authorId?: string;
+}
+
+// --- 5가지 구체적인 Thread Item 타입 정의 ---
+
+export interface GeneralThreadItem extends BaseThreadItem {
+  type: "General";
+}
+
+export interface BottleneckThreadItem extends BaseThreadItem {
+  type: "Bottleneck";
+  isResolved: boolean;
+}
+
+export interface TaskThreadItem extends BaseThreadItem {
+  type: "Task";
+  isCompleted: boolean;
+}
+
+export interface ActionThreadItem extends BaseThreadItem {
+  type: "Action";
+  status: ActionStatus;
   timeSpent: number;
-  workSessionIds: string[]; // 이 Objective에 대한 작업 세션(WorkSession) ID 목록 추가
-  completionCriteriaText?: string;
-  numericalTarget?: number;
-  currentNumericalProgress?: number;
-  createdAt: Date;
+  deadline?: Date;
   completedAt?: Date;
-  order?: number;
+}
+
+export interface SessionThreadItem extends BaseThreadItem {
+  type: "Session";
+  timeSpent: number;
+  startTime: Date;
 }
 
 /**
- * Rule: Problem 해결 과정에서 사용자가 정의하는 지침
+ * 모든 ThreadItem 타입을 하나로 묶는 Discriminated Union
  */
-export interface Rule {
-  id: string;
-  problemId: string;
-  title: string;
-  createdAt: Date;
-}
+export type ThreadItem =
+  | GeneralThreadItem
+  | BottleneckThreadItem
+  | TaskThreadItem
+  | ActionThreadItem
+  | SessionThreadItem;
 
 /**
- * Tag: 사용자가 생성하고 Problem에 연결할 수 있는 태그
+ * Result: 각 ThreadItem에 주석처럼 달 수 있는 구체적인 성과 또는 결과물
  */
-export interface Tag {
+export interface Result {
   id: string;
-  name: string;
-  color?: string;
+  parentThreadId: string;
+  content: string;
+  occurredAt?: Date;
   createdAt: Date;
 }
 
@@ -132,6 +144,14 @@ export interface StarReport {
   action: string;
   result: string;
   learnings?: string;
-  timeSpent?: number;
   createdAt: Date;
+}
+
+/**
+ * Tag: Problem에 연결할 수 있는 태그
+ */
+export interface Tag {
+  id: string;
+  name: string;
+  color?: string;
 }

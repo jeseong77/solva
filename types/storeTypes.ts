@@ -1,18 +1,21 @@
 // src/types/storeTypes.ts
 
-// @/types (즉, types/index.ts) 에서 모든 엔티티 및 상태 타입들을 가져옵니다.
 import {
-  Objective,
-  ObjectiveStatus,
   Persona,
-  Priority,
   Problem,
   ProblemStatus,
-  Rule,
+  Priority,
+  WeeklyProblem, // 새로 추가된 타입 임포트
+  ThreadItem, // 누락된 타입 임포트
+  BaseThreadItem,
+  BottleneckThreadItem,
+  TaskThreadItem,
+  ActionThreadItem,
+  SessionThreadItem,
+  Result,
   StarReport,
   Tag,
-  WeeklyProblem,
-  WorkSession,
+  ThreadItemType,
 } from "@/types";
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
@@ -29,36 +32,25 @@ export interface PersonaSlice {
   updatePersona: (personaToUpdate: Persona) => Promise<Persona | null>;
   deletePersona: (personaId: string) => Promise<boolean>;
   getPersonaById: (id: string) => Persona | undefined;
-  // Persona에 Problem ID 연결/해제 액션 등
-  // linkProblemToPersona: (personaId: string, problemId: string) => Promise<Persona | null>;
-  // unlinkProblemFromPersona: (personaId: string, problemId: string) => Promise<Persona | null>;
 }
 
 export interface ProblemSlice {
   problems: Problem[];
   isLoadingProblems: boolean;
-  fetchProblems: (personaId?: string) => Promise<void>; // 특정 Persona의 Problem 또는 전체 Problem
+  fetchProblems: (personaId?: string) => Promise<void>;
   addProblem: (
-    // Omit: id, createdAt, objectiveIds, ruleIds, tagIds, timeSpent, currentNumericalProgress, resolvedAt, archivedAt, starReportId
-    // 필수: personaId, title, status, priority
-    // 옵션: description, resolutionCriteriaText, resolutionNumericalTarget
     problemData: Omit<
       Problem,
       | "id"
       | "createdAt"
-      | "objectiveIds"
-      | "ruleIds"
-      | "tagIds"
+      | "childThreadIds"
       | "timeSpent"
-      | "currentNumericalProgress"
-      | "resolvedAt"
-      | "archivedAt"
-      | "starReportId"
       | "status"
       | "priority"
+      | "starReportId"
+      | "resolvedAt"
+      | "archivedAt"
     > & {
-      personaId: string;
-      title: string;
       status?: ProblemStatus;
       priority?: Priority;
     }
@@ -66,71 +58,80 @@ export interface ProblemSlice {
   updateProblem: (problemToUpdate: Problem) => Promise<Problem | null>;
   deleteProblem: (problemId: string) => Promise<boolean>;
   getProblemById: (id: string) => Problem | undefined;
-  // Problem에 Objective ID 또는 Rule ID 연결/해제, Tag ID 연결/해제, 시간/진행도 업데이트 등의 액션은 updateProblem으로 처리
 }
 
-export interface ObjectiveSlice {
-  objectives: Objective[];
-  isLoadingObjectives: boolean;
-  // Problem ID로 해당 Problem의 최상위 Objective 로드, 또는 parent Objective ID로 하위 Objective 로드
-  fetchObjectives: (
-    options:
-      | { problemId: string; parentObjectiveId?: string | null }
-      | { parentObjectiveId: string; problemId?: string }
-  ) => Promise<void>;
-  addObjective: (
-    // Omit: id, createdAt, childObjectiveIds, blockingProblemIds, status, timeSpent, completedAt
-    // 필수: problemId, title
-    // 옵션: description, parentId, deadline, order, completionCriteriaText, numericalTarget, currentNumericalProgress, status
-    objectiveData: Omit<
-      Objective,
-      | "id"
-      | "createdAt"
-      | "childObjectiveIds"
-      | "blockingProblemIds"
-      | "status"
-      | "timeSpent"
-      | "completedAt"
-      | "workSessionIds"
-    > & {
-      problemId: string;
-      title: string;
-      parentId?: string | null;
-      status?: ObjectiveStatus;
-    }
-  ) => Promise<Objective | null>;
-  updateObjective: (objectiveToUpdate: Objective) => Promise<Objective | null>;
-  deleteObjective: (objectiveId: string) => Promise<boolean>;
-  getObjectiveById: (id: string) => Objective | undefined;
-  // Objective에 blockingProblemId 추가/제거 등의 액션은 updateObjective로 처리
+/**
+ * @description 주간 문제(WeeklyProblem) 상태 관리를 위한 슬라이스
+ */
+export interface WeeklyProblemSlice {
+  weeklyProblems: WeeklyProblem[];
+  isLoadingWeeklyProblems: boolean;
+  fetchWeeklyProblems: (options: {
+    personaId?: string;
+    weekIdentifier?: string;
+  }) => Promise<void>;
+  addWeeklyProblem: (
+    weeklyProblemData: Omit<WeeklyProblem, "id" | "createdAt">
+  ) => Promise<WeeklyProblem | null>;
+  updateWeeklyProblem: (
+    weeklyProblemToUpdate: WeeklyProblem
+  ) => Promise<WeeklyProblem | null>;
+  deleteWeeklyProblem: (weeklyProblemId: string) => Promise<boolean>;
+  getWeeklyProblemById: (id: string) => WeeklyProblem | undefined;
 }
 
-export interface RuleSlice {
-  rules: Rule[];
-  isLoadingRules: boolean;
-  fetchRules: (problemId: string) => Promise<void>;
-  addRule: (
-    ruleData: Omit<Rule, "id" | "createdAt"> & {
-      problemId: string;
-      title: string;
-    }
-  ) => Promise<Rule | null>;
-  updateRule: (ruleToUpdate: Rule) => Promise<Rule | null>;
-  deleteRule: (ruleId: string) => Promise<boolean>;
-  getRuleById: (id: string) => Rule | undefined;
+export interface ThreadSlice {
+  threadItems: ThreadItem[];
+  isLoadingThreads: boolean;
+  fetchThreads: (options: {
+    problemId: string;
+    parentId?: string | null;
+  }) => Promise<void>;
+  addThreadItem: (
+    itemData: Omit<
+      BaseThreadItem,
+      "id" | "createdAt" | "childThreadIds" | "resultIds"
+    > &
+      // 각 하위 타입의 고유한 필드들을 옵셔널하게 추가
+      Partial<Pick<BottleneckThreadItem, "isResolved">> &
+      Partial<Pick<TaskThreadItem, "isCompleted">> &
+      Partial<
+        Pick<
+          ActionThreadItem,
+          "status" | "timeSpent" | "deadline" | "completedAt"
+        >
+      > &
+      Partial<Pick<SessionThreadItem, "timeSpent" | "startTime">>
+  ) => Promise<ThreadItem | null>;
+  updateThreadItem: (itemToUpdate: ThreadItem) => Promise<ThreadItem | null>;
+  deleteThreadItem: (itemId: string) => Promise<boolean>;
+  getThreadItemById: (id: string) => ThreadItem | undefined;
+  getThreadItemByType: <T extends ThreadItemType>(options: {
+    problemId: string;
+    type: T;
+  }) => (ThreadItem & { type: T })[];
+}
+
+export interface ResultSlice {
+  results: Result[];
+  isLoadingResults: boolean;
+  fetchResults: (parentThreadId: string) => Promise<void>;
+  addResult: (
+    resultData: Omit<Result, "id" | "createdAt">
+  ) => Promise<Result | null>;
+  updateResult: (resultToUpdate: Result) => Promise<Result | null>;
+  deleteResult: (resultId: string) => Promise<boolean>;
+  getResultById: (id: string) => Result | undefined;
 }
 
 export interface TagSlice {
   tags: Tag[];
   isLoadingTags: boolean;
-  fetchTags: () => Promise<void>; // 모든 태그를 가져오거나, 사용자 ID 기반 필터링 가능
-  addTag: (
-    tagData: Omit<Tag, "id" | "createdAt"> // name, color?
-  ) => Promise<Tag | null>;
+  fetchTags: () => Promise<void>;
+  addTag: (tagData: Omit<Tag, "id">) => Promise<Tag | null>;
   updateTag: (tagToUpdate: Tag) => Promise<Tag | null>;
   deleteTag: (tagId: string) => Promise<boolean>;
   getTagById: (id: string) => Tag | undefined;
-  // Problem에 Tag 연결/해제는 ProblemSlice의 updateProblem을 통해 Problem.tagIds를 수정하여 처리
 }
 
 export interface StarReportSlice {
@@ -154,48 +155,16 @@ export interface UIStateSlice {
   setGlobalLoading: (isLoading: boolean) => void; // 로딩 상태 변경 액션
 }
 
-// --- WeeklyProblem Slice 인터페이스 정의 ---
-export interface WeeklyProblemSlice {
-  weeklyProblems: WeeklyProblem[];
-  isLoadingWeeklyProblems: boolean;
-  // 특정 페르소나의 특정 주간 문제, 또는 전체 기록을 가져오는 액션
-  fetchWeeklyProblems: (options?: {
-    personaId?: string;
-    weekIdentifier?: string;
-  }) => Promise<void>;
-  addWeeklyProblem: (
-    data: Omit<WeeklyProblem, "id" | "createdAt">
-  ) => Promise<WeeklyProblem | null>;
-  updateWeeklyProblem: (item: WeeklyProblem) => Promise<WeeklyProblem | null>;
-  deleteWeeklyProblem: (id: string) => Promise<boolean>;
-  getWeeklyProblemById: (id: string) => WeeklyProblem | undefined;
-}
-
-export interface WorkSessionSlice {
-  workSessions: WorkSession[];
-  isLoadingWorkSessions: boolean;
-  fetchWorkSessions: (objectiveId: string) => Promise<void>;
-  addWorkSession: (
-    sessionData: Omit<WorkSession, "id" | "createdAt">
-  ) => Promise<WorkSession | null>;
-  updateWorkSession: (
-    sessionToUpdate: WorkSession
-  ) => Promise<WorkSession | null>;
-  deleteWorkSession: (sessionId: string) => Promise<boolean>;
-  getWorkSessionById: (id: string) => WorkSession | undefined;
-}
-
-// --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 (수정) ---
+// --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---
 export interface AppState
   extends PersonaSlice,
     ProblemSlice,
-    ObjectiveSlice,
-    RuleSlice,
+    WeeklyProblemSlice, // 새로 추가된 슬라이스
+    ThreadSlice,
+    ResultSlice,
     TagSlice,
-    StarReportSlice,
     UIStateSlice,
-    WeeklyProblemSlice,
-    WorkSessionSlice {
-  // 새로 추가
-  // 전역 상태는 여기에 추가
+    StarReportSlice {
+  // UI 상태 등을 위한 별도의 Slice 추가 가능
+  // extends UIStateSlice
 }

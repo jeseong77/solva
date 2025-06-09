@@ -1,27 +1,25 @@
-// src/lib/tagSlice.ts
+// src/store/slices/tagSlice.ts
 
-import { StateCreator } from "zustand";
-import { Tag, Problem } from "@/types"; // Problem is needed for updating Problem.tagIds
+import { getDatabase } from "@/lib/db";
+import { Tag } from "@/types";
 import type {
   AppState,
   TagSlice as TagSliceInterface,
 } from "@/types/storeTypes";
-import { getDatabase } from "@/lib/db";
-import { v4 as uuidv4 } from "uuid";
 import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+import { StateCreator } from "zustand";
 
-// Helper to parse Tag from DB record
+/**
+ * 데이터베이스에서 가져온 데이터를 Tag 타입으로 변환합니다.
+ * @param dbItem - 데이터베이스의 row 아이템
+ * @returns Tag 타입 객체
+ */
 const parseTagFromDB = (dbItem: any): Tag => ({
   id: dbItem.id,
   name: dbItem.name,
-  color: dbItem.color === null ? undefined : dbItem.color, // Handle null from DB for optional color
-  createdAt: new Date(dbItem.createdAt),
+  color: dbItem.color === null ? undefined : dbItem.color,
 });
-
-// Helper to sort tags by name
-const sortTagsByName = (tags: Tag[]): Tag[] => {
-  return [...tags].sort((a, b) => a.name.localeCompare(b.name));
-};
 
 export const createTagSlice: StateCreator<
   AppState,
@@ -32,129 +30,100 @@ export const createTagSlice: StateCreator<
   tags: [],
   isLoadingTags: false,
 
+  /**
+   * 데이터베이스에서 모든 태그를 불러옵니다.
+   */
   fetchTags: async () => {
     set({ isLoadingTags: true });
     try {
       const db = await getDatabase();
-      const query = "SELECT * FROM Tags ORDER BY name ASC;";
-      const results = await db.getAllAsync<any>(query);
-      const fetchedTags = results.map(parseTagFromDB);
-      set({ tags: fetchedTags, isLoadingTags: false });
-      // console.log(`[TagSlice] Tags fetched:`, fetchedTags.length);
+      const dbResults = await db.getAllAsync<any>(
+        "SELECT * FROM Tags ORDER BY name ASC;"
+      );
+      const fetchedTags = dbResults.map(parseTagFromDB);
+
+      set({
+        tags: fetchedTags,
+        isLoadingTags: false,
+      });
+
+      console.log(`[TagSlice] ${fetchedTags.length} tags fetched.`);
     } catch (error) {
       console.error("[TagSlice] Error fetching tags:", error);
       set({ isLoadingTags: false });
     }
   },
 
-  // tagData: Omit<Tag, "id" | "createdAt">
-  // Expected to contain: name
-  // Optional: color
+  /**
+   * 새로운 태그를 추가합니다. 태그 이름은 고유해야 합니다.
+   */
   addTag: async (tagData) => {
     const newTag: Tag = {
       id: uuidv4(),
-      name: tagData.name,
-      color: tagData.color,
-      createdAt: new Date(),
+      ...tagData,
     };
 
-    const db = await getDatabase();
     try {
-      // The Tags table has a UNIQUE constraint on the name column.
-      // Attempting to insert a duplicate name will result in a SQLiteConstraintError.
-      // This should be handled by the caller or UI, e.g., by checking if a tag with that name already exists.
+      const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO Tags (id, name, color, createdAt)
-         VALUES (?, ?, ?, ?);`,
-        [
-          newTag.id,
-          newTag.name,
-          newTag.color === undefined ? null : newTag.color,
-          newTag.createdAt.toISOString(),
-        ]
+        `INSERT INTO Tags (id, name, color) VALUES (?, ?, ?);`,
+        [newTag.id, newTag.name, newTag.color ?? null]
       );
 
-      const updatedTags = sortTagsByName([...get().tags, newTag]);
-      set({ tags: updatedTags });
+      set((state) => ({
+        tags: [...state.tags, newTag].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        ),
+      }));
+
       console.log("[TagSlice] Tag added:", newTag.name);
       return newTag;
     } catch (error) {
-      // Specifically check for constraint errors if possible, or let the caller handle generic errors.
-      // For example, error.message might include "UNIQUE constraint failed: Tags.name"
-      console.error(
-        "[TagSlice] Error adding tag (possibly duplicate name):",
-        error
-      );
+      // UNIQUE 제약 조건 위반 시 에러가 발생할 수 있습니다.
+      console.error("[TagSlice] Error adding tag:", error);
       return null;
     }
   },
 
+  /**
+   * 기존 태그를 업데이트합니다.
+   */
   updateTag: async (tagToUpdate) => {
-    const currentTags = get().tags;
-    const tagIndex = currentTags.findIndex((t) => t.id === tagToUpdate.id);
-    if (tagIndex === -1) {
-      console.error("[TagSlice] Tag not found for update:", tagToUpdate.id);
-      return null;
-    }
-
-    // Ensure createdAt is not part of the update payload to DB if it's immutable
-    const { id, createdAt, ...updateData } = tagToUpdate;
-
-    const db = await getDatabase();
     try {
-      // Similar to addTag, updating the name to an existing name (not its own) would violate UNIQUE constraint.
-      await db.runAsync(
-        `UPDATE Tags SET name = ?, color = ?
-         WHERE id = ?;`,
-        [
-          updateData.name,
-          updateData.color === undefined ? null : updateData.color,
-          id,
-        ]
-      );
+      const db = await getDatabase();
+      await db.runAsync(`UPDATE Tags SET name = ?, color = ? WHERE id = ?;`, [
+        tagToUpdate.name,
+        tagToUpdate.color ?? null,
+        tagToUpdate.id,
+      ]);
 
-      const updatedTags = sortTagsByName(
-        currentTags.map((t) => (t.id === id ? tagToUpdate : t))
-      );
-      set({ tags: updatedTags });
+      set((state) => ({
+        tags: state.tags
+          .map((t) => (t.id === tagToUpdate.id ? tagToUpdate : t))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+
       console.log("[TagSlice] Tag updated:", tagToUpdate.name);
       return tagToUpdate;
     } catch (error) {
-      console.error(
-        "[TagSlice] Error updating tag (possibly duplicate name):",
-        error
-      );
+      console.error("[TagSlice] Error updating tag:", error);
       return null;
     }
   },
 
+  /**
+   * 태그를 삭제합니다.
+   * 참고: 이 작업은 Problem에 연결된 태그 문자열을 자동으로 제거하지 않습니다.
+   */
   deleteTag: async (tagId) => {
-    const db = await getDatabase();
     try {
+      const db = await getDatabase();
       await db.runAsync(`DELETE FROM Tags WHERE id = ?;`, [tagId]);
 
-      // Remove the tagId from all problems that might be using it
-      const problemsToUpdate: Problem[] = [];
-      get().problems.forEach((problem) => {
-        if (problem.tagIds && problem.tagIds.includes(tagId)) {
-          problemsToUpdate.push({
-            ...problem,
-            tagIds: problem.tagIds.filter((id) => id !== tagId),
-          });
-        }
-      });
+      set((state) => ({
+        tags: state.tags.filter((t) => t.id !== tagId),
+      }));
 
-      // Update each affected problem
-      // This uses Promise.all to wait for all updates to complete.
-      // Note: updateProblem itself also updates the problem in the DB.
-      await Promise.all(
-        problemsToUpdate.map((problem) => get().updateProblem(problem))
-      );
-
-      const updatedTags = sortTagsByName(
-        get().tags.filter((t) => t.id !== tagId)
-      );
-      set({ tags: updatedTags });
       console.log("[TagSlice] Tag deleted:", tagId);
       return true;
     } catch (error) {
@@ -163,6 +132,9 @@ export const createTagSlice: StateCreator<
     }
   },
 
+  /**
+   * ID로 태그를 동기적으로 조회합니다.
+   */
   getTagById: (id: string) => {
     return get().tags.find((t) => t.id === id);
   },

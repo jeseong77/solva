@@ -1,61 +1,133 @@
 import PersonaList from "@/components/persona/personaList";
+import ProblemList from "@/components/problem/ProblemList";
+import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
 import { useAppStore } from "@/store/store";
-import { useRouter } from "expo-router";
-import React, { useEffect, useCallback } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo } from "react";
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Alert,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-import { useFocusEffect } from "expo-router";
+
+// 현재 날짜에 대한 주차 식별자(예: "2025-W23")를 생성하는 헬퍼 함수
+const getWeekIdentifier = (date: Date): string => {
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  );
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(
+    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7
+  );
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+};
 
 export default function HomeScreen() {
   const router = useRouter();
 
+  // 1. WeeklyProblem 관련 상태와 액션을 추가로 가져옵니다.
   const {
     personas,
     fetchPersonas,
     selectedPersonaId,
     setSelectedPersonaId,
     deletePersona,
+    problems,
+    fetchProblems,
+    fetchThreads,
+    weeklyProblems,
+    fetchWeeklyProblems,
   } = useAppStore(
     useShallow((state) => ({
-      personas: state.personas, // 길게 눌렀을 때 메뉴에 페르소나 이름을 표시하기 위해 필요
+      personas: state.personas,
       fetchPersonas: state.fetchPersonas,
-      selectedPersonaId: state.selectedPersonaId, // 현재 선택된 페르소나 ID
-      setSelectedPersonaId: state.setSelectedPersonaId, // 페르소나를 선택하는 액션
-      deletePersona: state.deletePersona, // 페르소나 삭제 액션
+      selectedPersonaId: state.selectedPersonaId,
+      setSelectedPersonaId: state.setSelectedPersonaId,
+      deletePersona: state.deletePersona,
+      problems: state.problems,
+      fetchProblems: state.fetchProblems,
+      fetchThreads: state.fetchThreads,
+      weeklyProblems: state.weeklyProblems,
+      fetchWeeklyProblems: state.fetchWeeklyProblems,
     }))
   );
 
-  // 화면이 포커스될 때마다 페르소나 목록을 다시 가져와
-  // 다른 화면에서 추가/삭제/수정된 내용이 즉시 반영되도록 합니다.
   useFocusEffect(
     useCallback(() => {
       fetchPersonas();
     }, [fetchPersonas])
   );
 
-  // 짧게 탭했을 때: 선택된 페르소나 ID를 스토어에 저장하는 핸들러
+  // 2. 선택된 페르소나가 변경될 때마다 관련 데이터를 모두 불러옵니다.
+  useEffect(() => {
+    if (selectedPersonaId) {
+      const loadDataForPersona = async () => {
+        // 문제들과 주간 문제를 병렬로 가져와 성능 향상
+        await Promise.all([
+          fetchProblems(selectedPersonaId),
+          fetchWeeklyProblems({ personaId: selectedPersonaId }),
+        ]);
+
+        const currentProblems = useAppStore.getState().problems;
+        const problemsForPersona = currentProblems.filter(
+          (p) => p.personaId === selectedPersonaId
+        );
+
+        for (const problem of problemsForPersona) {
+          await fetchThreads({ problemId: problem.id });
+        }
+      };
+      loadDataForPersona();
+    }
+  }, [selectedPersonaId, fetchProblems, fetchWeeklyProblems, fetchThreads]);
+
+  // 3. 렌더링에 필요한 데이터를 계산합니다.
+  const selectedPersona = useMemo(
+    () => personas.find((p) => p.id === selectedPersonaId),
+    [personas, selectedPersonaId]
+  );
+
+  const filteredProblems = useMemo(
+    () =>
+      selectedPersonaId
+        ? problems.filter((p) => p.personaId === selectedPersonaId)
+        : [],
+    [problems, selectedPersonaId]
+  );
+
+  // 이번 주에 해당하는 weeklyProblem과 problem 객체를 찾습니다.
+  const currentWeeklyProblem = useMemo(() => {
+    if (!selectedPersonaId) return undefined;
+    const weekIdentifier = getWeekIdentifier(new Date());
+    return weeklyProblems.find(
+      (wp) =>
+        wp.personaId === selectedPersonaId &&
+        wp.weekIdentifier === weekIdentifier
+    );
+  }, [weeklyProblems, selectedPersonaId]);
+
+  const problemForWeekly = useMemo(() => {
+    if (!currentWeeklyProblem) return undefined;
+    return problems.find((p) => p.id === currentWeeklyProblem.problemId);
+  }, [problems, currentWeeklyProblem]);
+
+  // 핸들러 함수들
   const handleSelectPersona = (personaId: string) => {
-    // 이미 선택된 페르소나를 다시 탭하면 선택 해제 (선택적 기능)
     const newSelectedId = selectedPersonaId === personaId ? null : personaId;
     setSelectedPersonaId(newSelectedId);
-    console.log("Selected Persona ID:", newSelectedId);
   };
 
-  // 길게 눌렀을 때: 컨텍스트 메뉴(Alert)를 표시하는 핸들러
   const handleLongPressPersona = (personaId: string) => {
     const persona = personas.find((p) => p.id === personaId);
     if (!persona) return;
-
     Alert.alert(
-      `"${persona.title}"`, // 메뉴 제목
-      "어떤 작업을 하시겠습니까?", // 메뉴 설명
+      `"${persona.title}"`,
+      "어떤 작업을 하시겠습니까?",
       [
         {
           text: "편집하기",
@@ -64,22 +136,18 @@ export default function HomeScreen() {
         {
           text: "삭제하기",
           onPress: () => showDeleteConfirmation(personaId, persona.title),
-          style: "destructive", // iOS에서 빨간색으로 표시
+          style: "destructive",
         },
-        {
-          text: "취소",
-          style: "cancel",
-        },
+        { text: "취소", style: "cancel" },
       ],
       { cancelable: true }
     );
   };
 
-  // 삭제 최종 확인 Alert
   const showDeleteConfirmation = (personaId: string, title: string) => {
     Alert.alert(
       `"${title}" 페르소나 삭제`,
-      "이 페르소나와 연결된 모든 문제(Problem)들이 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      "이 페르소나와 연결된 모든 데이터가 함께 삭제됩니다. 정말 삭제하시겠습니까?",
       [
         { text: "취소", style: "cancel" },
         {
@@ -98,9 +166,27 @@ export default function HomeScreen() {
     );
   };
 
-  // '+' 버튼 클릭 시 호출될 핸들러
   const handleNavigateToCreatePersona = () => {
     router.push("/persona/create");
+  };
+
+  const handleNavigateToProblemDetail = (problemId: string) => {
+    router.push(`/problem/${problemId}`);
+  };
+
+  const handleNavigateToCreateProblem = () => {
+    if (selectedPersonaId) {
+      router.push(`/problem/create?personaId=${selectedPersonaId}`);
+    } else {
+      Alert.alert("알림", "문제를 추가할 페르소나를 먼저 선택해주세요.");
+    }
+  };
+
+  // 4. WeeklyProblemCard에 전달할 핸들러 함수를 정의합니다.
+  const handleNavigateToSetWeeklyProblem = () => {
+    // 주간 문제를 설정하거나 변경하는 화면으로 이동하는 로직
+    // 예: router.push(`/weekly-problem/set?personaId=${selectedPersonaId}`);
+    Alert.alert("알림", "주간 문제 설정 기능은 준비 중입니다.");
   };
 
   return (
@@ -112,13 +198,30 @@ export default function HomeScreen() {
         onPressAddPersona={handleNavigateToCreatePersona}
       />
       <ScrollView style={styles.mainContentContainer}>
-        <View style={styles.placeholderContainer}>
-          <Text style={styles.placeholderText}>
-            {selectedPersonaId
-              ? "선택된 페르소나의 문제 목록이 여기에 표시됩니다."
-              : "페르소나를 선택하여 관련 문제들을 확인하세요."}
-          </Text>
-        </View>
+        {/* 5. 선택된 페르소나가 있을 경우 두 컴포넌트를 순서대로 렌더링합니다. */}
+        {selectedPersona ? (
+          <>
+            <WeeklyProblemCard
+              persona={selectedPersona}
+              weeklyProblem={currentWeeklyProblem}
+              problem={problemForWeekly}
+              onPress={handleNavigateToProblemDetail}
+              onPressNew={handleNavigateToSetWeeklyProblem}
+            />
+            <ProblemList
+              persona={selectedPersona}
+              problems={filteredProblems}
+              onPressProblem={handleNavigateToProblemDetail}
+              onPressNewProblem={handleNavigateToCreateProblem}
+            />
+          </>
+        ) : (
+          <View style={styles.placeholderContainer}>
+            <Text style={styles.placeholderText}>
+              페르소나를 선택하여 관련 문제들을 확인하세요.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -134,8 +237,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
   },
   placeholderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
-    marginTop: 20,
   },
   placeholderText: {
     fontSize: 16,
