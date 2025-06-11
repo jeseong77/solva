@@ -129,8 +129,7 @@ export default function WeeklyProblemCard({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    paddingTop: 24, // 위쪽 여백을 더 주어 시각적 중요도 강조
-    paddingBottom: 8,
+    paddingTop: 24,
   },
   componentTitle: {
     fontSize: 18,

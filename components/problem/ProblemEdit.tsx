@@ -242,6 +242,7 @@ const styles = StyleSheet.create({
   bodyInput: {
     fontSize: 17,
     lineHeight: 26,
+    marginTop: 10,
     color: "#343a40",
     flex: 1,
   },

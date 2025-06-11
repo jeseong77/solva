@@ -80,14 +80,12 @@ const ProblemItem = ({
         <View style={styles.statsContainer}>
           <Feather name="git-branch" size={14} color="#6c757d" />
           <Text style={styles.statsText}>{stats.totalThreads}</Text>
-          {stats.tasks > 0 && (
+          
             <>
               <Text style={styles.separator}>·</Text>
               <Feather name="check-square" size={14} color="#6c757d" />
               <Text style={styles.statsText}>{stats.tasks}</Text>
             </>
-          )}
-          {stats.actions > 0 && (
             <>
               <Text style={styles.separator}>·</Text>
               <MaterialCommunityIcons
@@ -97,14 +95,11 @@ const ProblemItem = ({
               />
               <Text style={styles.statsText}>{stats.actions}</Text>
             </>
-          )}
-          {stats.sessions > 0 && (
             <>
               <Text style={styles.separator}>·</Text>
               <Feather name="clock" size={14} color="#6c757d" />
               <Text style={styles.statsText}>{stats.sessions}</Text>
             </>
-          )}
         </View>
       </View>
     </TouchableOpacity>

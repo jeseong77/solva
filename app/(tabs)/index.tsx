@@ -1,4 +1,5 @@
 import PersonaList from "@/components/persona/personaList";
+import ProblemDetail from "@/components/problem/ProblemDetail";
 import ProblemEdit from "@/components/problem/ProblemEdit";
 import ProblemList from "@/components/problem/ProblemList";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
@@ -34,6 +35,8 @@ export default function HomeScreen() {
   const [editingProblemId, setEditingProblemId] = useState<string | undefined>(
     undefined
   );
+  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
+  const [viewingProblemId, setViewingProblemId] = useState<string | null>(null);
 
   // 1. WeeklyProblem 관련 상태와 액션을 추가로 가져옵니다.
   const {
@@ -171,12 +174,13 @@ export default function HomeScreen() {
     );
   };
 
-  const handleNavigateToCreatePersona = () => {
-    router.push("/persona/create");
+  const handleNavigateToProblemDetail = (problemId: string) => {
+    setViewingProblemId(problemId);
+    setDetailModalVisible(true);
   };
 
-  const handleNavigateToProblemDetail = (problemId: string) => {
-    router.push(`/problem/${problemId}`);
+  const handleNavigateToCreatePersona = () => {
+    router.push("/persona/create");
   };
 
   const handleCreateProblem = () => {
@@ -246,6 +250,13 @@ export default function HomeScreen() {
           personaId={selectedPersona.id} // 생성 시 현재 페르소나 ID를 알려주기 위함
         />
       )}
+
+      {/* ProblemDetail 모달 렌더링 */}
+      <ProblemDetail
+        isVisible={isDetailModalVisible}
+        onClose={() => setDetailModalVisible(false)}
+        problemId={viewingProblemId}
+      />
     </SafeAreaView>
   );
 }
