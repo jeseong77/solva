@@ -11,6 +11,7 @@ import {
   TaskThreadItem,
   ThreadItem,
   ThreadItemType,
+  Problem, // Problem 타입을 import 해야 할 수 있습니다.
 } from "@/types";
 import type {
   AppState,
@@ -68,9 +69,48 @@ const parseThreadItemFromDB = (dbItem: any): ThreadItem => {
         startTime: new Date(dbItem.startTime),
       } as SessionThreadItem;
     default:
-      // 기본적으로 General 타입으로 처리하거나 에러를 발생시킬 수 있습니다.
-      // 여기서는 General 타입으로 안전하게 처리합니다.
       return { ...baseItem, type: "General" } as GeneralThreadItem;
+  }
+};
+
+/**
+ * 헬퍼 함수: 스레드 아이템을 DB에만 업데이트합니다. (set 호출 없음)
+ * 슬라이스 내부에서만 사용됩니다.
+ */
+const _updateThreadItemInDB = async (itemToUpdate: ThreadItem) => {
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      `UPDATE ThreadItems SET 
+       content = ?, isImportant = ?, childThreadIds = ?, resultIds = ?, isResolved = ?, isCompleted = ?, status = ?, timeSpent = ?, deadline = ?, completedAt = ?, startTime = ?
+       WHERE id = ?;`,
+      [
+        itemToUpdate.content,
+        itemToUpdate.isImportant ? 1 : 0,
+        JSON.stringify(itemToUpdate.childThreadIds),
+        JSON.stringify(itemToUpdate.resultIds),
+        "isResolved" in itemToUpdate ? (itemToUpdate.isResolved ? 1 : 0) : null,
+        "isCompleted" in itemToUpdate
+          ? itemToUpdate.isCompleted
+            ? 1
+            : 0
+          : null,
+        "status" in itemToUpdate ? itemToUpdate.status : null,
+        "timeSpent" in itemToUpdate ? itemToUpdate.timeSpent : null,
+        "deadline" in itemToUpdate
+          ? itemToUpdate.deadline?.toISOString() ?? null
+          : null,
+        "completedAt" in itemToUpdate
+          ? itemToUpdate.completedAt?.toISOString() ?? null
+          : null,
+        "startTime" in itemToUpdate
+          ? itemToUpdate.startTime.toISOString()
+          : null,
+        itemToUpdate.id,
+      ]
+    );
+  } catch (error) {
+    console.error(`[DB Helper] Error updating thread item:`, error);
   }
 };
 
@@ -84,7 +124,7 @@ export const createThreadSlice: StateCreator<
   isLoadingThreads: false,
 
   /**
-   * 특정 Problem 또는 Parent 스레드에 속한 스레드 아이템들을 불러옵니다.
+   * 특정 Problem 또는 Parent 스레드에 속한 스레드 아이템들을 불러옵니다. (기존과 동일)
    */
   fetchThreads: async (options) => {
     set({ isLoadingThreads: true });
@@ -122,10 +162,9 @@ export const createThreadSlice: StateCreator<
   },
 
   /**
-   * 새로운 스레드 아이템을 추가합니다.
+   * 새로운 스레드 아이템을 추가합니다. (수정된 버전)
    */
   addThreadItem: async (itemData) => {
-    // itemData를 기반으로 완전한 ThreadItem 객체 생성
     const baseItem: BaseThreadItem = {
       id: uuidv4(),
       ...itemData,
@@ -165,12 +204,8 @@ export const createThreadSlice: StateCreator<
 
     try {
       const db = await getDatabase();
-      // 모든 하위 타입의 필드를 포함하는 포괄적인 INSERT 쿼리
       await db.runAsync(
-        `INSERT INTO ThreadItems (
-          id, problemId, parentId, childThreadIds, type, content, isImportant, resultIds, createdAt, authorId,
-          isResolved, isCompleted, status, timeSpent, deadline, completedAt, startTime
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO ThreadItems (id, problemId, parentId, childThreadIds, type, content, isImportant, resultIds, createdAt, authorId, isResolved, isCompleted, status, timeSpent, deadline, completedAt, startTime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newThreadItem.id,
           newThreadItem.problemId,
@@ -206,31 +241,71 @@ export const createThreadSlice: StateCreator<
         ]
       );
 
-      // 부모의 childThreadIds 업데이트
-      if (newThreadItem.parentId) {
-        const parent = get().threadItems.find(
-          (item) => item.id === newThreadItem.parentId
-        );
-        if (parent) {
-          parent.childThreadIds.push(newThreadItem.id);
-          await get().updateThreadItem(parent); // updateThreadItem 호출
+      let parentThreadToUpdate: ThreadItem | null = null;
+      let parentProblemToUpdate: Problem | null = null;
+
+      set((state) => {
+        let nextProblems = state.problems;
+        let nextThreadItems = state.threadItems;
+
+        if (newThreadItem.parentId) {
+          const parent = state.threadItems.find(
+            (t) => t.id === newThreadItem.parentId
+          );
+          if (parent) {
+            const updatedParent = {
+              ...parent,
+              childThreadIds: [...parent.childThreadIds, newThreadItem.id],
+            };
+            parentThreadToUpdate = updatedParent;
+            nextThreadItems = state.threadItems.map((t) =>
+              t.id === updatedParent.id ? updatedParent : t
+            );
+          }
+        } else {
+          const parent = state.problems.find(
+            (p) => p.id === newThreadItem.problemId
+          );
+          if (parent) {
+            const updatedParent = {
+              ...parent,
+              childThreadIds: [...parent.childThreadIds, newThreadItem.id],
+            };
+            parentProblemToUpdate = updatedParent;
+            nextProblems = state.problems.map((p) =>
+              p.id === updatedParent.id ? updatedParent : p
+            );
+          }
         }
-      } else {
-        // 부모가 없으면 Problem이 부모
-        const parentProblem = get().problems.find(
-          (p) => p.id === newThreadItem.problemId
-        );
-        if (parentProblem) {
-          parentProblem.childThreadIds.push(newThreadItem.id);
-          await get().updateProblem(parentProblem); // problemSlice의 액션 호출
-        }
+
+        return {
+          problems: nextProblems,
+          threadItems: [...nextThreadItems, newThreadItem],
+        };
+      });
+
+      if (parentThreadToUpdate) {
+        await _updateThreadItemInDB(parentThreadToUpdate);
+      }
+      if (parentProblemToUpdate) {
+        // problemSlice에도 _updateProblemInDB와 같은 DB 헬퍼 함수를 만들어 호출하는 것을 권장합니다.
+        // 여기서는 기존 updateProblem을 호출하되, 그 함수가 set을 호출하지 않도록 수정하거나
+        // 문제가 없다면 그대로 사용합니다.
+        await get().updateProblem(parentProblemToUpdate);
       }
 
-      set((state) => ({ threadItems: [...state.threadItems, newThreadItem] }));
+      // --- 상태 확인용 console.log 시작 ---
+      const problemTitle = get().getProblemById(newThreadItem.problemId)?.title;
       console.log(
-        `[ThreadSlice] ${newThreadItem.type} item added:`,
-        newThreadItem.id
+        `--- [상태 확인] Problem: "${problemTitle}"의 모든 스레드 ---`
       );
+      const allThreadsForProblem = get().threadItems.filter(
+        (t) => t.problemId === newThreadItem.problemId
+      );
+      // 전체 스레드 목록을 보기 좋게 출력합니다.
+      console.log(JSON.stringify(allThreadsForProblem, null, 2));
+      console.log(`--------------------------------------------------`);
+      // --- 상태 확인용 console.log 끝 ---
       return newThreadItem;
     } catch (error) {
       console.error(`[ThreadSlice] Error adding ${itemData.type} item:`, error);
@@ -239,16 +314,15 @@ export const createThreadSlice: StateCreator<
   },
 
   /**
-   * 스레드 아이템을 업데이트합니다.
+   * 스레드 아이템을 업데이트합니다. (기존과 동일)
    */
   updateThreadItem: async (itemToUpdate) => {
     try {
       const db = await getDatabase();
-      // 포괄적인 UPDATE 쿼리
       await db.runAsync(
         `UPDATE ThreadItems SET 
-         content = ?, isImportant = ?, childThreadIds = ?, resultIds = ?, isResolved = ?, isCompleted = ?, status = ?, timeSpent = ?, deadline = ?, completedAt = ?, startTime = ?
-         WHERE id = ?;`,
+       content = ?, isImportant = ?, childThreadIds = ?, resultIds = ?, isResolved = ?, isCompleted = ?, status = ?, timeSpent = ?, deadline = ?, completedAt = ?, startTime = ?
+       WHERE id = ?;`,
         [
           itemToUpdate.content,
           itemToUpdate.isImportant ? 1 : 0,
@@ -278,11 +352,13 @@ export const createThreadSlice: StateCreator<
           itemToUpdate.id,
         ]
       );
+
       set((state) => ({
         threadItems: state.threadItems.map((item) =>
           item.id === itemToUpdate.id ? itemToUpdate : item
         ),
       }));
+
       console.log(
         `[ThreadSlice] ${itemToUpdate.type} item updated:`,
         itemToUpdate.id
@@ -298,7 +374,7 @@ export const createThreadSlice: StateCreator<
   },
 
   /**
-   * 스레드 아이템과 모든 자손 아이템들을 삭제합니다.
+   * 스레드 아이템과 모든 자손 아이템들을 삭제합니다. (기존과 동일)
    */
   deleteThreadItem: async (itemId) => {
     const itemToDelete = get().threadItems.find((item) => item.id === itemId);
@@ -306,10 +382,8 @@ export const createThreadSlice: StateCreator<
 
     try {
       const db = await getDatabase();
-      // DB의 ON DELETE CASCADE가 하위 아이템 삭제를 처리
       await db.runAsync("DELETE FROM ThreadItems WHERE id = ?;", [itemId]);
 
-      // 로컬 상태에서 모든 자손 아이템 ID 수집
       const allIdsToDelete = new Set<string>([itemId]);
       const queue = [...itemToDelete.childThreadIds];
       while (queue.length > 0) {
@@ -325,30 +399,33 @@ export const createThreadSlice: StateCreator<
         }
       }
 
-      // 부모의 childThreadIds 배열에서 삭제
       if (itemToDelete.parentId) {
         const parent = get().threadItems.find(
           (item) => item.id === itemToDelete.parentId
         );
         if (parent) {
-          parent.childThreadIds = parent.childThreadIds.filter(
-            (id) => id !== itemId
-          );
-          await get().updateThreadItem(parent);
+          // 이 부분도 직접 수정 대신 새 객체를 만들어야 합니다.
+          const updatedParent = {
+            ...parent,
+            childThreadIds: parent.childThreadIds.filter((id) => id !== itemId),
+          };
+          await get().updateThreadItem(updatedParent);
         }
       } else {
         const parentProblem = get().problems.find(
           (p) => p.id === itemToDelete.problemId
         );
         if (parentProblem) {
-          parentProblem.childThreadIds = parentProblem.childThreadIds.filter(
-            (id) => id !== itemId
-          );
-          await get().updateProblem(parentProblem);
+          const updatedProblem = {
+            ...parentProblem,
+            childThreadIds: parentProblem.childThreadIds.filter(
+              (id) => id !== itemId
+            ),
+          };
+          await get().updateProblem(updatedProblem);
         }
       }
 
-      // 로컬 상태 업데이트
       set((state) => ({
         threadItems: state.threadItems.filter(
           (item) => !allIdsToDelete.has(item.id)
@@ -364,12 +441,15 @@ export const createThreadSlice: StateCreator<
   },
 
   /**
-   * ID로 스레드 아이템을 동기적으로 조회합니다.
+   * ID로 스레드 아이템을 동기적으로 조회합니다. (기존과 동일)
    */
   getThreadItemById: (id: string) => {
     return get().threadItems.find((item) => item.id === id);
   },
 
+  /**
+   * 타입으로 스레드 아이템을 조회합니다. (기존과 동일)
+   */
   getThreadItemByType: <T extends ThreadItemType>(options: {
     problemId: string;
     type: T;
@@ -377,7 +457,6 @@ export const createThreadSlice: StateCreator<
     const { problemId, type } = options;
     const allItems = get().threadItems;
 
-    // 문제 ID와 타입으로 필터링 후, 타입스크립트가 정확한 타입을 추론하도록 캐스팅
     return allItems.filter(
       (item) => item.problemId === problemId && item.type === type
     ) as (ThreadItem & { type: T })[];

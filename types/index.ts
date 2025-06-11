@@ -155,3 +155,10 @@ export interface Tag {
   name: string;
   color?: string;
 }
+
+export interface ActiveSession {
+  threadId: string;
+  startTime: number; // 세션 시작 또는 재시작 시의 타임스탬프 (Date.now())
+  isPaused: boolean;
+  pausedTime: number; // 일시정지 전까지 누적된 시간 (밀리초)
+}

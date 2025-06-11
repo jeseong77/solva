@@ -16,6 +16,7 @@ import {
   StarReport,
   Tag,
   ThreadItemType,
+  ActiveSession,
 } from "@/types";
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
@@ -151,8 +152,13 @@ export interface StarReportSlice {
 export interface UIStateSlice {
   selectedPersonaId: string | null; // 현재 선택된 페르소나의 ID
   isLoading: boolean; // 앱의 전반적인 UI 로딩 상태 (선택적)
+  activeSession: ActiveSession | null;
   setSelectedPersonaId: (personaId: string | null) => void; // 선택된 페르소나 ID를 변경하는 액션
   setGlobalLoading: (isLoading: boolean) => void; // 로딩 상태 변경 액션
+  startSession: (threadId: string) => void;
+  pauseSession: () => void;
+  resumeSession: () => void;
+  stopSession: () => void;
 }
 
 // --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---

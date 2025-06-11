@@ -1,11 +1,26 @@
-import { useAppStore } from "@/store/store";
-import { ThreadItemType as ThreadTypeEnum } from "@/types";
-import { Feather } from "@expo/vector-icons";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useShallow } from "zustand/react/shallow";
+// app/components/thread/ThreadItem.tsx
 
-// 타입별 태그의 스타일(색상, 이름)을 정의하는 객체
+import { useAppStore } from "@/store/store";
+import {
+  Persona,
+  Problem,
+  SessionThreadItem,
+  ThreadItem as ThreadItemData,
+  ThreadItemType as ThreadTypeEnum,
+} from "@/types";
+import { Feather } from "@expo/vector-icons";
+import React, { useMemo, useState, useCallback } from "react";
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  LayoutChangeEvent,
+  ViewStyle,
+} from "react-native";
+import { useShallow } from "zustand/react/shallow";
+import ActiveSessionTracker from "./ActiveSessionTracker";
+
 const typeStyles: {
   [key in Exclude<ThreadTypeEnum, "Session">]: {
     color: string;
@@ -19,60 +34,99 @@ const typeStyles: {
   Action: { color: "#d9480f", backgroundColor: "#fff0f6", name: "액션" },
 };
 
-// 컴포넌트가 받을 Props 정의
+// ✅ [오류 수정] formatSeconds 함수의 전체 구현을 포함합니다.
+const formatSeconds = (totalSeconds: number): string => {
+  if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
+    return "00:00";
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const parts = [
+    String(minutes).padStart(2, "0"),
+    String(seconds).padStart(2, "0"),
+  ];
+  if (hours > 0) {
+    parts.unshift(String(hours).padStart(2, "0"));
+  }
+  return parts.join(":");
+};
+
 interface ThreadItemProps {
-  threadId: string;
-  level: number; // 트리 구조의 깊이 (들여쓰기용)
+  thread: ThreadItemData;
+  persona: Persona;
+  problem: Problem;
   onReply: (threadId: string) => void;
   onStartSession: (threadId: string) => void;
+  onStopSession: (threadId: string, elapsedTime: number) => void;
+  level: number;
 }
 
 export default function ThreadItem({
-  threadId,
-  level,
+  thread,
+  persona,
+  problem,
   onReply,
   onStartSession,
+  onStopSession,
+  level,
 }: ThreadItemProps) {
-  // 스토어에서 필요한 함수와 데이터를 가져옵니다.
-  const { thread, problem, persona } = useAppStore(
-    useShallow((state) => {
-      const thread = state.getThreadItemById(threadId);
-      const problem = thread
-        ? state.getProblemById(thread.problemId)
-        : undefined;
-      const persona = problem
-        ? state.getPersonaById(problem.personaId)
-        : undefined;
-      return { thread, problem, persona };
-    })
+  const { activeSession, getThreadItemById } = useAppStore(
+    useShallow((state) => ({
+      activeSession: state.activeSession,
+      getThreadItemById: state.getThreadItemById,
+    }))
   );
 
-  // 데이터가 없으면 아무것도 렌더링하지 않음 (안전 장치)
-  if (!thread || !problem || !persona) {
-    return null;
-  }
+  const [sessionsVisible, setSessionsVisible] = useState(false);
+  const [contentHeight, setContentHeight] = useState(0);
 
-  // 날짜 포맷팅
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    setContentHeight(event.nativeEvent.layout.height);
+  }, []);
+
+  // ✅ [오류 수정] useMemo 함수의 전체 구현을 포함합니다.
+  const sessionStats = useMemo(() => {
+    if (!thread.childThreadIds || thread.childThreadIds.length === 0) {
+      return { sessions: [], totalTime: 0 };
+    }
+    const sessions = thread.childThreadIds
+      .map((id) => getThreadItemById(id))
+      .filter((item): item is SessionThreadItem => item?.type === "Session");
+    const totalTime = sessions.reduce((sum, s) => sum + (s.timeSpent || 0), 0);
+    return { sessions, totalTime };
+  }, [thread.childThreadIds, getThreadItemById]);
+
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(thread.createdAt);
+  }).format(new Date(thread.createdAt));
 
   const tagStyle =
-    typeStyles[thread.type as Exclude<ThreadTypeEnum, "Session">];
+    thread.type !== "Session"
+      ? typeStyles[thread.type as Exclude<ThreadTypeEnum, "Session">]
+      : null;
+  const isSessionActiveOnThisThread = activeSession?.threadId === thread.id;
+
+  const indentLevel = level > 0 ? level : 0;
+  const paddingLeft = 16 + indentLevel * 20;
+
+  // ✅ [오류 수정] position 속성의 타입을 명확히 합니다.
+  const lineStyle: ViewStyle = {
+    position: "absolute",
+    top: 0,
+    height: contentHeight, // onLayout으로 측정한 높이 사용
+    left: paddingLeft / 2 - 8,
+    width: 2,
+    backgroundColor: "#e9ecef",
+  };
 
   return (
-    <View style={[styles.wrapper, { paddingLeft: level * 16 }]}>
-      {/* 왼쪽: 트리 구조를 보여주는 세로선 */}
-      <View style={styles.gutter}>
-        {level > 0 && <View style={styles.threadLine} />}
-      </View>
-
-      {/* 오른쪽: 실제 콘텐츠 영역 */}
-      <View style={styles.contentContainer}>
-        {/* 헤더: 작성자 정보 및 날짜 */}
+    <View style={styles.contentContainer} onLayout={onLayout}>
+      {level > 0 && <View style={lineStyle} />}
+      <View style={{ paddingLeft }}>
         <View style={styles.header}>
-          <Text style={styles.metaText}>
+          <Text style={styles.metaText} numberOfLines={1}>
             {persona.title}/{problem.title}
           </Text>
           <Text style={[styles.metaText, { marginLeft: 8 }]}>
@@ -80,7 +134,6 @@ export default function ThreadItem({
           </Text>
         </View>
 
-        {/* 타입 태그 및 본문 */}
         <View style={styles.body}>
           {tagStyle && (
             <View
@@ -97,7 +150,6 @@ export default function ThreadItem({
           <Text style={styles.contentText}>{thread.content}</Text>
         </View>
 
-        {/* 푸터: 액션 버튼 */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.actionButton}
@@ -109,51 +161,76 @@ export default function ThreadItem({
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => onStartSession(thread.id)}
+            disabled={!!activeSession}
           >
-            <Feather name="play-circle" size={16} color="#495057" />
-            <Text style={styles.actionText}>Start Session</Text>
+            <Feather
+              name="play-circle"
+              size={16}
+              color={activeSession ? "#ced4da" : "#495057"}
+            />
+            <Text
+              style={[styles.actionText, activeSession && { color: "#ced4da" }]}
+            >
+              Start Session
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* 자식 스레드가 렌더링될 영역 (Step 2에서 채워짐) */}
-        <View style={styles.childContainer}>
-          {/* <ThreadList threadIds={thread.childThreadIds} level={level + 1} ... /> */}
-        </View>
+        {isSessionActiveOnThisThread && (
+          <ActiveSessionTracker
+            onStop={(elapsedTime) => onStopSession(thread.id, elapsedTime)}
+          />
+        )}
+
+        {sessionStats.sessions.length > 0 && (
+          <View style={styles.completedSessionSection}>
+            <TouchableOpacity
+              style={styles.summaryContainer}
+              onPress={() => setSessionsVisible(!sessionsVisible)}
+            >
+              <Text style={styles.summaryText}>
+                완료된 세션: {sessionStats.sessions.length}개 · 총 시간:{" "}
+                {formatSeconds(sessionStats.totalTime)}
+              </Text>
+              <Feather
+                name={sessionsVisible ? "chevron-up" : "chevron-down"}
+                size={18}
+                color="#868e96"
+              />
+            </TouchableOpacity>
+            {sessionsVisible && (
+              <View style={styles.sessionList}>
+                {sessionStats.sessions.map((session) => (
+                  <View key={session.id} style={styles.sessionItem}>
+                    <Text style={styles.sessionContent}>
+                      {session.content || "기록 없음"}
+                    </Text>
+                    <Text style={styles.sessionTime}>
+                      {formatSeconds(session.timeSpent)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flexDirection: "row",
-  },
-  gutter: {
-    width: 16,
-    alignItems: "center",
-  },
-  threadLine: {
-    width: 2,
-    height: "100%",
-    backgroundColor: "#e9ecef",
-  },
   contentContainer: {
     flex: 1,
     paddingVertical: 12,
     paddingRight: 16,
+    borderBottomWidth: 1,
+    borderColor: "#f1f3f5",
+    position: "relative",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  metaText: {
-    fontSize: 13,
-    color: "#868e96",
-  },
-  body: {
-    marginBottom: 8,
-  },
+  header: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  metaText: { fontSize: 13, color: "#868e96", flexShrink: 1 },
+  body: { marginBottom: 8 },
   typeTag: {
     alignSelf: "flex-start",
     borderRadius: 4,
@@ -161,19 +238,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginBottom: 8,
   },
-  typeTagText: {
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  contentText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#343a40",
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  typeTagText: { fontSize: 12, fontWeight: "bold" },
+  contentText: { fontSize: 15, lineHeight: 22, color: "#343a40" },
+  footer: { flexDirection: "row", alignItems: "center" },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -186,7 +253,29 @@ const styles = StyleSheet.create({
     color: "#495057",
     fontWeight: "500",
   },
-  childContainer: {
-    // 자식 ThreadList가 위치할 곳
+  completedSessionSection: {
+    marginTop: 12,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+  },
+  summaryContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+  },
+  summaryText: { fontSize: 13, fontWeight: "500", color: "#495057" },
+  sessionList: { borderTopWidth: 1, borderColor: "#e9ecef", padding: 12 },
+  sessionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  sessionContent: { fontSize: 14, color: "#495057", flex: 1 },
+  sessionTime: {
+    fontSize: 14,
+    color: "#868e96",
+    fontWeight: "bold",
+    fontVariant: ["tabular-nums"],
   },
 });

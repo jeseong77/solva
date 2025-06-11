@@ -2,22 +2,28 @@
 
 import { useAppStore } from "@/store/store";
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react"; // useState 임포트
+import React, { useState } from "react";
 import {
+  Alert,
+  FlatList,
   Modal,
   Platform,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
+import ThreadItem from "../thread/ThreadItem";
 import ThreadWrite from "../thread/ThreadWrite";
 import ProblemPost from "./ProblemPost";
 
-// 컴포넌트가 받을 Props 정의
+interface FlatThreadItem {
+  id: string;
+  level: number;
+}
+
 interface ProblemDetailProps {
   isVisible: boolean;
   onClose: () => void;
@@ -29,33 +35,121 @@ export default function ProblemDetail({
   onClose,
   problemId,
 }: ProblemDetailProps) {
-  // 스토어에서 필요한 함수들을 가져옴
-  const { getProblemById, getPersonaById } = useAppStore(
-    useShallow((state) => ({
-      getProblemById: state.getProblemById,
-      getPersonaById: state.getPersonaById,
-    }))
+  const {
+    problem,
+    persona,
+    getThreadItemById,
+    threadItems,
+    startSession,
+    stopSession,
+    addThreadItem,
+  } = useAppStore(
+    useShallow((state) => {
+      const problem = problemId
+        ? state.problems.find((p) => p.id === problemId)
+        : null;
+      const persona = problem
+        ? state.personas.find((p) => p.id === problem.personaId)
+        : null;
+      return {
+        problem,
+        persona,
+        getThreadItemById: state.getThreadItemById,
+        threadItems: state.threadItems,
+        startSession: state.startSession,
+        stopSession: state.stopSession,
+        addThreadItem: state.addThreadItem,
+      };
+    })
   );
 
-  // 1. ThreadWrite 모달 제어를 위한 상태 추가
   const [isWriteModalVisible, setWriteModalVisible] = useState(false);
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
 
-  // problemId를 기반으로 problem과 persona 객체를 조회
-  const problem = problemId ? getProblemById(problemId) : null;
-  const persona = problem ? getPersonaById(problem.personaId) : null;
+  const flattenedThreads = ((): FlatThreadItem[] => {
+    if (!problem) return [];
+    const allThreadsById = new Map(threadItems.map((item) => [item.id, item]));
+    const flatten = (ids: string[], level: number): FlatThreadItem[] => {
+      let result: FlatThreadItem[] = [];
+      for (const id of ids) {
+        const item = allThreadsById.get(id);
+        if (item && item.type !== "Session") {
+          result.push({ id, level });
+          if (item.childThreadIds && item.childThreadIds.length > 0) {
+            const childItems = flatten(item.childThreadIds, level + 1);
+            result = result.concat(childItems);
+          }
+        }
+      }
+      return result;
+    };
+    return flatten(problem.childThreadIds, 0);
+  })();
 
-  // 2. 모달을 여는 핸들러 함수들 정의
-  // 최상위 스레드 작성 모달 열기
   const handleOpenRootWriteModal = () => {
-    setReplyParentId(null); // 부모 ID가 없으므로 null
+    setReplyParentId(null);
     setWriteModalVisible(true);
   };
-
-  // 답글 작성 모달 열기 (향후 ThreadItem에서 사용)
   const handleOpenReplyWriteModal = (parentId: string) => {
     setReplyParentId(parentId);
     setWriteModalVisible(true);
+  };
+  const handleStartSession = (threadId: string) => {
+    startSession(threadId);
+  };
+  const handleStopSession = (threadId: string, elapsedTime: number) => {
+    Alert.alert("세션 종료", "이번 세션에서 한 작업을 기록하시겠습니까?", [
+      {
+        text: "아니요 (시간만 기록)",
+        onPress: () => saveSession(""),
+        style: "cancel",
+      },
+      {
+        text: "예 (내용 기록)",
+        onPress: () => {
+          if (Platform.OS === "ios") {
+            Alert.prompt(
+              "작업 내용 기록",
+              "이번 세션에서 한 작업을 간단히 기록해주세요.",
+              (text) => saveSession(text || "")
+            );
+          } else {
+            saveSession("");
+            Alert.alert("알림", "작업 내용 기록 기능은 준비 중입니다.");
+          }
+        },
+      },
+    ]);
+    const saveSession = async (content: string) => {
+      if (!problem) return;
+      await addThreadItem({
+        problemId: problem.id,
+        parentId: threadId,
+        type: "Session",
+        content: content || "작업 세션 기록",
+        timeSpent: Math.round(elapsedTime / 1000),
+        startTime: new Date(Date.now() - elapsedTime),
+      });
+      stopSession();
+    };
+  };
+
+  // ✅ [수정] 들여쓰기 관련 스타일 제거
+  const renderThreadItem = ({ item }: { item: FlatThreadItem }) => {
+    const thread = getThreadItemById(item.id);
+    if (!thread || !problem || !persona) return null;
+
+    return (
+      <ThreadItem
+        thread={thread}
+        persona={persona}
+        problem={problem}
+        onReply={handleOpenReplyWriteModal}
+        onStartSession={handleStartSession}
+        onStopSession={handleStopSession}
+        level={item.level}
+      />
+    );
   };
 
   return (
@@ -66,25 +160,30 @@ export default function ProblemDetail({
             <Feather name="x" size={26} color="#343a40" />
           </TouchableOpacity>
         </View>
-
         {problem && persona ? (
-          <ScrollView style={styles.contentScrollView}>
-            <ProblemPost problem={problem} persona={persona} />
-            <View style={styles.divider} />
-            <View style={styles.threadSection}>
-              <Text style={styles.threadTitle}>Threads</Text>
-              {/* 향후 여기에 ThreadList 컴포넌트가 위치하며,
-                handleOpenReplyWriteModal 함수를 props로 전달하게 됩니다.
-              */}
-            </View>
-          </ScrollView>
+          <FlatList
+            style={styles.contentScrollView}
+            data={flattenedThreads}
+            renderItem={renderThreadItem}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={
+              <ProblemPost problem={problem} persona={persona} />
+            }
+            ListFooterComponent={
+              flattenedThreads.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.noThreadsText}>
+                    아직 추가된 스레드가 없습니다.
+                  </Text>
+                </View>
+              ) : null
+            }
+          />
         ) : (
           <View style={styles.loadingContainer}>
             <Text>문제 정보를 불러오는 중...</Text>
           </View>
         )}
-
-        {/* 3. 푸터: 눌러서 스레드 작성 모달을 열도록 수정 */}
         <TouchableOpacity
           style={styles.commentInputContainer}
           onPress={handleOpenRootWriteModal}
@@ -92,8 +191,6 @@ export default function ProblemDetail({
           <Text style={styles.commentInputPlaceholder}>Add a thread...</Text>
         </TouchableOpacity>
       </SafeAreaView>
-
-      {/* 4. ThreadWrite 모달 렌더링 */}
       {problem && (
         <ThreadWrite
           isVisible={isWriteModalVisible}
@@ -107,10 +204,7 @@ export default function ProblemDetail({
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "#ffffff", // 배경색을 흰색으로 변경
-  },
+  modalContainer: { flex: 1, backgroundColor: "#ffffff" },
   header: {
     flexDirection: "row",
     justifyContent: "flex-start",
@@ -121,36 +215,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#e9ecef",
   },
-  contentScrollView: {
-    flex: 1,
-    backgroundColor: "#f8f9fa", // 스크롤 배경은 다른 색으로
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  divider: {
-    height: 8,
-    backgroundColor: "#f1f3f5",
-  },
-  threadSection: {
-    padding: 16,
-    backgroundColor: "#ffffff",
-    minHeight: 200, // 스레드가 없을 때도 최소 높이 확보
-  },
-  threadTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+  contentScrollView: { flex: 1, backgroundColor: "#ffffff", },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  emptyContainer: { paddingTop: 16 },
+  noThreadsText: {
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    color: "#868e96",
+    textAlign: "center",
   },
   commentInputContainer: {
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16, // iOS 하단 여백 추가
+    paddingBottom: Platform.OS === "ios" ? 30 : 16,
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderColor: "#e9ecef",
   },
-  commentInputPlaceholder: {
-    color: "#adb5bd",
-  },
+  commentInputPlaceholder: { color: "#adb5bd" },
 });
