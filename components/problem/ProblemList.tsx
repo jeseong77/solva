@@ -1,7 +1,7 @@
 // app/components/problem/ProblemList.tsx
 
 import { useAppStore } from "@/store/store";
-import { Persona, Problem, ThreadItemType, Priority } from "@/types"; // Priority 타입 임포트
+import { Persona, Priority, Problem, ThreadItemType } from "@/types"; // Priority 타입 임포트
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import {
@@ -27,9 +27,15 @@ interface ProblemItemProps {
   problem: Problem;
   persona: Persona; // persona 객체를 props로 받도록 수정
   onPress: (id: string) => void;
+  onLongPress?: (id: string) => void;
 }
 
-const ProblemItem = ({ problem, persona, onPress }: ProblemItemProps) => {
+const ProblemItem = ({
+  problem,
+  persona,
+  onPress,
+  onLongPress,
+}: ProblemItemProps) => {
   const threadItems = useAppStore((state) => state.threadItems);
 
   const stats = useMemo(() => {
@@ -54,6 +60,8 @@ const ProblemItem = ({ problem, persona, onPress }: ProblemItemProps) => {
     <TouchableOpacity
       style={styles.itemContainer}
       onPress={() => onPress(problem.id)}
+      onLongPress={() => onLongPress?.(problem.id)} // onLongPress 핸들러 연결
+      delayLongPress={500} // 0.5초 이상 누르면 롱프레스로 간주
     >
       {/* 왼쪽: Priority 색상 인디케이터 */}
       <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
@@ -110,6 +118,7 @@ interface ProblemListProps {
   persona: Persona;
   onPressProblem: (problemId: string) => void;
   onPressNewProblem: () => void;
+  onLongPressProblem?: (problemId: string) => void; // 길게 누르기 이벤트 핸들러 추가
 }
 
 export default function ProblemList({
@@ -117,6 +126,7 @@ export default function ProblemList({
   persona,
   onPressProblem,
   onPressNewProblem,
+  onLongPressProblem,
 }: ProblemListProps) {
   const renderEmptyComponent = () => (
     <View style={styles.emptyContainer}>
@@ -154,6 +164,7 @@ export default function ProblemList({
             problem={item}
             persona={persona}
             onPress={onPressProblem}
+            onLongPress={onLongPressProblem}
           />
         )}
         keyExtractor={(item) => item.id}

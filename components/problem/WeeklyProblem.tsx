@@ -63,7 +63,7 @@ export default function WeeklyProblemCard({
         <TouchableOpacity style={styles.emptyCard} onPress={onPressNew}>
           <Feather name="plus-circle" size={24} color="#adb5bd" />
           <Text style={styles.emptyText}>
-            이번 주에 집중할 문제를 설정해주세요.
+            이번 주에 해결할 문제를 설정해주세요.
           </Text>
         </TouchableOpacity>
       </View>

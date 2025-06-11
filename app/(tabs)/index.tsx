@@ -1,9 +1,10 @@
 import PersonaList from "@/components/persona/personaList";
+import ProblemEdit from "@/components/problem/ProblemEdit";
 import ProblemList from "@/components/problem/ProblemList";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
 import { useAppStore } from "@/store/store";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   SafeAreaView,
@@ -29,6 +30,10 @@ const getWeekIdentifier = (date: Date): string => {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [isEditModalVisible, setEditModalVisible] = useState(false);
+  const [editingProblemId, setEditingProblemId] = useState<string | undefined>(
+    undefined
+  );
 
   // 1. WeeklyProblem 관련 상태와 액션을 추가로 가져옵니다.
   const {
@@ -174,12 +179,19 @@ export default function HomeScreen() {
     router.push(`/problem/${problemId}`);
   };
 
-  const handleNavigateToCreateProblem = () => {
-    if (selectedPersonaId) {
-      router.push(`/problem/create?personaId=${selectedPersonaId}`);
-    } else {
-      Alert.alert("알림", "문제를 추가할 페르소나를 먼저 선택해주세요.");
-    }
+  const handleCreateProblem = () => {
+    setEditingProblemId(undefined); // 수정 ID 초기화 (생성 모드임을 명시)
+    setEditModalVisible(true);
+  };
+
+  // ProblemList의 아이템 길게 눌렀을 시: 수정 모드로 모달 열기
+  const handleEditProblem = (problemId: string) => {
+    setEditingProblemId(problemId); // 수정할 ID 설정
+    setEditModalVisible(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalVisible(false);
   };
 
   // 4. WeeklyProblemCard에 전달할 핸들러 함수를 정의합니다.
@@ -212,7 +224,8 @@ export default function HomeScreen() {
               persona={selectedPersona}
               problems={filteredProblems}
               onPressProblem={handleNavigateToProblemDetail}
-              onPressNewProblem={handleNavigateToCreateProblem}
+              onPressNewProblem={handleCreateProblem} // 생성 모달 열기 함수로 교체
+              onLongPressProblem={handleEditProblem} // 수정 모달 열기 함수 전달
             />
           </>
         ) : (
@@ -223,6 +236,16 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ProblemEdit 모달 렌더링 */}
+      {selectedPersona && (
+        <ProblemEdit
+          isVisible={isEditModalVisible}
+          onClose={handleCloseEditModal}
+          problemId={editingProblemId}
+          personaId={selectedPersona.id} // 생성 시 현재 페르소나 ID를 알려주기 위함
+        />
+      )}
     </SafeAreaView>
   );
 }
