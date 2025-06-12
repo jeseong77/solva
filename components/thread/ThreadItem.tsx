@@ -99,7 +99,7 @@ export default function ThreadItem({
 
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
-    timeStyle: "short",
+   // timeStyle: "short",
   }).format(new Date(thread.createdAt));
 
   const tagStyle =

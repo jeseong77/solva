@@ -6,7 +6,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-// Priority에 따른 색상 맵
+// Priority에 따른 색상 맵 (기존과 동일)
 const priorityColors: { [key in Priority]: string } = {
   high: "#ffcdd2",
   medium: "#ffe0b2",
@@ -23,34 +23,44 @@ interface ProblemPostProps {
 export default function ProblemPost({ problem, persona }: ProblemPostProps) {
   // 전역 상태에서 스레드 아이템을 가져와 통계 계산
   const threadItems = useAppStore((state) => state.threadItems);
+
+  // ✅ [수정] 통계 계산 로직 변경
   const stats = useMemo(() => {
-    const relevantThreads = threadItems.filter((item) =>
-      problem.childThreadIds.includes(item.id)
+    // 1. problemId를 기준으로 이 문제에 속한 '모든' 스레드를 가져옵니다.
+    const allThreadsInProblem = threadItems.filter(
+      (item) => item.problemId === problem.id
     );
+
+    // 2. '총 스레드 수'는 보통 작업 내용을 담은 스레드를 의미하므로, 'Session' 타입은 제외하고 계산합니다.
+    const contentThreads = allThreadsInProblem.filter(
+      (item) => item.type !== "Session"
+    );
+
+    // 3. 타입별 개수는 전체 스레드에서 계산합니다.
     const countByType = (type: ThreadItemType) => {
-      return relevantThreads.filter((item) => item.type === type).length;
+      return allThreadsInProblem.filter((item) => item.type === type).length;
     };
+
     return {
-      totalThreads: problem.childThreadIds.length,
+      totalThreads: contentThreads.length, // 세션을 제외한 전체 쓰레드 수
       tasks: countByType("Task"),
       actions: countByType("Action"),
       sessions: countByType("Session"),
     };
-  }, [problem.childThreadIds, threadItems]);
+  }, [problem.id, threadItems]); // 의존성을 problem.id로 변경하여 더 명확하게 함
 
   const indicatorColor =
     priorityColors[problem.priority] || priorityColors.none;
 
-  // 생성 날짜 포맷팅
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(problem.createdAt);
+  }).format(new Date(problem.createdAt));
 
   return (
     <View style={styles.postContainer}>
-      {/* 헤더: 페르소나, 우선순위, 생성일 */}
+      {/* 헤더 (기존과 동일) */}
       <View style={styles.header}>
         <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
         <View style={styles.metaContainer}>
@@ -61,7 +71,7 @@ export default function ProblemPost({ problem, persona }: ProblemPostProps) {
         </View>
       </View>
 
-      {/* 본문: 제목, 설명 */}
+      {/* 본문 (기존과 동일) */}
       <View style={styles.body}>
         <Text style={styles.problemTitle}>{problem.title}</Text>
         {problem.description && (
@@ -69,7 +79,7 @@ export default function ProblemPost({ problem, persona }: ProblemPostProps) {
         )}
       </View>
 
-      {/* 푸터: 통계 정보 */}
+      {/* 푸터 (기존과 동일) */}
       <View style={styles.statsContainer}>
         <Feather name="git-branch" size={14} color="#6c757d" />
         <Text style={styles.statsText}>{stats.totalThreads}</Text>
@@ -87,6 +97,7 @@ export default function ProblemPost({ problem, persona }: ProblemPostProps) {
   );
 }
 
+// styles는 기존과 동일
 const styles = StyleSheet.create({
   postContainer: {
     padding: 16,
