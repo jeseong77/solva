@@ -1,7 +1,12 @@
-// app/components/problem/ProblemItem.tsx
-
 import { useAppStore } from "@/store/store";
-import { Persona, Priority, Problem, ThreadItemType } from "@/types";
+import {
+  ActionThreadItem,
+  Persona,
+  Priority,
+  Problem,
+  SessionThreadItem,
+  TaskThreadItem,
+} from "@/types";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -12,6 +17,26 @@ const priorityColors: { [key in Priority]: string } = {
   medium: "#ffe0b2",
   low: "#c8e6c9",
   none: "#e9ecef",
+};
+
+/**
+ * 초(seconds)를 HH:MM:SS 또는 MM:SS 형식의 문자열로 변환하는 헬퍼 함수
+ */
+const formatSeconds = (totalSeconds: number): string => {
+  if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
+    return "00:00";
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const parts = [
+    String(minutes).padStart(2, "0"),
+    String(seconds).padStart(2, "0"),
+  ];
+  if (hours > 0) {
+    parts.unshift(String(hours).padStart(2, "0"));
+  }
+  return parts.join(":");
 };
 
 // 컴포넌트가 받을 Props 정의
@@ -30,22 +55,47 @@ export default function ProblemItem({
 }: ProblemItemProps) {
   const threadItems = useAppStore((state) => state.threadItems);
 
-  // 문제에 속한 전체 스레드를 대상으로 통계 계산
+  // ✅ [수정] 문제에 속한 전체 스레드를 대상으로 통계 계산
   const stats = useMemo(() => {
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
-    const contentThreads = allThreadsInProblem.filter(
+
+    const totalThreads = allThreadsInProblem.filter(
       (item) => item.type !== "Session"
+    ).length;
+
+    const taskItems = allThreadsInProblem.filter(
+      (item): item is TaskThreadItem => item.type === "Task"
     );
-    const countByType = (type: ThreadItemType) => {
-      return allThreadsInProblem.filter((item) => item.type === type).length;
-    };
+    const completedTasks = taskItems.filter((item) => item.isCompleted).length;
+
+    const actionItems = allThreadsInProblem.filter(
+      (item): item is ActionThreadItem => item.type === "Action"
+    );
+    const completedActions = actionItems.filter(
+      (item) => item.status === "completed"
+    ).length;
+
+    const sessionItems = allThreadsInProblem.filter(
+      (item): item is SessionThreadItem => item.type === "Session"
+    );
+    const totalSessionTime = sessionItems.reduce(
+      (sum, item) => sum + (item.timeSpent || 0),
+      0
+    );
+
     return {
-      totalThreads: contentThreads.length,
-      tasks: countByType("Task"),
-      actions: countByType("Action"),
-      sessions: countByType("Session"),
+      totalThreads,
+      tasks: {
+        completed: completedTasks,
+        total: taskItems.length,
+      },
+      actions: {
+        completed: completedActions,
+        total: actionItems.length,
+      },
+      totalSessionTime,
     };
   }, [problem.id, threadItems]);
 
@@ -65,18 +115,25 @@ export default function ProblemItem({
           <Text style={styles.metaText}>persona/{persona.title}</Text>
         </View>
         <Text style={styles.itemTitle}>{problem.title}</Text>
+        {/* ✅ [수정] 통계 표시 방식 변경 */}
         <View style={styles.statsContainer}>
           <Feather name="git-branch" size={14} color="#6c757d" />
           <Text style={styles.statsText}>{stats.totalThreads}</Text>
           <Text style={styles.separator}>·</Text>
           <Feather name="check-square" size={14} color="#6c757d" />
-          <Text style={styles.statsText}>{stats.tasks}</Text>
+          <Text style={styles.statsText}>
+            {stats.tasks.completed} / {stats.tasks.total}
+          </Text>
           <Text style={styles.separator}>·</Text>
           <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-          <Text style={styles.statsText}>{stats.actions}</Text>
+          <Text style={styles.statsText}>
+            {stats.actions.completed} / {stats.actions.total}
+          </Text>
           <Text style={styles.separator}>·</Text>
           <Feather name="clock" size={14} color="#6c757d" />
-          <Text style={styles.statsText}>{stats.sessions}</Text>
+          <Text style={styles.statsText}>
+            {formatSeconds(stats.totalSessionTime)}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -125,6 +182,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6c757d",
     marginLeft: 4,
+    fontVariant: ["tabular-nums"], // 숫자 고정폭 스타일 추가
   },
   separator: {
     color: "#ced4da",

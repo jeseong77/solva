@@ -7,11 +7,11 @@ import {
   BaseThreadItem,
   BottleneckThreadItem,
   GeneralThreadItem,
+  Problem,
   SessionThreadItem,
   TaskThreadItem,
   ThreadItem,
   ThreadItemType,
-  Problem, // Problem 타입을 import 해야 할 수 있습니다.
 } from "@/types";
 import type {
   AppState,
@@ -194,8 +194,6 @@ export const createThreadSlice: StateCreator<
       case "Session":
         newThreadItem = {
           ...baseItem,
-          timeSpent: 0,
-          startTime: new Date(),
         } as SessionThreadItem;
         break;
       default:

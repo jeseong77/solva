@@ -1,7 +1,12 @@
-// app/components/problem/ProblemPost.tsx
-
 import { useAppStore } from "@/store/store";
-import { Persona, Priority, Problem, ThreadItemType } from "@/types";
+import {
+  ActionThreadItem,
+  Persona,
+  Priority,
+  Problem,
+  SessionThreadItem,
+  TaskThreadItem,
+} from "@/types";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -14,6 +19,27 @@ const priorityColors: { [key in Priority]: string } = {
   none: "#e9ecef",
 };
 
+/**
+ * 초(seconds)를 HH:MM:SS 또는 MM:SS 형식의 문자열로 변환하는 헬퍼 함수
+ * ThreadItem.tsx 에서 가져와 재사용합니다.
+ */
+const formatSeconds = (totalSeconds: number): string => {
+  if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
+    return "00:00";
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60); // Math.floor 추가하여 정수로 처리
+  const parts = [
+    String(minutes).padStart(2, "0"),
+    String(seconds).padStart(2, "0"),
+  ];
+  if (hours > 0) {
+    parts.unshift(String(hours).padStart(2, "0"));
+  }
+  return parts.join(":");
+};
+
 // 컴포넌트가 받을 Props 정의
 interface ProblemPostProps {
   problem: Problem;
@@ -24,30 +50,54 @@ export default function ProblemPost({ problem, persona }: ProblemPostProps) {
   // 전역 상태에서 스레드 아이템을 가져와 통계 계산
   const threadItems = useAppStore((state) => state.threadItems);
 
-  // ✅ [수정] 통계 계산 로직 변경
+  // ✅ [수정] 통계 계산 로직 전체 변경
   const stats = useMemo(() => {
-    // 1. problemId를 기준으로 이 문제에 속한 '모든' 스레드를 가져옵니다.
+    // 1. 이 문제에 속한 모든 스레드를 필터링합니다.
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
 
-    // 2. '총 스레드 수'는 보통 작업 내용을 담은 스레드를 의미하므로, 'Session' 타입은 제외하고 계산합니다.
-    const contentThreads = allThreadsInProblem.filter(
+    // 2. '총 스레드 수'는 'Session' 타입을 제외하고 계산합니다.
+    const totalThreads = allThreadsInProblem.filter(
       (item) => item.type !== "Session"
+    ).length;
+
+    // 3. '할 일' 통계를 계산합니다.
+    const taskItems = allThreadsInProblem.filter(
+      (item): item is TaskThreadItem => item.type === "Task"
+    );
+    const completedTasks = taskItems.filter((item) => item.isCompleted).length;
+
+    // 4. '액션' 통계를 계산합니다.
+    const actionItems = allThreadsInProblem.filter(
+      (item): item is ActionThreadItem => item.type === "Action"
+    );
+    const completedActions = actionItems.filter(
+      (item) => item.status === "completed"
+    ).length;
+
+    // 5. '총 세션 시간'을 계산합니다.
+    const sessionItems = allThreadsInProblem.filter(
+      (item): item is SessionThreadItem => item.type === "Session"
+    );
+    const totalSessionTime = sessionItems.reduce(
+      (sum, item) => sum + (item.timeSpent || 0),
+      0
     );
 
-    // 3. 타입별 개수는 전체 스레드에서 계산합니다.
-    const countByType = (type: ThreadItemType) => {
-      return allThreadsInProblem.filter((item) => item.type === type).length;
-    };
-
     return {
-      totalThreads: contentThreads.length, // 세션을 제외한 전체 쓰레드 수
-      tasks: countByType("Task"),
-      actions: countByType("Action"),
-      sessions: countByType("Session"),
+      totalThreads,
+      tasks: {
+        completed: completedTasks,
+        total: taskItems.length,
+      },
+      actions: {
+        completed: completedActions,
+        total: actionItems.length,
+      },
+      totalSessionTime, // 총 시간을 초 단위 숫자로 저장
     };
-  }, [problem.id, threadItems]); // 의존성을 problem.id로 변경하여 더 명확하게 함
+  }, [problem.id, threadItems]);
 
   const indicatorColor =
     priorityColors[problem.priority] || priorityColors.none;
@@ -79,19 +129,25 @@ export default function ProblemPost({ problem, persona }: ProblemPostProps) {
         )}
       </View>
 
-      {/* 푸터 (기존과 동일) */}
+      {/* ✅ [수정] 푸터 통계 표시 방식 변경 */}
       <View style={styles.statsContainer}>
         <Feather name="git-branch" size={14} color="#6c757d" />
         <Text style={styles.statsText}>{stats.totalThreads}</Text>
         <Text style={styles.separator}>·</Text>
         <Feather name="check-square" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>{stats.tasks}</Text>
+        <Text style={styles.statsText}>
+          {stats.tasks.completed} / {stats.tasks.total}
+        </Text>
         <Text style={styles.separator}>·</Text>
         <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>{stats.actions}</Text>
+        <Text style={styles.statsText}>
+          {stats.actions.completed} / {stats.actions.total}
+        </Text>
         <Text style={styles.separator}>·</Text>
         <Feather name="clock" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>{stats.sessions}</Text>
+        <Text style={styles.statsText}>
+          {formatSeconds(stats.totalSessionTime)}
+        </Text>
       </View>
     </View>
   );
@@ -148,6 +204,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6c757d",
     marginLeft: 4,
+    fontVariant: ["tabular-nums"], // 숫자가 고정폭으로 보이도록 설정
   },
   separator: {
     color: "#ced4da",

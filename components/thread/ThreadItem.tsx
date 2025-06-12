@@ -1,23 +1,16 @@
-// app/components/thread/ThreadItem.tsx
-
 import { useAppStore } from "@/store/store";
 import {
+  ActionThreadItem,
   Persona,
   Problem,
   SessionThreadItem,
+  TaskThreadItem,
   ThreadItem as ThreadItemData,
   ThreadItemType as ThreadTypeEnum,
 } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
-import {
-  LayoutChangeEvent,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from "react-native";
+import React, { useMemo, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 import ActiveSessionTracker from "./ActiveSessionTracker";
 
@@ -51,7 +44,6 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
-// ✅ [수정] onPressMenu prop 타입 추가
 interface ThreadItemProps {
   thread: ThreadItemData;
   persona: Persona;
@@ -59,7 +51,8 @@ interface ThreadItemProps {
   onReply: (threadId: string) => void;
   onStartSession: (threadId: string) => void;
   onStopSession: (threadId: string, elapsedTime: number) => void;
-  onPressMenu: (threadId: string) => void; // 메뉴 아이콘 클릭 시 호출될 함수
+  onPressMenu: (threadId: string) => void;
+  onToggleCompletion: (threadId: string) => void;
   level: number;
 }
 
@@ -70,7 +63,8 @@ export default function ThreadItem({
   onReply,
   onStartSession,
   onStopSession,
-  onPressMenu, // ✅ prop 받기
+  onPressMenu,
+  onToggleCompletion,
   level,
 }: ThreadItemProps) {
   const { activeSession, getThreadItemById } = useAppStore(
@@ -81,11 +75,14 @@ export default function ThreadItem({
   );
 
   const [sessionsVisible, setSessionsVisible] = useState(false);
-  const [contentHeight, setContentHeight] = useState(0);
 
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    setContentHeight(event.nativeEvent.layout.height);
-  }, []);
+  const isCompletable = thread.type === "Task" || thread.type === "Action";
+  let isCompleted = false;
+  if (thread.type === "Task") {
+    isCompleted = (thread as TaskThreadItem).isCompleted;
+  } else if (thread.type === "Action") {
+    isCompleted = (thread as ActionThreadItem).status === "completed";
+  }
 
   const sessionStats = useMemo(() => {
     if (!thread.childThreadIds || thread.childThreadIds.length === 0) {
@@ -100,7 +97,6 @@ export default function ThreadItem({
 
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
-    // timeStyle: "short",
   }).format(new Date(thread.createdAt));
 
   const tagStyle =
@@ -112,22 +108,23 @@ export default function ThreadItem({
   const indentLevel = level > 0 ? level : 0;
   const paddingLeft = 16 + indentLevel * 20;
 
-  const lineStyle: ViewStyle = {
-    position: "absolute",
-    top: 0,
-    height: contentHeight,
-    left: paddingLeft / 2 - 8,
-    width: 2,
-    backgroundColor: "#e9ecef",
-  };
-
   return (
-    <View style={styles.contentContainer} onLayout={onLayout}>
-      {level > 0 && <View style={lineStyle} />}
+    <View style={styles.contentContainer}>
       <View style={{ paddingLeft }}>
-        {/* ✅ [수정] 헤더 영역을 좌/우로 나누고 오른쪽에 메뉴 아이콘 추가 */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
+            {tagStyle && (
+              <View
+                style={[
+                  styles.typeTag,
+                  { backgroundColor: tagStyle.backgroundColor },
+                ]}
+              >
+                <Text style={[styles.typeTagText, { color: tagStyle.color }]}>
+                  {tagStyle.name}
+                </Text>
+              </View>
+            )}
             <Text style={styles.metaText} numberOfLines={1}>
               {persona.title}/{problem.title}
             </Text>
@@ -135,40 +132,34 @@ export default function ThreadItem({
               · {formattedDate}
             </Text>
           </View>
-
-          <TouchableOpacity onPress={() => onPressMenu(thread.id)}>
-            <Feather
-              name="more-vertical"
-              size={20}
-              color="#868e96"
-              style={styles.menuTrigger}
-            />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={() => onPressMenu(thread.id)}>
+              <Feather
+                name="more-vertical"
+                size={20}
+                color="#868e96"
+                style={styles.menuTrigger}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.body}>
-          {tagStyle && (
-            <View
-              style={[
-                styles.typeTag,
-                { backgroundColor: tagStyle.backgroundColor },
-              ]}
-            >
-              <Text style={[styles.typeTagText, { color: tagStyle.color }]}>
-                {tagStyle.name}
-              </Text>
-            </View>
-          )}
-          <Text style={styles.contentText}>{thread.content}</Text>
+          <Text
+            style={[styles.contentText, isCompleted && styles.completedText]}
+          >
+            {thread.content}
+          </Text>
         </View>
 
+        {/* ✅ [수정] 푸터의 모든 텍스트 제거 및 아이콘 변경 */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => onReply(thread.id)}
           >
-            <Feather name="message-square" size={16} color="#495057" />
-            <Text style={styles.actionText}>Reply</Text>
+            {/* 'Reply' 아이콘을 'corner-down-right'로 변경 */}
+            <Feather name="corner-down-right" size={18} color="#495057" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
@@ -177,15 +168,22 @@ export default function ThreadItem({
           >
             <Feather
               name="play-circle"
-              size={16}
+              size={18}
               color={activeSession ? "#ced4da" : "#495057"}
             />
-            <Text
-              style={[styles.actionText, activeSession && { color: "#ced4da" }]}
-            >
-              Start Session
-            </Text>
           </TouchableOpacity>
+          {isCompletable && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => onToggleCompletion(thread.id)}
+            >
+              <Feather
+                name={isCompleted ? "check-square" : "square"}
+                size={18}
+                color={isCompleted ? "#2b8a3e" : "#495057"}
+              />
+            </TouchableOpacity>
+          )}
         </View>
 
         {isSessionActiveOnThisThread && (
@@ -231,55 +229,59 @@ export default function ThreadItem({
   );
 }
 
-// ✅ [수정] 헤더와 메뉴 아이콘 관련 스타일 추가
 const styles = StyleSheet.create({
   contentContainer: {
-    flex: 1,
     paddingVertical: 12,
     paddingRight: 16,
     borderBottomWidth: 1,
     borderColor: "#f1f3f5",
-    position: "relative",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
     justifyContent: "space-between",
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1, // 아이콘을 제외한 영역을 모두 차지하도록
+    flex: 1,
     marginRight: 8,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   metaText: { fontSize: 13, color: "#868e96", flexShrink: 1 },
   menuTrigger: {
-    padding: 4, // 아이콘 터치 영역 확보
+    padding: 4,
   },
-  body: { marginBottom: 8 },
+  body: {
+    marginBottom: 8,
+  },
   typeTag: {
     alignSelf: "flex-start",
     borderRadius: 4,
     paddingVertical: 2,
     paddingHorizontal: 6,
-    marginBottom: 8,
+    marginRight: 8,
   },
   typeTagText: { fontSize: 12, fontWeight: "bold" },
   contentText: { fontSize: 15, lineHeight: 22, color: "#343a40" },
-  footer: { flexDirection: "row", alignItems: "center" },
-  actionButton: {
+  completedText: {
+    textDecorationLine: "line-through",
+    color: "#adb5bd",
+  },
+  footer: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 4,
-    marginRight: 16,
   },
-  actionText: {
-    marginLeft: 6,
-    fontSize: 14,
-    color: "#495057",
-    fontWeight: "500",
+  actionButton: {
+    padding: 6, // 텍스트가 없으므로 터치 영역 확보를 위해 padding 조정
+    marginRight: 12, // 버튼 간 간격 조정
   },
+  // ✅ [제거] 더 이상 사용하지 않는 스타일 제거
+  // actionText, completedActionText
   completedSessionSection: {
     marginTop: 12,
     backgroundColor: "#f8f9fa",

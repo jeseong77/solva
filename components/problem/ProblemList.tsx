@@ -1,9 +1,11 @@
 // app/components/problem/ProblemList.tsx
 
-import { Persona, Problem } from "@/types"; // 필요한 타입만 남김
+import { useAppStore } from "@/store/store"; // ✅ 스토어 import
+import { Persona, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
+  Alert, // ✅ Alert import
   Dimensions,
   FlatList,
   StyleSheet,
@@ -11,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import ProblemItem from "./ProblemItem"; // ✅ 분리된 ProblemItem 컴포넌트를 import
+import ProblemItem from "./ProblemItem";
 
 // --- ProblemList 컴포넌트 ---
 
@@ -30,6 +32,55 @@ export default function ProblemList({
   onPressNewProblem,
   onLongPressProblem,
 }: ProblemListProps) {
+  // ✅ [수정 1] 스토어에서 deleteProblem 함수 가져오기
+  const deleteProblem = useAppStore((state) => state.deleteProblem);
+
+  // ✅ [수정 2] 삭제 확인을 위한 별도 함수
+  const showDeleteConfirmation = (problemId: string, title: string) => {
+    Alert.alert(
+      `"${title}" 문제 삭제`,
+      "이 문제와 연결된 모든 스레드 데이터가 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          onPress: async () => {
+            await deleteProblem(problemId);
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
+  // ✅ [수정 3] Problem을 길게 눌렀을 때의 Alert 메뉴 핸들러
+  const handleLongPress = (problemId: string) => {
+    const problem = problems.find((p) => p.id === problemId);
+    if (!problem) return;
+
+    // 부모로부터 받은 onLongPressProblem 함수가 있을 때만 '편집하기' 옵션 표시
+    const options = [];
+    if (onLongPressProblem) {
+      options.push({
+        text: "편집하기",
+        onPress: () => onLongPressProblem(problemId), // 부모의 편집 로직 실행
+      });
+    }
+    options.push({
+      text: "삭제하기",
+      onPress: () => showDeleteConfirmation(problemId, problem.title),
+      style: "destructive" as const,
+    });
+    options.push({ text: "취소", style: "cancel" as const });
+
+    Alert.alert(
+      `"${problem.title}"`,
+      "문제에 대한 작업을 선택하세요.",
+      options,
+      { cancelable: true }
+    );
+  };
+
   const renderEmptyComponent = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>
@@ -60,12 +111,11 @@ export default function ProblemList({
       <FlatList
         data={problems}
         renderItem={({ item }) => (
-          // ✅ 분리된 ProblemItem 컴포넌트 사용
           <ProblemItem
             problem={item}
             persona={persona}
             onPress={onPressProblem}
-            onLongPress={onLongPressProblem}
+            onLongPress={handleLongPress} // ✅ [수정 4] 새로 만든 핸들러로 교체
           />
         )}
         keyExtractor={(item) => item.id}
@@ -78,7 +128,7 @@ export default function ProblemList({
   );
 }
 
-// --- 스타일시트: ProblemItem 관련 스타일은 제거됨 ---
+// --- 스타일시트 ---
 
 const styles = StyleSheet.create({
   container: {

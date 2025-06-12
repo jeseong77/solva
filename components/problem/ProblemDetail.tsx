@@ -1,7 +1,7 @@
-// app/components/problem/ProblemDetail.tsx
-
 import { useAppStore } from "@/store/store";
-import { Feather } from "@expo/vector-icons";
+import {
+  Feather,
+} from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   Alert,
@@ -18,6 +18,7 @@ import { useShallow } from "zustand/react/shallow";
 import ThreadItem from "../thread/ThreadItem";
 import ThreadWrite from "../thread/ThreadWrite";
 import ProblemPost from "./ProblemPost";
+import { ActionThreadItem, TaskThreadItem } from "@/types";
 
 interface FlatThreadItem {
   id: string;
@@ -35,7 +36,7 @@ export default function ProblemDetail({
   onClose,
   problemId,
 }: ProblemDetailProps) {
-  // ✅ [수정] 스토어에서 deleteThreadItem 함수 가져오기
+  // ✅ [수정] 스토어에서 updateThreadItem 함수 가져오기
   const {
     problem,
     persona,
@@ -44,7 +45,8 @@ export default function ProblemDetail({
     startSession,
     stopSession,
     addThreadItem,
-    deleteThreadItem, // 👈 추가
+    deleteThreadItem,
+    updateThreadItem, // 👈 추가
   } = useAppStore(
     useShallow((state) => {
       const problem = problemId
@@ -61,7 +63,8 @@ export default function ProblemDetail({
         startSession: state.startSession,
         stopSession: state.stopSession,
         addThreadItem: state.addThreadItem,
-        deleteThreadItem: state.deleteThreadItem, // 👈 추가
+        deleteThreadItem: state.deleteThreadItem,
+        updateThreadItem: state.updateThreadItem, // 👈 추가
       };
     })
   );
@@ -117,8 +120,13 @@ export default function ProblemDetail({
               (text) => saveSession(text || "")
             );
           } else {
+            // 안드로이드에서는 prompt가 기본 지원되지 않으므로, 별도 모달 구현 필요.
+            // 여기서는 임시로 내용 없이 저장하도록 처리합니다.
             saveSession("");
-            Alert.alert("알림", "작업 내용 기록 기능은 준비 중입니다.");
+            Alert.alert(
+              "알림",
+              "작업 내용 기록 기능은 준비 중입니다. 시간만 기록됩니다."
+            );
           }
         },
       },
@@ -137,14 +145,11 @@ export default function ProblemDetail({
     };
   };
 
-  // ✅ [수정] '...' 아이콘 클릭 시 실행될 핸들러 함수 추가
   const handlePressThreadMenu = (threadId: string) => {
-    // 여기에 나중에 '수정', '복사' 등 다양한 메뉴를 추가할 수 있습니다.
     const options = [
       {
         text: "삭제하기",
         onPress: () => {
-          // 삭제 전 재확인
           Alert.alert(
             "스레드 삭제",
             "이 스레드와 모든 하위 스레드들이 영구적으로 삭제됩니다. 계속하시겠습니까?",
@@ -162,13 +167,33 @@ export default function ProblemDetail({
       },
       { text: "취소", style: "cancel" as const },
     ];
-
     Alert.alert(
       "스레드 옵션",
       "이 스레드에 대한 작업을 선택하세요.",
-      // iOS에서는 '취소' 버튼이 보통 하단에 위치하므로 순서를 조정해줍니다.
       Platform.OS === "ios" ? options : options.reverse()
     );
+  };
+
+  // ✅ [추가] 'Task' 또는 'Action'의 완료 상태를 토글하는 핸들러
+  const handleToggleCompletion = (threadId: string) => {
+    const thread = getThreadItemById(threadId);
+    if (!thread) return;
+
+    if (thread.type === "Task") {
+      const updatedTask: TaskThreadItem = {
+        ...thread,
+        isCompleted: !thread.isCompleted,
+      };
+      updateThreadItem(updatedTask);
+    } else if (thread.type === "Action") {
+      const newStatus = thread.status === "completed" ? "todo" : "completed";
+      const updatedAction: ActionThreadItem = {
+        ...thread,
+        status: newStatus,
+        completedAt: newStatus === "completed" ? new Date() : undefined,
+      };
+      updateThreadItem(updatedAction);
+    }
   };
 
   const renderThreadItem = ({ item }: { item: FlatThreadItem }) => {
@@ -183,7 +208,8 @@ export default function ProblemDetail({
         onReply={handleOpenReplyWriteModal}
         onStartSession={handleStartSession}
         onStopSession={handleStopSession}
-        onPressMenu={handlePressThreadMenu} // ✅ [수정] 핸들러 함수를 prop으로 전달
+        onPressMenu={handlePressThreadMenu}
+        onToggleCompletion={handleToggleCompletion} // ✅ 핸들러 함수를 prop으로 전달
         level={item.level}
       />
     );
