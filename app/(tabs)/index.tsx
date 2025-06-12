@@ -3,6 +3,7 @@ import ProblemDetail from "@/components/problem/ProblemDetail";
 import ProblemEdit from "@/components/problem/ProblemEdit";
 import ProblemList from "@/components/problem/ProblemList";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
+import SessionBox from "@/components/session/SessionBox"; // ✅ SessionBox 컴포넌트 임포트
 import { useAppStore } from "@/store/store";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -38,7 +39,6 @@ export default function HomeScreen() {
   const [isDetailModalVisible, setDetailModalVisible] = useState(false);
   const [viewingProblemId, setViewingProblemId] = useState<string | null>(null);
 
-  // 1. WeeklyProblem 관련 상태와 액션을 추가로 가져옵니다.
   const {
     personas,
     fetchPersonas,
@@ -71,11 +71,9 @@ export default function HomeScreen() {
     }, [fetchPersonas])
   );
 
-  // 2. 선택된 페르소나가 변경될 때마다 관련 데이터를 모두 불러옵니다.
   useEffect(() => {
     if (selectedPersonaId) {
       const loadDataForPersona = async () => {
-        // 문제들과 주간 문제를 병렬로 가져와 성능 향상
         await Promise.all([
           fetchProblems(selectedPersonaId),
           fetchWeeklyProblems({ personaId: selectedPersonaId }),
@@ -94,7 +92,6 @@ export default function HomeScreen() {
     }
   }, [selectedPersonaId, fetchProblems, fetchWeeklyProblems, fetchThreads]);
 
-  // 3. 렌더링에 필요한 데이터를 계산합니다.
   const selectedPersona = useMemo(
     () => personas.find((p) => p.id === selectedPersonaId),
     [personas, selectedPersonaId]
@@ -108,7 +105,6 @@ export default function HomeScreen() {
     [problems, selectedPersonaId]
   );
 
-  // 이번 주에 해당하는 weeklyProblem과 problem 객체를 찾습니다.
   const currentWeeklyProblem = useMemo(() => {
     if (!selectedPersonaId) return undefined;
     const weekIdentifier = getWeekIdentifier(new Date());
@@ -124,7 +120,7 @@ export default function HomeScreen() {
     return problems.find((p) => p.id === currentWeeklyProblem.problemId);
   }, [problems, currentWeeklyProblem]);
 
-  // 핸들러 함수들
+  // 핸들러 함수들... (기존과 동일)
   const handleSelectPersona = (personaId: string) => {
     const newSelectedId = selectedPersonaId === personaId ? null : personaId;
     setSelectedPersonaId(newSelectedId);
@@ -184,13 +180,12 @@ export default function HomeScreen() {
   };
 
   const handleCreateProblem = () => {
-    setEditingProblemId(undefined); // 수정 ID 초기화 (생성 모드임을 명시)
+    setEditingProblemId(undefined);
     setEditModalVisible(true);
   };
 
-  // ProblemList의 아이템 길게 눌렀을 시: 수정 모드로 모달 열기
   const handleEditProblem = (problemId: string) => {
-    setEditingProblemId(problemId); // 수정할 ID 설정
+    setEditingProblemId(problemId);
     setEditModalVisible(true);
   };
 
@@ -198,10 +193,7 @@ export default function HomeScreen() {
     setEditModalVisible(false);
   };
 
-  // 4. WeeklyProblemCard에 전달할 핸들러 함수를 정의합니다.
   const handleNavigateToSetWeeklyProblem = () => {
-    // 주간 문제를 설정하거나 변경하는 화면으로 이동하는 로직
-    // 예: router.push(`/weekly-problem/set?personaId=${selectedPersonaId}`);
     Alert.alert("알림", "주간 문제 설정 기능은 준비 중입니다.");
   };
 
@@ -214,7 +206,9 @@ export default function HomeScreen() {
         onPressAddPersona={handleNavigateToCreatePersona}
       />
       <ScrollView style={styles.mainContentContainer}>
-        {/* 5. 선택된 페르소나가 있을 경우 두 컴포넌트를 순서대로 렌더링합니다. */}
+        {/* ✅ SessionBox를 메인 콘텐츠 상단에 배치 */}
+        <SessionBox />
+
         {selectedPersona ? (
           <>
             <WeeklyProblemCard
@@ -228,8 +222,8 @@ export default function HomeScreen() {
               persona={selectedPersona}
               problems={filteredProblems}
               onPressProblem={handleNavigateToProblemDetail}
-              onPressNewProblem={handleCreateProblem} // 생성 모달 열기 함수로 교체
-              onLongPressProblem={handleEditProblem} // 수정 모달 열기 함수 전달
+              onPressNewProblem={handleCreateProblem}
+              onLongPressProblem={handleEditProblem}
             />
           </>
         ) : (
@@ -241,17 +235,15 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      {/* ProblemEdit 모달 렌더링 */}
       {selectedPersona && (
         <ProblemEdit
           isVisible={isEditModalVisible}
           onClose={handleCloseEditModal}
           problemId={editingProblemId}
-          personaId={selectedPersona.id} // 생성 시 현재 페르소나 ID를 알려주기 위함
+          personaId={selectedPersona.id}
         />
       )}
 
-      {/* ProblemDetail 모달 렌더링 */}
       <ProblemDetail
         isVisible={isDetailModalVisible}
         onClose={() => setDetailModalVisible(false)}
@@ -275,6 +267,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    marginTop: 50, // SessionBox와의 간격을 위해 추가
   },
   placeholderText: {
     fontSize: 16,

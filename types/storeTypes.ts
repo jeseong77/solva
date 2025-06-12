@@ -1,22 +1,22 @@
 // src/types/storeTypes.ts
 
 import {
-  Persona,
-  Problem,
-  ProblemStatus,
-  Priority,
-  WeeklyProblem, // 새로 추가된 타입 임포트
-  ThreadItem, // 누락된 타입 임포트
+  ActionThreadItem,
+  ActiveSession, // 누락된 타입 임포트
   BaseThreadItem,
   BottleneckThreadItem,
-  TaskThreadItem,
-  ActionThreadItem,
-  SessionThreadItem,
+  Persona,
+  Priority,
+  Problem,
+  ProblemStatus,
   Result,
+  SessionThreadItem,
   StarReport,
   Tag,
+  TaskThreadItem, // 새로 추가된 타입 임포트
+  ThreadItem,
   ThreadItemType,
-  ActiveSession,
+  WeeklyProblem, // 새로 추가된 타입 임포트
 } from "@/types";
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
@@ -80,6 +80,13 @@ export interface WeeklyProblemSlice {
   deleteWeeklyProblem: (weeklyProblemId: string) => Promise<boolean>;
   getWeeklyProblemById: (id: string) => WeeklyProblem | undefined;
 }
+/**
+ * ✅ [추가] 가장 최근 세션 정보를 담는 객체 타입
+ */
+export interface RecentSessionInfo {
+  session: SessionThreadItem;
+  parentThread: ThreadItem | undefined;
+}
 
 export interface ThreadSlice {
   threadItems: ThreadItem[];
@@ -111,6 +118,10 @@ export interface ThreadSlice {
     problemId: string;
     type: T;
   }) => (ThreadItem & { type: T })[];
+  /**
+   * ✅ [추가] 가장 최근에 완료된 세션과 그 부모 스레드 정보를 가져옵니다.
+   */
+  getMostRecentSession: () => RecentSessionInfo | null;
 }
 
 export interface ResultSlice {

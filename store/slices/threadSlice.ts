@@ -459,4 +459,35 @@ export const createThreadSlice: StateCreator<
       (item) => item.problemId === problemId && item.type === type
     ) as (ThreadItem & { type: T })[];
   },
+  /**
+   * ✅ [추가] 가장 최근에 완료된 세션과 그 부모 스레드 정보를 가져옵니다.
+   */
+  getMostRecentSession: () => {
+    const { threadItems } = get();
+
+    // 1. 모든 스레드 중 'Session' 타입만 필터링합니다.
+    const sessions = threadItems.filter(
+      (item): item is SessionThreadItem => item.type === "Session"
+    );
+
+    // 2. 세션이 없으면 null을 반환합니다.
+    if (sessions.length === 0) {
+      return null;
+    }
+
+    // 3. 생성일(createdAt) 기준으로 내림차순 정렬하여 가장 최신 세션을 찾습니다.
+    sessions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const mostRecentSession = sessions[0];
+
+    // 4. 최신 세션의 부모 스레드를 찾습니다.
+    const parentThread = mostRecentSession.parentId
+      ? get().getThreadItemById(mostRecentSession.parentId)
+      : undefined;
+
+    // 5. 최신 세션 정보와 부모 스레드 정보를 함께 반환합니다.
+    return {
+      session: mostRecentSession,
+      parentThread: parentThread,
+    };
+  },
 });
