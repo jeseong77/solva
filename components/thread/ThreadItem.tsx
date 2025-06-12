@@ -9,13 +9,13 @@ import {
   ThreadItemType as ThreadTypeEnum,
 } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
+  LayoutChangeEvent,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  LayoutChangeEvent,
   ViewStyle,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
@@ -34,7 +34,6 @@ const typeStyles: {
   Action: { color: "#d9480f", backgroundColor: "#fff0f6", name: "액션" },
 };
 
-// ✅ [오류 수정] formatSeconds 함수의 전체 구현을 포함합니다.
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
     return "00:00";
@@ -52,6 +51,7 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
+// ✅ [수정] onPressMenu prop 타입 추가
 interface ThreadItemProps {
   thread: ThreadItemData;
   persona: Persona;
@@ -59,6 +59,7 @@ interface ThreadItemProps {
   onReply: (threadId: string) => void;
   onStartSession: (threadId: string) => void;
   onStopSession: (threadId: string, elapsedTime: number) => void;
+  onPressMenu: (threadId: string) => void; // 메뉴 아이콘 클릭 시 호출될 함수
   level: number;
 }
 
@@ -69,6 +70,7 @@ export default function ThreadItem({
   onReply,
   onStartSession,
   onStopSession,
+  onPressMenu, // ✅ prop 받기
   level,
 }: ThreadItemProps) {
   const { activeSession, getThreadItemById } = useAppStore(
@@ -85,7 +87,6 @@ export default function ThreadItem({
     setContentHeight(event.nativeEvent.layout.height);
   }, []);
 
-  // ✅ [오류 수정] useMemo 함수의 전체 구현을 포함합니다.
   const sessionStats = useMemo(() => {
     if (!thread.childThreadIds || thread.childThreadIds.length === 0) {
       return { sessions: [], totalTime: 0 };
@@ -99,7 +100,7 @@ export default function ThreadItem({
 
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
-   // timeStyle: "short",
+    // timeStyle: "short",
   }).format(new Date(thread.createdAt));
 
   const tagStyle =
@@ -111,11 +112,10 @@ export default function ThreadItem({
   const indentLevel = level > 0 ? level : 0;
   const paddingLeft = 16 + indentLevel * 20;
 
-  // ✅ [오류 수정] position 속성의 타입을 명확히 합니다.
   const lineStyle: ViewStyle = {
     position: "absolute",
     top: 0,
-    height: contentHeight, // onLayout으로 측정한 높이 사용
+    height: contentHeight,
     left: paddingLeft / 2 - 8,
     width: 2,
     backgroundColor: "#e9ecef",
@@ -125,13 +125,25 @@ export default function ThreadItem({
     <View style={styles.contentContainer} onLayout={onLayout}>
       {level > 0 && <View style={lineStyle} />}
       <View style={{ paddingLeft }}>
+        {/* ✅ [수정] 헤더 영역을 좌/우로 나누고 오른쪽에 메뉴 아이콘 추가 */}
         <View style={styles.header}>
-          <Text style={styles.metaText} numberOfLines={1}>
-            {persona.title}/{problem.title}
-          </Text>
-          <Text style={[styles.metaText, { marginLeft: 8 }]}>
-            · {formattedDate}
-          </Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.metaText} numberOfLines={1}>
+              {persona.title}/{problem.title}
+            </Text>
+            <Text style={[styles.metaText, { marginLeft: 8 }]}>
+              · {formattedDate}
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={() => onPressMenu(thread.id)}>
+            <Feather
+              name="more-vertical"
+              size={20}
+              color="#868e96"
+              style={styles.menuTrigger}
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.body}>
@@ -219,6 +231,7 @@ export default function ThreadItem({
   );
 }
 
+// ✅ [수정] 헤더와 메뉴 아이콘 관련 스타일 추가
 const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
@@ -228,8 +241,22 @@ const styles = StyleSheet.create({
     borderColor: "#f1f3f5",
     position: "relative",
   },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+    justifyContent: "space-between",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1, // 아이콘을 제외한 영역을 모두 차지하도록
+    marginRight: 8,
+  },
   metaText: { fontSize: 13, color: "#868e96", flexShrink: 1 },
+  menuTrigger: {
+    padding: 4, // 아이콘 터치 영역 확보
+  },
   body: { marginBottom: 8 },
   typeTag: {
     alignSelf: "flex-start",

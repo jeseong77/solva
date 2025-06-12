@@ -35,6 +35,7 @@ export default function ProblemDetail({
   onClose,
   problemId,
 }: ProblemDetailProps) {
+  // ✅ [수정] 스토어에서 deleteThreadItem 함수 가져오기
   const {
     problem,
     persona,
@@ -43,6 +44,7 @@ export default function ProblemDetail({
     startSession,
     stopSession,
     addThreadItem,
+    deleteThreadItem, // 👈 추가
   } = useAppStore(
     useShallow((state) => {
       const problem = problemId
@@ -59,6 +61,7 @@ export default function ProblemDetail({
         startSession: state.startSession,
         stopSession: state.stopSession,
         addThreadItem: state.addThreadItem,
+        deleteThreadItem: state.deleteThreadItem, // 👈 추가
       };
     })
   );
@@ -134,7 +137,40 @@ export default function ProblemDetail({
     };
   };
 
-  // ✅ [수정] 들여쓰기 관련 스타일 제거
+  // ✅ [수정] '...' 아이콘 클릭 시 실행될 핸들러 함수 추가
+  const handlePressThreadMenu = (threadId: string) => {
+    // 여기에 나중에 '수정', '복사' 등 다양한 메뉴를 추가할 수 있습니다.
+    const options = [
+      {
+        text: "삭제하기",
+        onPress: () => {
+          // 삭제 전 재확인
+          Alert.alert(
+            "스레드 삭제",
+            "이 스레드와 모든 하위 스레드들이 영구적으로 삭제됩니다. 계속하시겠습니까?",
+            [
+              { text: "취소", style: "cancel" as const },
+              {
+                text: "삭제",
+                onPress: () => deleteThreadItem(threadId),
+                style: "destructive" as const,
+              },
+            ]
+          );
+        },
+        style: "destructive" as const,
+      },
+      { text: "취소", style: "cancel" as const },
+    ];
+
+    Alert.alert(
+      "스레드 옵션",
+      "이 스레드에 대한 작업을 선택하세요.",
+      // iOS에서는 '취소' 버튼이 보통 하단에 위치하므로 순서를 조정해줍니다.
+      Platform.OS === "ios" ? options : options.reverse()
+    );
+  };
+
   const renderThreadItem = ({ item }: { item: FlatThreadItem }) => {
     const thread = getThreadItemById(item.id);
     if (!thread || !problem || !persona) return null;
@@ -147,6 +183,7 @@ export default function ProblemDetail({
         onReply={handleOpenReplyWriteModal}
         onStartSession={handleStartSession}
         onStopSession={handleStopSession}
+        onPressMenu={handlePressThreadMenu} // ✅ [수정] 핸들러 함수를 prop으로 전달
         level={item.level}
       />
     );
@@ -215,7 +252,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#e9ecef",
   },
-  contentScrollView: { flex: 1, backgroundColor: "#ffffff", },
+  contentScrollView: { flex: 1, backgroundColor: "#ffffff" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyContainer: { paddingTop: 16 },
   noThreadsText: {
