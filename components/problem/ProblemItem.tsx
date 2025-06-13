@@ -4,6 +4,7 @@ import {
   Persona,
   Priority,
   Problem,
+  ProblemStatus,
   SessionThreadItem,
   TaskThreadItem,
 } from "@/types";
@@ -37,6 +38,20 @@ const formatSeconds = (totalSeconds: number): string => {
     parts.unshift(String(hours).padStart(2, "0"));
   }
   return parts.join(":");
+};
+
+// ✅ [추가] 상태별 이름 및 색상 정보
+const statusInfo: {
+  [key in ProblemStatus]: {
+    name: string;
+    color: string;
+    backgroundColor: string;
+  };
+} = {
+  active: { name: "Active", color: "#2b8a3e", backgroundColor: "#e6fcf5" },
+  onHold: { name: "On Hold", color: "#868e96", backgroundColor: "#f1f3f5" },
+  resolved: { name: "Resolved", color: "#1971c2", backgroundColor: "#e7f5ff" },
+  archived: { name: "Archived", color: "#495057", backgroundColor: "#e9ecef" },
 };
 
 // 컴포넌트가 받을 Props 정의
@@ -102,6 +117,9 @@ export default function ProblemItem({
   const indicatorColor =
     priorityColors[problem.priority] || priorityColors.none;
 
+  const currentStatus = problem.status || "active";
+  const currentStatusInfo = statusInfo[currentStatus];
+
   return (
     <TouchableOpacity
       style={styles.itemContainer}
@@ -111,8 +129,21 @@ export default function ProblemItem({
     >
       <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
       <View style={styles.contentContainer}>
+        {/* ✅ [수정] 메타 정보 컨테이너에 상태 태그 추가 */}
         <View style={styles.metaContainer}>
           <Text style={styles.metaText}>persona/{persona.title}</Text>
+          <View
+            style={[
+              styles.statusTag,
+              { backgroundColor: currentStatusInfo.backgroundColor },
+            ]}
+          >
+            <Text
+              style={[styles.statusTagText, { color: currentStatusInfo.color }]}
+            >
+              {currentStatusInfo.name}
+            </Text>
+          </View>
         </View>
         <Text style={styles.itemTitle}>{problem.title}</Text>
         {/* ✅ [수정] 통계 표시 방식 변경 */}
@@ -161,11 +192,23 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   metaContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
   metaText: {
     fontSize: 12,
     color: "#868e96",
+  },
+  statusTag: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  statusTagText: {
+    fontSize: 11,
+    fontWeight: "bold",
   },
   itemTitle: {
     fontSize: 16,
@@ -182,7 +225,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6c757d",
     marginLeft: 4,
-    fontVariant: ["tabular-nums"], // 숫자 고정폭 스타일 추가
+    fontVariant: ["tabular-nums"],
   },
   separator: {
     color: "#ced4da",

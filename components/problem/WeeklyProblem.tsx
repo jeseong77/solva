@@ -1,10 +1,37 @@
 // app/components/problem/WeeklyProblem.tsx
 
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Persona, Problem, ThreadItemType, WeeklyProblem } from "@/types";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAppStore } from "@/store/store";
+import {
+  ActionThreadItem, // ✅ 추가
+  Persona,
+  Problem,
+  SessionThreadItem, // ✅ 추가
+  TaskThreadItem,
+  WeeklyProblem,
+} from "@/types";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useMemo } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+/**
+ * 초(seconds)를 HH:MM:SS 또는 MM:SS 형식으로 변환하는 헬퍼 함수
+ */
+const formatSeconds = (totalSeconds: number): string => {
+  if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
+    return "00:00";
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const parts = [
+    String(minutes).padStart(2, "0"),
+    String(seconds).padStart(2, "0"),
+  ];
+  if (hours > 0) {
+    parts.unshift(String(hours).padStart(2, "0"));
+  }
+  return parts.join(":");
+};
 
 // WeeklyProblem 컴포넌트가 받을 Props 정의
 interface WeeklyProblemProps {
@@ -13,6 +40,7 @@ interface WeeklyProblemProps {
   persona: Persona | null | undefined; // 현재 페르소나 객체
   onPress: (problemId: string) => void; // 카드 클릭 시 실행될 함수
   onPressNew: () => void; // 새 주간 문제 설정 시 실행될 함수
+  onChangeWeeklyProblem: () => void;
 }
 
 export default function WeeklyProblemCard({
@@ -21,6 +49,7 @@ export default function WeeklyProblemCard({
   persona,
   onPress,
   onPressNew,
+  onChangeWeeklyProblem,
 }: WeeklyProblemProps) {
   // 전역 상태에서 모든 스레드 아이템을 가져옵니다.
   const threadItems = useAppStore((state) => state.threadItems);
@@ -37,21 +66,42 @@ export default function WeeklyProblemCard({
     return `D-${daysUntilSunday}`;
   }, []);
 
-  // 통계 계산 로직 (useMemo로 최적화)
   const stats = useMemo(() => {
     if (!problem) return null;
-
-    const relevantThreads = threadItems.filter((item) =>
-      problem.childThreadIds.includes(item.id)
+    // ✅ [수정] 문제에 속한 모든 스레드를 효율적으로 필터링
+    const allThreadsInProblem = threadItems.filter(
+      (item) => item.problemId === problem.id
     );
-    const countByType = (type: ThreadItemType) => {
-      return relevantThreads.filter((item) => item.type === type).length;
-    };
+
+    const totalThreads = allThreadsInProblem.filter(
+      (item) => item.type !== "Session"
+    ).length;
+
+    const taskItems = allThreadsInProblem.filter(
+      (item): item is TaskThreadItem => item.type === "Task"
+    );
+    const completedTasks = taskItems.filter((item) => item.isCompleted).length;
+
+    const actionItems = allThreadsInProblem.filter(
+      (item): item is ActionThreadItem => item.type === "Action"
+    );
+    const completedActions = actionItems.filter(
+      (item) => item.status === "completed"
+    ).length;
+
+    const sessionItems = allThreadsInProblem.filter(
+      (item): item is SessionThreadItem => item.type === "Session"
+    );
+    const totalSessionTime = sessionItems.reduce(
+      (sum, item) => sum + (item.timeSpent || 0),
+      0
+    );
+
     return {
-      totalThreads: problem.childThreadIds.length,
-      tasks: countByType("Task"),
-      actions: countByType("Action"),
-      sessions: countByType("Session"),
+      totalThreads,
+      tasks: { completed: completedTasks, total: taskItems.length },
+      actions: { completed: completedActions, total: actionItems.length },
+      totalSessionTime,
     };
   }, [problem, threadItems]);
 
@@ -73,7 +123,8 @@ export default function WeeklyProblemCard({
   // 주간 문제가 있는 경우, 카드 UI 렌더링
   return (
     <View style={styles.container}>
-      <Text style={styles.componentTitle}>이번주에 해결할 문제:</Text>
+      <Text style={styles.componentTitle}>이번주에 집중할 문제:</Text>
+      <View style={styles.cardWrapper}>
       <TouchableOpacity
         style={styles.cardContainer}
         onPress={() => onPress(problem.id)}
@@ -101,27 +152,33 @@ export default function WeeklyProblemCard({
           <View style={styles.statsContainer}>
             <Feather name="git-branch" size={14} color="#6c757d" />
             <Text style={styles.statsText}>{stats.totalThreads}</Text>
-            {stats.tasks > 0 && (
-              <>
-                <Text style={styles.separator}>·</Text>
-                <Feather name="check-square" size={14} color="#6c757d" />
-                <Text style={styles.statsText}>{stats.tasks}</Text>
-              </>
-            )}
-            {stats.actions > 0 && (
-              <>
-                <Text style={styles.separator}>·</Text>
-                <MaterialCommunityIcons
-                  name="run-fast"
-                  size={14}
-                  color="#6c757d"
-                />
-                <Text style={styles.statsText}>{stats.actions}</Text>
-              </>
-            )}
+            <Text style={styles.separator}>·</Text>
+            <Feather name="check-square" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>
+              {stats.tasks.completed} / {stats.tasks.total}
+            </Text>
+            <Text style={styles.separator}>·</Text>
+            <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>
+              {stats.actions.completed} / {stats.actions.total}
+            </Text>
+            <Text style={styles.separator}>·</Text>
+            <Feather name="clock" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>
+              {formatSeconds(stats.totalSessionTime)}
+            </Text>
           </View>
         )}
       </TouchableOpacity>
+      {/* ✅ [추가] '문제 바꾸기' 버튼. TouchableOpacity가 끝나는 지점 바로 아래에 추가 */}
+      <TouchableOpacity
+        style={styles.changeButton}
+        onPress={onChangeWeeklyProblem}
+      >
+        <Feather name="refresh-cw" size={14} color="#495057" />
+        <Text style={styles.changeButtonText}>주간 집중 문제 바꾸기</Text>
+      </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -138,13 +195,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 4,
   },
-  // 카드 컨테이너 스타일
-  cardContainer: {
+  cardWrapper: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#dee2e6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  // 카드 컨테이너 스타일
+  cardContainer: {
+    backgroundColor: "#ffffff",
     padding: 16,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   cardHeader: {
     flexDirection: "row",
@@ -213,6 +280,24 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 15,
     color: "#868e96",
+    fontWeight: "500",
+  },
+  // ✅ [수정] 변경 버튼 스타일
+  changeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12, // 패딩 조정
+    backgroundColor: "#f8f9fa", // 배경색 변경
+    borderTopWidth: 1, // 상단 구분선 추가
+    borderColor: "#e9ecef",
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  changeButtonText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#495057",
     fontWeight: "500",
   },
 });

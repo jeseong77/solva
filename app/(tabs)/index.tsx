@@ -1,7 +1,10 @@
+// app/(tabs)/index.tsx
+
 import PersonaList from "@/components/persona/personaList";
 import ProblemDetail from "@/components/problem/ProblemDetail";
 import ProblemEdit from "@/components/problem/ProblemEdit";
 import ProblemList from "@/components/problem/ProblemList";
+import SelectWeeklyProblemModal from "@/components/problem/SelectWeeklyProblemModal";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
 import SessionBox from "@/components/session/SessionBox"; // ✅ SessionBox 컴포넌트 임포트
 import { useAppStore } from "@/store/store";
@@ -38,6 +41,8 @@ export default function HomeScreen() {
   );
   const [isDetailModalVisible, setDetailModalVisible] = useState(false);
   const [viewingProblemId, setViewingProblemId] = useState<string | null>(null);
+  const [isWeeklySelectModalVisible, setWeeklySelectModalVisible] =
+    useState(false); // ✅ [추가]
 
   const {
     personas,
@@ -50,6 +55,8 @@ export default function HomeScreen() {
     fetchThreads,
     weeklyProblems,
     fetchWeeklyProblems,
+    addWeeklyProblem,
+    deleteWeeklyProblem,
   } = useAppStore(
     useShallow((state) => ({
       personas: state.personas,
@@ -62,6 +69,8 @@ export default function HomeScreen() {
       fetchThreads: state.fetchThreads,
       weeklyProblems: state.weeklyProblems,
       fetchWeeklyProblems: state.fetchWeeklyProblems,
+      addWeeklyProblem: state.addWeeklyProblem,
+      deleteWeeklyProblem: state.deleteWeeklyProblem,
     }))
   );
 
@@ -193,8 +202,32 @@ export default function HomeScreen() {
     setEditModalVisible(false);
   };
 
+  const handleConfirmWeeklyProblem = (problemId: string) => {
+    if (!selectedPersonaId) return;
+
+    const weekIdentifier = getWeekIdentifier(new Date());
+
+    // ✅ [추가] 기존 주간 문제가 있으면 ID를 찾아서 삭제 먼저 실행
+    const existingWeeklyProblem = weeklyProblems.find(
+      (wp) =>
+        wp.personaId === selectedPersonaId &&
+        wp.weekIdentifier === weekIdentifier
+    );
+    if (existingWeeklyProblem) {
+      deleteWeeklyProblem(existingWeeklyProblem.id);
+    }
+
+    // 새로운 주간 문제 추가
+    addWeeklyProblem({
+      personaId: selectedPersonaId,
+      problemId,
+      weekIdentifier,
+    });
+  };
+
+  // ✅ [수정] 기존 핸들러가 Alert 대신 모달을 열도록 변경
   const handleNavigateToSetWeeklyProblem = () => {
-    Alert.alert("알림", "주간 문제 설정 기능은 준비 중입니다.");
+    setWeeklySelectModalVisible(true);
   };
 
   return (
@@ -217,6 +250,7 @@ export default function HomeScreen() {
               problem={problemForWeekly}
               onPress={handleNavigateToProblemDetail}
               onPressNew={handleNavigateToSetWeeklyProblem}
+              onChangeWeeklyProblem={handleNavigateToSetWeeklyProblem} // ✅ [추가]
             />
             <ProblemList
               persona={selectedPersona}
@@ -248,6 +282,12 @@ export default function HomeScreen() {
         isVisible={isDetailModalVisible}
         onClose={() => setDetailModalVisible(false)}
         problemId={viewingProblemId}
+      />
+
+      <SelectWeeklyProblemModal
+        isVisible={isWeeklySelectModalVisible}
+        onClose={() => setWeeklySelectModalVisible(false)}
+        onConfirm={handleConfirmWeeklyProblem}
       />
     </SafeAreaView>
   );

@@ -231,7 +231,7 @@ export default function ThreadItem({
 
 const styles = StyleSheet.create({
   contentContainer: {
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingRight: 16,
     borderBottomWidth: 1,
     borderColor: "#f1f3f5",
@@ -252,7 +252,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  metaText: { fontSize: 13, color: "#868e96", flexShrink: 1 },
+  metaText: {
+    fontSize: 13,
+    color: "#868e96",
+    flexShrink: 1
+  },
   menuTrigger: {
     padding: 4,
   },
@@ -266,8 +270,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginRight: 8,
   },
-  typeTagText: { fontSize: 12, fontWeight: "bold" },
-  contentText: { fontSize: 15, lineHeight: 22, color: "#343a40" },
+  typeTagText: {
+    fontSize: 12,
+    fontWeight: "bold"
+  },
+  contentText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#343a40"
+  },
   completedText: {
     textDecorationLine: "line-through",
     color: "#adb5bd",
@@ -280,8 +291,6 @@ const styles = StyleSheet.create({
     padding: 6, // 텍스트가 없으므로 터치 영역 확보를 위해 padding 조정
     marginRight: 12, // 버튼 간 간격 조정
   },
-  // ✅ [제거] 더 이상 사용하지 않는 스타일 제거
-  // actionText, completedActionText
   completedSessionSection: {
     marginTop: 12,
     backgroundColor: "#f8f9fa",
@@ -293,14 +302,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 12,
   },
-  summaryText: { fontSize: 13, fontWeight: "500", color: "#495057" },
-  sessionList: { borderTopWidth: 1, borderColor: "#e9ecef", padding: 12 },
+  summaryText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#495057"
+  },
+  sessionList: {
+    borderTopWidth: 1,
+    borderColor: "#e9ecef",
+    padding: 12
+  },
   sessionItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 4,
   },
-  sessionContent: { fontSize: 14, color: "#495057", flex: 1 },
+  sessionContent: {
+    fontSize: 14,
+    color: "#495057",
+    flex: 1
+  },
   sessionTime: {
     fontSize: 14,
     color: "#868e96",
