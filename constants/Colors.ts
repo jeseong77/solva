@@ -12,9 +12,9 @@ export const Colors = {
     background: 'f0f0f0',
     cardBackground: '#ffffff',
     tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    icon: '#000000',
+    tabIconDefault: '#000000',
+    tabIconSelected: '#000000',
   },
   dark: {
     text: '#ECEDEE',

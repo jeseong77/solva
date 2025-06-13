@@ -1,7 +1,5 @@
-// app/components/thread/ThreadWrite.tsx
-
 import { useAppStore } from "@/store/store";
-import { ThreadItemType } from "@/types";
+import { ThreadItem, ThreadItemType } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
 import {
@@ -18,7 +16,6 @@ import {
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-// 선택 가능한 스레드 타입 (Session 제외)
 const SELECTABLE_TYPES: Exclude<ThreadItemType, "Session">[] = [
   "General",
   "Bottleneck",
@@ -26,7 +23,6 @@ const SELECTABLE_TYPES: Exclude<ThreadItemType, "Session">[] = [
   "Action",
 ];
 
-// 타입별 색상 및 이름 정의
 const typeInfo: {
   [key in Exclude<ThreadItemType, "Session">]: { color: string; name: string };
 } = {
@@ -36,12 +32,12 @@ const typeInfo: {
   Action: { color: "#d9480f", name: "액션" },
 };
 
-// 컴포넌트가 받을 Props 정의
 interface ThreadWriteProps {
   isVisible: boolean;
   onClose: () => void;
   problemId: string;
-  parentThreadId?: string | null; // 답글을 달 대상 스레드 ID
+  parentThreadId?: string | null;
+  threadToEditId?: string | null;
 }
 
 export default function ThreadWrite({
@@ -49,48 +45,122 @@ export default function ThreadWrite({
   onClose,
   problemId,
   parentThreadId,
+  threadToEditId,
 }: ThreadWriteProps) {
-  // 폼 내부 상태
   const [content, setContent] = useState("");
   const [selectedType, setSelectedType] =
     useState<Exclude<ThreadItemType, "Session">>("General");
 
-  // 전역 스토어에서 필요한 액션과 함수 가져오기
-  const { addThreadItem, getThreadItemById } = useAppStore(
+  const { addThreadItem, getThreadItemById, updateThreadItem } = useAppStore(
     useShallow((state) => ({
       addThreadItem: state.addThreadItem,
       getThreadItemById: state.getThreadItemById,
+      updateThreadItem: state.updateThreadItem,
     }))
   );
 
-  // 답글 모드일 경우, 부모 스레드 정보 조회
   const parentThread = parentThreadId
     ? getThreadItemById(parentThreadId)
     : null;
 
-  // 모달이 닫힐 때 상태 초기화
-  useEffect(() => {
-    if (!isVisible) {
-      setContent("");
-      setSelectedType("General");
-    }
-  }, [isVisible]);
+  const isEditMode = !!threadToEditId;
 
-  // 저장 핸들러
+  useEffect(() => {
+    if (isVisible) {
+      if (isEditMode) {
+        const threadToEdit = getThreadItemById(threadToEditId);
+        if (threadToEdit && threadToEdit.type !== "Session") {
+          setContent(threadToEdit.content);
+          setSelectedType(threadToEdit.type);
+        }
+      } else {
+        setContent("");
+        setSelectedType("General");
+      }
+    }
+  }, [isVisible, threadToEditId, getThreadItemById, isEditMode]);
   const handleSave = async () => {
     if (!content.trim()) {
       Alert.alert("내용을 입력해주세요.");
       return;
     }
 
-    await addThreadItem({
-      problemId,
-      parentId: parentThreadId || null,
-      type: selectedType,
-      content: content.trim(),
-    });
+    if (isEditMode) {
+      // --- 수정 모드 ---
+      const originalThread = getThreadItemById(threadToEditId);
+      if (!originalThread) {
+        Alert.alert("오류", "수정할 스레드를 찾을 수 없습니다.");
+        return;
+      }
 
-    onClose(); // 저장 후 모달 닫기
+      // `selectedType`에 따라 완전한 새 객체를 생성합니다.
+      let updatedThread: ThreadItem;
+
+      // 공통 기본 속성을 정의합니다.
+      const baseProperties = {
+        ...originalThread,
+        content: content.trim(),
+        type: selectedType,
+      };
+
+      switch (selectedType) {
+        case "General":
+          updatedThread = {
+            ...baseProperties,
+            type: "General",
+          };
+          break;
+        case "Bottleneck":
+          updatedThread = {
+            ...baseProperties,
+            type: "Bottleneck",
+            // 타입이 변경되었을 경우를 대비해 기본값을 설정합니다.
+            isResolved:
+              originalThread.type === "Bottleneck"
+                ? originalThread.isResolved
+                : false,
+          };
+          break;
+        case "Task":
+          updatedThread = {
+            ...baseProperties,
+            type: "Task",
+            // 타입이 변경되었을 경우를 대비해 기본값을 설정합니다.
+            isCompleted:
+              originalThread.type === "Task"
+                ? originalThread.isCompleted
+                : false,
+          };
+          break;
+        case "Action":
+          updatedThread = {
+            ...baseProperties,
+            type: "Action",
+            // 타입이 변경되었을 경우를 대비해 기본값을 설정합니다.
+            status:
+              originalThread.type === "Action" ? originalThread.status : "todo",
+            timeSpent:
+              originalThread.type === "Action" ? originalThread.timeSpent : 0,
+          };
+          break;
+        default:
+          // Session 타입 등 다른 예외 케이스 처리
+          console.error("Unsupported type for editing:", selectedType);
+          return;
+      }
+
+      await updateThreadItem(updatedThread);
+    } else {
+      // --- 생성 모드 (기존과 동일) ---
+      await addThreadItem({
+        problemId,
+        parentId: parentThreadId || null,
+        type: selectedType,
+        content: content.trim(),
+      });
+    }
+
+    onClose();
   };
 
   return (
@@ -106,7 +176,6 @@ export default function ThreadWrite({
         style={styles.keyboardAvoidingView}
       >
         <View style={styles.container}>
-          {/* 답글 모드일 때만 표시되는 부모 스레드 정보 */}
           {parentThread && (
             <View style={styles.replyingToContainer}>
               <Feather name="corner-down-right" size={16} color="#868e96" />
@@ -116,18 +185,20 @@ export default function ThreadWrite({
             </View>
           )}
 
-          {/* 메인 텍스트 입력창 */}
           <TextInput
             style={styles.textInput}
-            placeholder="새로운 스레드를 추가하세요..."
+            placeholder={
+              isEditMode
+                ? "스레드 내용 수정..."
+                : "새로운 스레드를 추가하세요..."
+            }
             placeholderTextColor="#adb5bd"
             value={content}
             onChangeText={setContent}
             multiline
-            autoFocus // 모달이 열리면 바로 키보드 포커스
+            autoFocus
           />
 
-          {/* 하단 컨트롤러: 타입 선택 및 Post 버튼 */}
           <View style={styles.bottomControls}>
             <View style={styles.typeSelector}>
               {SELECTABLE_TYPES.map((type) => (
@@ -153,7 +224,9 @@ export default function ThreadWrite({
               ))}
             </View>
             <TouchableOpacity style={styles.postButton} onPress={handleSave}>
-              <Text style={styles.postButtonText}>Post</Text>
+              <Text style={styles.postButtonText}>
+                {isEditMode ? "Update" : "Post"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -178,7 +251,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16, // iOS 하단 여백 추가
+    paddingBottom: Platform.OS === "ios" ? 30 : 16,
   },
   replyingToContainer: {
     flexDirection: "row",

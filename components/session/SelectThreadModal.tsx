@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: "absolute",
-    right: 16,
+    left: 16,
   },
   listContentContainer: {
     paddingHorizontal: 16,

@@ -88,7 +88,6 @@ export default function ProblemEdit({
         { text: "High", onPress: () => setPriority("high") },
         { text: "Medium", onPress: () => setPriority("medium") },
         { text: "Low", onPress: () => setPriority("low") },
-        { text: "None", onPress: () => setPriority("none") },
         { text: "취소", style: "cancel" },
       ],
       { cancelable: true }
@@ -241,9 +240,7 @@ const styles = StyleSheet.create({
   },
   bodyInput: {
     fontSize: 17,
-    lineHeight: 26,
     marginTop: 10,
     color: "#343a40",
-    flex: 1,
   },
 });

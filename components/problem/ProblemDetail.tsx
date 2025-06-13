@@ -1,7 +1,6 @@
 import { useAppStore } from "@/store/store";
-import {
-  Feather,
-} from "@expo/vector-icons";
+import { ActionThreadItem, TaskThreadItem } from "@/types";
+import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   Alert,
@@ -18,7 +17,6 @@ import { useShallow } from "zustand/react/shallow";
 import ThreadItem from "../thread/ThreadItem";
 import ThreadWrite from "../thread/ThreadWrite";
 import ProblemPost from "./ProblemPost";
-import { ActionThreadItem, TaskThreadItem } from "@/types";
 
 interface FlatThreadItem {
   id: string;
@@ -71,6 +69,7 @@ export default function ProblemDetail({
 
   const [isWriteModalVisible, setWriteModalVisible] = useState(false);
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null); // [추가]
 
   const flattenedThreads = ((): FlatThreadItem[] => {
     if (!problem) return [];
@@ -93,10 +92,12 @@ export default function ProblemDetail({
   })();
 
   const handleOpenRootWriteModal = () => {
+    setEditingThreadId(null); // [추가] 수정 모드 해제
     setReplyParentId(null);
     setWriteModalVisible(true);
   };
   const handleOpenReplyWriteModal = (parentId: string) => {
+    setEditingThreadId(null); // [추가] 수정 모드 해제
     setReplyParentId(parentId);
     setWriteModalVisible(true);
   };
@@ -145,8 +146,19 @@ export default function ProblemDetail({
     };
   };
 
+  // [추가] 수정 모달을 여는 핸들러
+  const handleOpenEditModal = (threadId: string) => {
+    setEditingThreadId(threadId);
+    setReplyParentId(null);
+    setWriteModalVisible(true);
+  };
+
   const handlePressThreadMenu = (threadId: string) => {
     const options = [
+      {
+        text: "수정하기",
+        onPress: () => handleOpenEditModal(threadId),
+      },
       {
         text: "삭제하기",
         onPress: () => {
@@ -236,7 +248,8 @@ export default function ProblemDetail({
               flattenedThreads.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.noThreadsText}>
-                    아직 추가된 스레드가 없습니다.
+                    아직 추가된 스레드가 없습니다. {"\n"}이 문제를 해결하기 위해
+                    필요한 것들을 나열해보세요.
                   </Text>
                 </View>
               ) : null
@@ -257,9 +270,13 @@ export default function ProblemDetail({
       {problem && (
         <ThreadWrite
           isVisible={isWriteModalVisible}
-          onClose={() => setWriteModalVisible(false)}
+          onClose={() => {
+            setWriteModalVisible(false);
+            setEditingThreadId(null); // [추가] 모달 닫을 때 수정 ID 초기화
+          }}
           problemId={problem.id}
           parentThreadId={replyParentId}
+          threadToEditId={editingThreadId} // [추가] 수정할 스레드 ID 전달
         />
       )}
     </Modal>
