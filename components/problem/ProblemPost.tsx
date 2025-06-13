@@ -4,12 +4,13 @@ import {
   Persona,
   Priority,
   Problem,
+  ProblemStatus,
   SessionThreadItem,
   TaskThreadItem,
 } from "@/types";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Priority에 따른 색상 맵 (기존과 동일)
 const priorityColors: { [key in Priority]: string } = {
@@ -40,15 +41,36 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
+// ✅ [추가] 상태별 이름 및 색상 정보
+const statusInfo: {
+  [key in ProblemStatus]: {
+    name: string;
+    color: string;
+    backgroundColor: string;
+  };
+} = {
+  active: { name: "Active", color: "#2b8a3e", backgroundColor: "#e6fcf5" },
+  onHold: { name: "On Hold", color: "#868e96", backgroundColor: "#f1f3f5" },
+  resolved: { name: "Resolved", color: "#1971c2", backgroundColor: "#e7f5ff" },
+  archived: { name: "Archived", color: "#495057", backgroundColor: "#e9ecef" },
+};
+
 // 컴포넌트가 받을 Props 정의
 interface ProblemPostProps {
   problem: Problem;
   persona: Persona;
+  onStatusBadgePress: () => void;
 }
 
-export default function ProblemPost({ problem, persona }: ProblemPostProps) {
+export default function ProblemPost({
+  problem,
+  persona,
+  onStatusBadgePress,
+}: ProblemPostProps) {
   // 전역 상태에서 스레드 아이템을 가져와 통계 계산
   const threadItems = useAppStore((state) => state.threadItems);
+  const currentStatus = problem.status || "active";
+  const currentStatusInfo = statusInfo[currentStatus];
 
   // ✅ [수정] 통계 계산 로직 전체 변경
   const stats = useMemo(() => {
@@ -112,13 +134,39 @@ export default function ProblemPost({ problem, persona }: ProblemPostProps) {
     <View style={styles.postContainer}>
       {/* 헤더 (기존과 동일) */}
       <View style={styles.header}>
-        <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
-        <View style={styles.metaContainer}>
-          <Text style={styles.metaText}>
-            persona/<Text style={styles.personaTitle}>{persona.title}</Text>
-          </Text>
-          <Text style={styles.metaText}>{formattedDate}</Text>
+        {/* 헤더 왼쪽 컨텐츠 */}
+        <View style={styles.headerLeft}>
+          <View
+            style={[styles.indicator, { backgroundColor: indicatorColor }]}
+          />
+          <View style={styles.metaContainer}>
+            <Text style={styles.metaText}>
+              persona/<Text style={styles.personaTitle}>{persona.title}</Text>
+            </Text>
+            <Text style={styles.metaText}>{formattedDate}</Text>
+          </View>
         </View>
+
+        {/* 헤더 오른쪽: 상태 배지 */}
+        <TouchableOpacity
+          style={[
+            styles.statusBadge,
+            { backgroundColor: currentStatusInfo.backgroundColor },
+          ]}
+          onPress={onStatusBadgePress} // ✅ 이벤트 핸들러 연결
+        >
+          <Text
+            style={[styles.statusBadgeText, { color: currentStatusInfo.color }]}
+          >
+            {currentStatusInfo.name}
+          </Text>
+          <Feather
+            name="chevron-down"
+            size={16}
+            color={currentStatusInfo.color}
+            style={{ marginLeft: 4 }}
+          />
+        </TouchableOpacity>
       </View>
 
       {/* 본문 (기존과 동일) */}
@@ -159,14 +207,23 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#ffffff",
   },
+  // [수정] header 스타일
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    justifyContent: "space-between", // 양쪽 정렬
+    marginBottom: 8,
+  },
+  // [추가] headerLeft 스타일
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1, // 왼쪽 영역이 남는 공간을 차지하도록
+    marginRight: 8, // 오른쪽과의 간격
   },
   indicator: {
-    width: 32,
-    height: 32,
+    width: 16,
+    height: 16,
     borderRadius: 16,
   },
   metaContainer: {
@@ -209,5 +266,17 @@ const styles = StyleSheet.create({
   separator: {
     color: "#ced4da",
     marginHorizontal: 8,
+  },
+  // [추가] statusBadge 관련 스타일
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontWeight: "bold",
   },
 });

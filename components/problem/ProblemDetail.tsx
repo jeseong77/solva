@@ -1,5 +1,10 @@
 import { useAppStore } from "@/store/store";
-import { ActionThreadItem, TaskThreadItem } from "@/types";
+import {
+  ActionThreadItem,
+  Problem,
+  ProblemStatus,
+  TaskThreadItem,
+} from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -44,7 +49,8 @@ export default function ProblemDetail({
     stopSession,
     addThreadItem,
     deleteThreadItem,
-    updateThreadItem, // 👈 추가
+    updateThreadItem,
+    updateProblem,
   } = useAppStore(
     useShallow((state) => {
       const problem = problemId
@@ -62,7 +68,8 @@ export default function ProblemDetail({
         stopSession: state.stopSession,
         addThreadItem: state.addThreadItem,
         deleteThreadItem: state.deleteThreadItem,
-        updateThreadItem: state.updateThreadItem, // 👈 추가
+        updateThreadItem: state.updateThreadItem,
+        updateProblem: state.updateProblem,
       };
     })
   );
@@ -208,6 +215,50 @@ export default function ProblemDetail({
     }
   };
 
+  // ✅ [추가] 문제 상태(status)를 업데이트하는 핸들러
+  const handleStatusUpdate = (newStatus: ProblemStatus) => {
+    if (!problem) return;
+
+    // 업데이트할 새로운 problem 객체 생성
+    const updatedProblem: Problem = {
+      ...problem,
+      status: newStatus,
+      // 상태 변경에 따라 완료/아카이브 날짜도 함께 업데이트
+      resolvedAt: newStatus === "resolved" ? new Date() : problem.resolvedAt,
+      archivedAt: newStatus === "archived" ? new Date() : problem.archivedAt,
+    };
+
+    // 'resolved' 또는 'archived' 상태에서 다른 상태로 변경 시, 날짜 기록을 초기화
+    if (problem.status === "resolved" && newStatus !== "resolved") {
+      updatedProblem.resolvedAt = undefined;
+    }
+    if (problem.status === "archived" && newStatus !== "archived") {
+      updatedProblem.archivedAt = undefined;
+    }
+
+    updateProblem(updatedProblem);
+  };
+
+  // ✅ [추가] 상태 배지를 눌렀을 때 선택 메뉴(Alert)를 띄우는 핸들러
+  const handleChangeStatusPress = () => {
+    if (!problem) return;
+
+    // Alert에 표시될 버튼 목록
+    const options = [
+      { text: "Active", onPress: () => handleStatusUpdate("active") },
+      { text: "On Hold", onPress: () => handleStatusUpdate("onHold") },
+      { text: "Resolved", onPress: () => handleStatusUpdate("resolved") },
+      { text: "Archived", onPress: () => handleStatusUpdate("archived") },
+      { text: "취소", style: "cancel" as const },
+    ];
+
+    Alert.alert(
+      "문제 상태 변경",
+      `'${problem.title}' 문제의 상태를 선택하세요.`,
+      options
+    );
+  };
+
   const renderThreadItem = ({ item }: { item: FlatThreadItem }) => {
     const thread = getThreadItemById(item.id);
     if (!thread || !problem || !persona) return null;
@@ -242,7 +293,11 @@ export default function ProblemDetail({
             renderItem={renderThreadItem}
             keyExtractor={(item) => item.id}
             ListHeaderComponent={
-              <ProblemPost problem={problem} persona={persona} />
+              <ProblemPost
+                problem={problem}
+                persona={persona}
+                onStatusBadgePress={handleChangeStatusPress} // ✅ prop 전달
+              />
             }
             ListFooterComponent={
               flattenedThreads.length === 0 ? (

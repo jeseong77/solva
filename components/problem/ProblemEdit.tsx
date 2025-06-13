@@ -1,12 +1,13 @@
 import { useAppStore } from "@/store/store";
 import { Priority, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -42,6 +43,11 @@ export default function ProblemEdit({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
+  const descriptionInputRef = useRef<TextInput>(null);
+
+  const focusDescriptionInput = () => {
+    descriptionInputRef.current?.focus();
+  };
 
   // 1. 스토어에서는 데이터 탐색 로직이 아닌, 필요한 '도구'(함수)들만 가져옵니다.
   const { getProblemById, getPersonaById, addProblem, updateProblem } =
@@ -142,15 +148,15 @@ export default function ProblemEdit({
           {/* 서브헤더: 페르소나 정보, 우선순위 버튼 */}
           <View style={styles.subHeader}>
             <View style={styles.personaInfo}>
-            <TouchableOpacity
-              onPress={handleChangePriority}
-            ><View
-                style={[
-                  styles.indicator,
-                  { backgroundColor: priorityColors[priority] },
-                ]}
-              /></TouchableOpacity>
-              
+              <TouchableOpacity onPress={handleChangePriority}>
+                <View
+                  style={[
+                    styles.indicator,
+                    { backgroundColor: priorityColors[priority] },
+                  ]}
+                />
+              </TouchableOpacity>
+
               <Text style={styles.metaText}>
                 페르소나 → {personaForProblem?.title || "선택"}
               </Text>
@@ -169,14 +175,20 @@ export default function ProblemEdit({
               value={title}
               onChangeText={setTitle}
             />
-            <TextInput
-              style={styles.bodyInput}
-              placeholder="내용 (선택 사항)"
-              placeholderTextColor="#adb5bd"
-              value={description}
-              onChangeText={setDescription}
-              multiline
-            />
+            <Pressable
+              style={styles.bodyPressable}
+              onPress={focusDescriptionInput}
+            >
+              <TextInput
+                ref={descriptionInputRef}
+                style={styles.bodyInput}
+                placeholder="내용 (선택 사항)"
+                placeholderTextColor="#adb5bd"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+              />
+            </Pressable>
           </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -238,9 +250,14 @@ const styles = StyleSheet.create({
     height: 26,
     color: "#212529",
   },
+  bodyPressable: {
+    flex: 1,
+    marginTop: 10,
+    minHeight: 200, // 최소 터치 높이 확보
+  },
   bodyInput: {
     fontSize: 17,
-    marginTop: 10,
     color: "#343a40",
+    textAlignVertical: "top",
   },
 });

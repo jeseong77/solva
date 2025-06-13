@@ -1,27 +1,27 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Updated colors for a black-and-white theme.
  */
 
-const tintColorLight = 'a8cbe8';
-const tintColorDark = '#fff';
+const tintColorLight = "#000000";
+const tintColorDark = "#ffffff";
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: 'f0f0f0',
-    cardBackground: '#ffffff',
-    tint: tintColorLight,
-    icon: '#000000',
-    tabIconDefault: '#000000',
-    tabIconSelected: '#000000',
+    text: "#000000", // Black text
+    background: "#ffffff", // White background
+    cardBackground: "#ffffff", // White card background
+    tint: tintColorLight, // Black tint
+    icon: "#000000", // Black icons
+    tabIconDefault: "#000000", // Black default tab icon
+    tabIconSelected: "#000000", // Black selected tab icon
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: "#ffffff", // White text
+    background: "#000000", // Black background
+    cardBackground: "#000000", // Black card background
+    tint: tintColorDark, // White tint
+    icon: "#ffffff", // White icons
+    tabIconDefault: "#ffffff", // White default tab icon
+    tabIconSelected: tintColorDark, // White selected tab icon
   },
 };
