@@ -4,6 +4,7 @@ import PersonaList from "@/components/persona/personaList";
 import ProblemDetail from "@/components/problem/ProblemDetail";
 import ProblemEdit from "@/components/problem/ProblemEdit";
 import ProblemList from "@/components/problem/ProblemList";
+import ResolvedProblemList from "@/components/problem/ResolvedProblemList";
 import SelectWeeklyProblemModal from "@/components/problem/SelectWeeklyProblemModal";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
 import SessionBox from "@/components/session/SessionBox"; // ✅ SessionBox 컴포넌트 임포트
@@ -17,6 +18,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Image
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
@@ -239,11 +241,9 @@ export default function HomeScreen() {
         onPressAddPersona={handleNavigateToCreatePersona}
       />
       <ScrollView style={styles.mainContentContainer}>
-        {/* ✅ SessionBox를 메인 콘텐츠 상단에 배치 */}
-        <SessionBox />
-
         {selectedPersona ? (
           <>
+            <SessionBox />
             <WeeklyProblemCard
               persona={selectedPersona}
               weeklyProblem={currentWeeklyProblem}
@@ -259,11 +259,22 @@ export default function HomeScreen() {
               onPressNewProblem={handleCreateProblem}
               onLongPressProblem={handleEditProblem}
             />
+            <ResolvedProblemList
+              persona={selectedPersona}
+              problems={filteredProblems}
+              onPressProblem={handleNavigateToProblemDetail}
+            />
           </>
         ) : (
           <View style={styles.placeholderContainer}>
+            {/* ✅ [추가] 이미지 */}
+            <Image
+              source={require("@/assets/images/main_sample.png")}
+              style={styles.placeholderImage}
+            />
+            {/* ✅ [수정] 텍스트 문구 변경 */}
             <Text style={styles.placeholderText}>
-              페르소나를 선택하여 관련 문제들을 확인하세요.
+              페르소나를 추가하거나 선택하여 작업을 시작해 보세요!
             </Text>
           </View>
         )}
@@ -313,5 +324,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#6c757d",
     textAlign: "center",
+  },
+  // placeholderText 스타일 아래에 추가
+  placeholderImage: {
+    width: 250,
+    height: 250,
+    marginBottom: 24,
+    opacity: 0.7,
   },
 });

@@ -134,9 +134,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: "#f8f9fa",
     borderWidth: 1,
-    marginTop: 16,
-    marginHorizontal: 16,
-    marginBottom: 64,
+    margin: 16,
     borderRadius: 8,
     borderColor: "#e9ecef",
     shadowOffset: { width: 0, height: 1 },

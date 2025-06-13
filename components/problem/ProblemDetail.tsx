@@ -1,3 +1,5 @@
+// components/problem/ProblemDetail.tsx
+
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
@@ -19,6 +21,7 @@ import {
   View,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
+import LogSessionModal from "../session/LogSessionModal";
 import ThreadItem from "../thread/ThreadItem";
 import ThreadWrite from "../thread/ThreadWrite";
 import ProblemPost from "./ProblemPost";
@@ -76,7 +79,9 @@ export default function ProblemDetail({
 
   const [isWriteModalVisible, setWriteModalVisible] = useState(false);
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null); // [추가]
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [isLogSessionModalVisible, setLogSessionModalVisible] = useState(false); // ✅ [추가]
+  const [loggingThreadId, setLoggingThreadId] = useState<string | null>(null); // ✅ [추가]
 
   const flattenedThreads = ((): FlatThreadItem[] => {
     if (!problem) return [];
@@ -109,8 +114,44 @@ export default function ProblemDetail({
     setWriteModalVisible(true);
   };
   const handleStartSession = (threadId: string) => {
-    startSession(threadId);
+    Alert.alert("세션 시작", "어떤 작업을 하시겠습니까?", [
+      {
+        text: "바로 시작하기",
+        onPress: () => startSession(threadId), // 기존 로직
+      },
+      {
+        text: "놓친 세션 기록하기",
+        onPress: () => {
+          setLoggingThreadId(threadId); // 어떤 스레드에 대한 기록인지 ID 저장
+          setLogSessionModalVisible(true); // 후기록 모달 열기
+        },
+      },
+      {
+        text: "취소",
+        style: "cancel",
+      },
+    ]);
   };
+
+  // ✅ [추가] LogSessionModal에서 전달받은 데이터로 세션을 저장하는 핸들러
+  const handleSaveLoggedSession = (
+    durationInSeconds: number,
+    description: string
+  ) => {
+    if (!loggingThreadId || !problem) return;
+
+    addThreadItem({
+      problemId: problem.id,
+      parentId: loggingThreadId,
+      type: "Session",
+      content: description || "기록된 세션",
+      timeSpent: durationInSeconds,
+      startTime: new Date(Date.now() - durationInSeconds * 1000),
+    });
+
+    setLogSessionModalVisible(false); // 모달 닫기
+  };
+
   const handleStopSession = (threadId: string, elapsedTime: number) => {
     Alert.alert("세션 종료", "이번 세션에서 한 작업을 기록하시겠습니까?", [
       {
@@ -332,6 +373,13 @@ export default function ProblemDetail({
           problemId={problem.id}
           parentThreadId={replyParentId}
           threadToEditId={editingThreadId} // [추가] 수정할 스레드 ID 전달
+        />
+      )}
+      {problem && (
+        <LogSessionModal
+          isVisible={isLogSessionModalVisible}
+          onClose={() => setLogSessionModalVisible(false)}
+          onSave={handleSaveLoggedSession}
         />
       )}
     </Modal>
