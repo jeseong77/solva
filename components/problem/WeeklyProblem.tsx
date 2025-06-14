@@ -106,7 +106,13 @@ export default function WeeklyProblemCard({
   }, [problem, threadItems]);
 
   // 주간 문제가 없는 경우, 대체 UI 렌더링
-  if (!weeklyProblem || !problem || !persona) {
+  if (
+    !weeklyProblem ||
+    !problem ||
+    !persona ||
+    problem.status === "resolved" ||
+    problem.status === "archived"
+  ) {
     return (
       <View style={styles.container}>
         <Text style={styles.componentTitle}>이번주에 해결할 문제:</Text>
@@ -125,59 +131,63 @@ export default function WeeklyProblemCard({
     <View style={styles.container}>
       <Text style={styles.componentTitle}>이번주에 집중할 문제:</Text>
       <View style={styles.cardWrapper}>
-      <TouchableOpacity
-        style={styles.cardContainer}
-        onPress={() => onPress(problem.id)}
-      >
-        {/* 카드 헤더: 페르소나 정보와 D-Day 칩 */}
-        <View style={styles.cardHeader}>
-          <Text style={styles.metaText}>persona/{persona.title}</Text>
-          <View style={styles.dDayChip}>
-            <Text style={styles.dDayText}>{dDay}</Text>
+        <TouchableOpacity
+          style={styles.cardContainer}
+          onPress={() => onPress(problem.id)}
+        >
+          {/* 카드 헤더: 페르소나 정보와 D-Day 칩 */}
+          <View style={styles.cardHeader}>
+            <Text style={styles.metaText}>persona/{persona.title}</Text>
+            <View style={styles.dDayChip}>
+              <Text style={styles.dDayText}>{dDay}</Text>
+            </View>
           </View>
-        </View>
 
-        {/* 카드 본문: 문제 제목과 설명 */}
-        <View style={styles.cardBody}>
-          <Text style={styles.problemTitle}>{problem.title}</Text>
-          {problem.description && (
-            <Text style={styles.problemDescription} numberOfLines={3}>
-              {problem.description}
-            </Text>
+          {/* 카드 본문: 문제 제목과 설명 */}
+          <View style={styles.cardBody}>
+            <Text style={styles.problemTitle}>{problem.title}</Text>
+            {problem.description && (
+              <Text style={styles.problemDescription} numberOfLines={3}>
+                {problem.description}
+              </Text>
+            )}
+          </View>
+
+          {/* 카드 푸터: 통계 정보 */}
+          {stats && (
+            <View style={styles.statsContainer}>
+              <Feather name="git-branch" size={14} color="#6c757d" />
+              <Text style={styles.statsText}>{stats.totalThreads}</Text>
+              <Text style={styles.separator}>·</Text>
+              <Feather name="check-square" size={14} color="#6c757d" />
+              <Text style={styles.statsText}>
+                {stats.tasks.completed} / {stats.tasks.total}
+              </Text>
+              <Text style={styles.separator}>·</Text>
+              <MaterialCommunityIcons
+                name="run-fast"
+                size={14}
+                color="#6c757d"
+              />
+              <Text style={styles.statsText}>
+                {stats.actions.completed} / {stats.actions.total}
+              </Text>
+              <Text style={styles.separator}>·</Text>
+              <Feather name="clock" size={14} color="#6c757d" />
+              <Text style={styles.statsText}>
+                {formatSeconds(stats.totalSessionTime)}
+              </Text>
+            </View>
           )}
-        </View>
-
-        {/* 카드 푸터: 통계 정보 */}
-        {stats && (
-          <View style={styles.statsContainer}>
-            <Feather name="git-branch" size={14} color="#6c757d" />
-            <Text style={styles.statsText}>{stats.totalThreads}</Text>
-            <Text style={styles.separator}>·</Text>
-            <Feather name="check-square" size={14} color="#6c757d" />
-            <Text style={styles.statsText}>
-              {stats.tasks.completed} / {stats.tasks.total}
-            </Text>
-            <Text style={styles.separator}>·</Text>
-            <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-            <Text style={styles.statsText}>
-              {stats.actions.completed} / {stats.actions.total}
-            </Text>
-            <Text style={styles.separator}>·</Text>
-            <Feather name="clock" size={14} color="#6c757d" />
-            <Text style={styles.statsText}>
-              {formatSeconds(stats.totalSessionTime)}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
-      {/* ✅ [추가] '문제 바꾸기' 버튼. TouchableOpacity가 끝나는 지점 바로 아래에 추가 */}
-      <TouchableOpacity
-        style={styles.changeButton}
-        onPress={onChangeWeeklyProblem}
-      >
-        <Feather name="refresh-cw" size={14} color="#495057" />
-        <Text style={styles.changeButtonText}>주간 집중 문제 바꾸기</Text>
-      </TouchableOpacity>
+        </TouchableOpacity>
+        {/* ✅ [추가] '문제 바꾸기' 버튼. TouchableOpacity가 끝나는 지점 바로 아래에 추가 */}
+        <TouchableOpacity
+          style={styles.changeButton}
+          onPress={onChangeWeeklyProblem}
+        >
+          <Feather name="refresh-cw" size={14} color="#495057" />
+          <Text style={styles.changeButtonText}>주간 집중 문제 바꾸기</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );

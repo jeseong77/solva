@@ -1,5 +1,4 @@
 import { useAppStore } from "@/store/store";
-import { Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
@@ -41,13 +40,10 @@ export default function SelectWeeklyProblemModal({
     }))
   );
 
-  // 선택 가능한 문제 목록 (active 또는 onHold 상태인 문제만)
   const selectableProblems = useMemo(() => {
     if (!selectedPersonaId) return [];
     return problems.filter(
-      (p) =>
-        p.personaId === selectedPersonaId &&
-        (p.status === "active" || p.status === "onHold")
+      (p) => p.personaId === selectedPersonaId && p.status === "active"
     );
   }, [selectedPersonaId, problems]);
 

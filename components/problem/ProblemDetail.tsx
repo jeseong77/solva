@@ -5,9 +5,11 @@ import {
   ActionThreadItem,
   Problem,
   ProblemStatus,
+  StarReport,
   TaskThreadItem,
 } from "@/types";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -25,6 +27,7 @@ import LogSessionModal from "../session/LogSessionModal";
 import ThreadItem from "../thread/ThreadItem";
 import ThreadWrite from "../thread/ThreadWrite";
 import ProblemPost from "./ProblemPost";
+import StarReportWrite from "../report/StarReportWrite";
 
 interface FlatThreadItem {
   id: string;
@@ -42,6 +45,7 @@ export default function ProblemDetail({
   onClose,
   problemId,
 }: ProblemDetailProps) {
+  const router = useRouter();
   // ✅ [수정] 스토어에서 updateThreadItem 함수 가져오기
   const {
     problem,
@@ -54,6 +58,8 @@ export default function ProblemDetail({
     deleteThreadItem,
     updateThreadItem,
     updateProblem,
+    getStarReportByProblemId,
+    addStarReport,
   } = useAppStore(
     useShallow((state) => {
       const problem = problemId
@@ -73,6 +79,8 @@ export default function ProblemDetail({
         deleteThreadItem: state.deleteThreadItem,
         updateThreadItem: state.updateThreadItem,
         updateProblem: state.updateProblem,
+        getStarReportByProblemId: state.getStarReportByProblemId, // ✅ [추가]
+        addStarReport: state.addStarReport,
       };
     })
   );
@@ -82,6 +90,10 @@ export default function ProblemDetail({
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [isLogSessionModalVisible, setLogSessionModalVisible] = useState(false); // ✅ [추가]
   const [loggingThreadId, setLoggingThreadId] = useState<string | null>(null); // ✅ [추가]
+  const [isStarReportModalVisible, setStarReportModalVisible] = useState(false);
+  const [reportingProblemId, setReportingProblemId] = useState<string | null>(
+    null
+  );
 
   const flattenedThreads = ((): FlatThreadItem[] => {
     if (!problem) return [];
@@ -256,28 +268,67 @@ export default function ProblemDetail({
     }
   };
 
-  // ✅ [추가] 문제 상태(status)를 업데이트하는 핸들러
-  const handleStatusUpdate = (newStatus: ProblemStatus) => {
+  // ✅ [수정] 전체 로직이 통합된 최종 버전
+  const handleStatusUpdate = async (newStatus: ProblemStatus) => {
     if (!problem) return;
 
-    // 업데이트할 새로운 problem 객체 생성
-    const updatedProblem: Problem = {
+    const isNewlyResolved =
+      newStatus === "resolved" && problem.status !== "resolved";
+
+    // 1. 문제 상태를 먼저 DB에 업데이트합니다.
+    const updatedProblemData: Problem = {
       ...problem,
       status: newStatus,
-      // 상태 변경에 따라 완료/아카이브 날짜도 함께 업데이트
       resolvedAt: newStatus === "resolved" ? new Date() : problem.resolvedAt,
       archivedAt: newStatus === "archived" ? new Date() : problem.archivedAt,
     };
-
-    // 'resolved' 또는 'archived' 상태에서 다른 상태로 변경 시, 날짜 기록을 초기화
     if (problem.status === "resolved" && newStatus !== "resolved") {
-      updatedProblem.resolvedAt = undefined;
+      updatedProblemData.resolvedAt = undefined;
     }
     if (problem.status === "archived" && newStatus !== "archived") {
-      updatedProblem.archivedAt = undefined;
+      updatedProblemData.archivedAt = undefined;
     }
+    await updateProblem(updatedProblemData);
 
-    updateProblem(updatedProblem);
+    // 2. 문제가 '처음으로' 해결된 경우에만 STAR 리포트 관련 로직을 실행합니다.
+    if (isNewlyResolved) {
+      let report: StarReport | undefined | null = getStarReportByProblemId(
+        problem.id
+      );
+
+      // 2-2. 없다면 빈 리포트를 생성합니다.
+      if (!report) {
+        report = await addStarReport({
+          problemId: problem.id,
+          situation: "",
+          task: "",
+          action: "",
+          result: "",
+        });
+      }
+
+      // 2-3. 리포트가 확실히 존재할 때, 작성 여부를 묻는 Alert를 띄웁니다.
+      if (report) {
+        Alert.alert(
+          "문제 해결 완료!",
+          "문제 해결 경험을 STAR 리포트로 기록하여 자산으로 남겨보시겠어요?",
+          [
+            {
+              text: "나중에 하기",
+              style: "cancel",
+            },
+            {
+              text: "지금 작성하기",
+              onPress: () => {
+                // 2-4. '예'를 선택하면, 상태를 변경하여 모달을 엽니다.
+                setReportingProblemId(problem.id);
+                setStarReportModalVisible(true);
+              },
+            },
+          ]
+        );
+      }
+    }
   };
 
   // ✅ [추가] 상태 배지를 눌렀을 때 선택 메뉴(Alert)를 띄우는 핸들러
@@ -380,6 +431,13 @@ export default function ProblemDetail({
           isVisible={isLogSessionModalVisible}
           onClose={() => setLogSessionModalVisible(false)}
           onSave={handleSaveLoggedSession}
+        />
+      )}
+      {reportingProblemId && (
+        <StarReportWrite
+          isVisible={isStarReportModalVisible}
+          onClose={() => setStarReportModalVisible(false)}
+          problemId={reportingProblemId} // ✅ problemId를 prop으로 전달
         />
       )}
     </Modal>

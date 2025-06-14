@@ -87,60 +87,24 @@ export default function ResolvedProblemList({
   persona,
   onPressProblem,
 }: ResolvedProblemListProps) {
-  // --- UI 확인을 위한 예시 데이터 ---
-  const dummyPersona: Persona = {
-    id: "p1",
-    title: "개발자",
-    createdAt: new Date(),
-    problemIds: ["d1", "d2"],
-  };
-
-  const dummyProblems: Problem[] = [
-    {
-      id: "d1",
-      personaId: "p1",
-      title: "1차 MVP 릴레이",
-      status: "resolved",
-      priority: "high",
-      childThreadIds: [],
-      timeSpent: 0,
-      createdAt: new Date("2025-05-20"),
-      resolvedAt: new Date("2025-06-01"),
-    },
-    {
-      id: "d2",
-      personaId: "p1",
-      title: "오래된 프로젝트 문서 정리",
-      status: "archived",
-      priority: "low",
-      childThreadIds: [],
-      timeSpent: 0,
-      createdAt: new Date("2025-01-10"),
-      archivedAt: new Date("2025-03-15"),
-    },
-  ];
-  // ---------------------------------
-
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
         <Text style={styles.titleText}>
           페르소나 -{" "}
           <Text style={styles.personaTitle}>
-            {/* 예시 데이터를 사용합니다. 실제 구현 시에는 persona로 교체 */}
-            {dummyPersona.title}
+            {persona.title} {/* ✅ 실제 persona prop 사용 */}
           </Text>
           의 이전 문제들:
         </Text>
       </View>
       <FlatList
-        // 예시 데이터를 사용합니다. 실제 구현 시에는 problems로 교체
-        data={dummyProblems}
+        data={problems}
         renderItem={({ item }) => (
           <ResolvedProblemItem problem={item} onPress={onPressProblem} />
         )}
         keyExtractor={(item) => item.id}
-        scrollEnabled={false} // 부모 스크롤을 사용하도록 설정
+        scrollEnabled={false}
       />
     </View>
   );

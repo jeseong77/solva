@@ -13,12 +13,12 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Image
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
@@ -108,10 +108,28 @@ export default function HomeScreen() {
     [personas, selectedPersonaId]
   );
 
-  const filteredProblems = useMemo(
+  // ✅ [수정] '진행 중'인 문제만 필터링 (active, onHold)
+  const activeProblems = useMemo(
     () =>
       selectedPersonaId
-        ? problems.filter((p) => p.personaId === selectedPersonaId)
+        ? problems.filter(
+            (p) =>
+              p.personaId === selectedPersonaId &&
+              (p.status === "active" || p.status === "onHold")
+          )
+        : [],
+    [problems, selectedPersonaId]
+  );
+
+  // ✅ [추가] '해결/보관'된 문제만 필터링 (resolved, archived)
+  const resolvedProblems = useMemo(
+    () =>
+      selectedPersonaId
+        ? problems.filter(
+            (p) =>
+              p.personaId === selectedPersonaId &&
+              (p.status === "resolved" || p.status === "archived")
+          )
         : [],
     [problems, selectedPersonaId]
   );
@@ -254,16 +272,19 @@ export default function HomeScreen() {
             />
             <ProblemList
               persona={selectedPersona}
-              problems={filteredProblems}
+              problems={activeProblems} // ✅ activeProblems 전달
               onPressProblem={handleNavigateToProblemDetail}
               onPressNewProblem={handleCreateProblem}
               onLongPressProblem={handleEditProblem}
             />
-            <ResolvedProblemList
-              persona={selectedPersona}
-              problems={filteredProblems}
-              onPressProblem={handleNavigateToProblemDetail}
-            />
+            {/* ✅ 해결된 문제가 있을 때만 ResolvedProblemList를 렌더링 */}
+            {resolvedProblems.length > 0 && (
+              <ResolvedProblemList
+                persona={selectedPersona}
+                problems={resolvedProblems} // ✅ resolvedProblems 전달
+                onPressProblem={handleNavigateToProblemDetail}
+              />
+            )}
           </>
         ) : (
           <View style={styles.placeholderContainer}>
@@ -317,8 +338,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
-    marginTop: 50, // SessionBox와의 간격을 위해 추가
+    paddingTop: 100,
   },
   placeholderText: {
     fontSize: 16,
