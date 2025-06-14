@@ -76,15 +76,18 @@ export const createProblemSlice: StateCreator<
       const fetchedProblems = results.map(parseProblemFromDB);
 
       // fetch한 데이터를 기존 상태와 병합하고 정렬
-      const existingProblems = get().problems.filter(
-        (p) => !personaId || p.personaId !== personaId
-      );
-      const updatedProblemList = [...existingProblems, ...fetchedProblems].sort(
+      const allProblems = [...get().problems, ...fetchedProblems];
+      const problemMap = new Map<string, Problem>();
+      allProblems.forEach((p) => {
+        problemMap.set(p.id, p); // id가 같으면 나중에 들어온 값으로 덮어씀
+      });
+
+      const uniqueProblemList = Array.from(problemMap.values()).sort(
         sortProblems
       );
 
       set({
-        problems: updatedProblemList,
+        problems: uniqueProblemList,
         isLoadingProblems: false,
       });
 

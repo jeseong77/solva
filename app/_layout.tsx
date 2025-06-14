@@ -48,7 +48,11 @@ export default function RootLayout() {
     // GestureHandlerRootView는 flex: 1 스타일을 가져야 전체 화면에서 제스처를 올바르게 처리할 수 있습니다.
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <Stack>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+          }}
+        >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>

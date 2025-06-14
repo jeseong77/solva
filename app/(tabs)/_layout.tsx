@@ -38,6 +38,7 @@ export default function TabLayout() {
               color={color}
             />
           ),
+          animation: "fade",
         }}
       />
       <Tabs.Screen
@@ -52,6 +53,7 @@ export default function TabLayout() {
               color={color}
             />
           ),
+          animation: "fade",
         }}
       />
     </Tabs>

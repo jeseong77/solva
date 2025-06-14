@@ -2,7 +2,7 @@
 
 import {
   ActionThreadItem,
-  ActiveSession, // 누락된 타입 임포트
+  ActiveSession,
   BaseThreadItem,
   BottleneckThreadItem,
   Persona,
@@ -13,10 +13,11 @@ import {
   SessionThreadItem,
   StarReport,
   Tag,
-  TaskThreadItem, // 새로 추가된 타입 임포트
+  TaskThreadItem,
   ThreadItem,
   ThreadItemType,
-  WeeklyProblem, // 새로 추가된 타입 임포트
+  Todo,
+  WeeklyProblem,
 } from "@/types";
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
@@ -172,6 +173,17 @@ export interface UIStateSlice {
   stopSession: () => void;
 }
 
+export interface TodoSlice {
+  todos: Todo[];
+  isLoadingTodos: boolean;
+  fetchTodos: () => Promise<void>;
+  addTodo: (todoData: { content: string }) => Promise<Todo | null>;
+  updateTodo: (todoToUpdate: Todo) => Promise<Todo | null>;
+  deleteTodo: (todoId: string) => Promise<boolean>;
+  getTodoById: (id: string) => Todo | undefined;
+}
+
+
 // --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---
 export interface AppState
   extends PersonaSlice,
@@ -179,6 +191,7 @@ export interface AppState
     WeeklyProblemSlice, // 새로 추가된 슬라이스
     ThreadSlice,
     ResultSlice,
+    TodoSlice,
     TagSlice,
     UIStateSlice,
     StarReportSlice {

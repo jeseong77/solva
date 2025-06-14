@@ -162,3 +162,14 @@ export interface ActiveSession {
   isPaused: boolean;
   pausedTime: number; // 일시정지 전까지 누적된 시간 (밀리초)
 }
+
+/**
+ * @description 문제에 종속되지 않는 독립적인 할 일
+ */
+export interface Todo {
+  id: string;
+  content: string;
+  isCompleted: boolean;
+  createdAt: Date;
+  completedAt?: Date;
+}

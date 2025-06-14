@@ -127,11 +127,19 @@ const initDatabase = async () => {
         createdAt TEXT NOT NULL,
         FOREIGN KEY (problemId) REFERENCES Problems(id) ON DELETE CASCADE
       );
+      -- ✅ [추가] Todos: 독립적인 할 일 목록
+      CREATE TABLE IF NOT EXISTS Todos (
+        id TEXT PRIMARY KEY NOT NULL,
+        content TEXT NOT NULL,
+        isCompleted INTEGER NOT NULL DEFAULT 0, -- 0: false, 1: true
+        createdAt TEXT NOT NULL,
+        completedAt TEXT
+      );
     `);
 
     // 성공 로그에 WeeklyProblems 테이블 추가
     console.log(
-      "[DB] Database tables (Personas, Problems, WeeklyProblems, ThreadItems, Results, Tags, StarReports) initialized successfully or already exist."
+      "[DB] Database tables (Personas, Problems, WeeklyProblems, ThreadItems, Results, Tags, StarReports, Todos) initialized successfully or already exist."
     );
   } catch (error) {
     console.error("[DB] Error initializing database tables: ", error);

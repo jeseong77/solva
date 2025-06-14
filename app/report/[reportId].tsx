@@ -2,7 +2,7 @@ import StarReportContent from "@/components/report/StarReportContent";
 import StarReportWrite from "@/components/report/StarReportWrite";
 import { useAppStore } from "@/store/store";
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
