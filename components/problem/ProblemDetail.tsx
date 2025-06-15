@@ -371,7 +371,7 @@ export default function ProblemDetail({
   };
 
   return (
-    <Modal visible={isVisible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={isVisible} animationType="slide" onRequestClose={onClose} presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined}>
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>

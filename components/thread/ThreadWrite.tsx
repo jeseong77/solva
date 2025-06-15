@@ -251,7 +251,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16,
   },
   replyingToContainer: {
     flexDirection: "row",

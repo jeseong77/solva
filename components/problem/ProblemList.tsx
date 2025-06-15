@@ -115,7 +115,7 @@ export default function ProblemList({
             problem={item}
             persona={persona}
             onPress={onPressProblem}
-            onLongPress={handleLongPress} // ✅ [수정 4] 새로 만든 핸들러로 교체
+            onLongPress={handleLongPress}
           />
         )}
         keyExtractor={(item) => item.id}
