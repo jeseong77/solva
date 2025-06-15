@@ -4,12 +4,12 @@ import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
-  InputAccessoryView,
+  Keyboard,
+  KeyboardEvent, // [수정] KeyboardEvent 타입을 react-native에서 직접 import 합니다.
   KeyboardAvoidingView,
   Modal,
   Platform,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,32 +17,49 @@ import {
   View,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+} from "react-native-reanimated";
 
-// Priority에 따른 색상 맵
+
+// Priority에 따른 색상 맵 (변경 없음)
 const priorityColors: { [key in Priority]: string } = {
-  high: "#e57373", // 연한 빨강 -> 진한 빨강 계열
-  medium: "#ffb74d", // 연한 주황 -> 진한 주황 계열
-  low: "#81c784", // 연한 녹색 -> 진한 녹색 계열
-  none: "#bdbdbd", // 연한 회색 -> 진한 회색 계열
+  high: "#e57373",
+  medium: "#ffb74d",
+  low: "#81c784",
+  none: "#bdbdbd",
 };
 
-// Define an interface for the component's props
-interface SaveButtonAccessoryViewProps {
-  nativeID: string;
+// 플로팅 저장 버튼 컴포넌트 (변경 없음)
+interface FloatingSaveButtonProps {
   onSave: () => void;
+  bottom: number;
 }
+const FloatingSaveButton = React.memo(
+  ({ onSave, bottom }: FloatingSaveButtonProps) => {
+    const opacity = useSharedValue(0);
 
-// Apply the interface to the component's props
-const SaveButtonAccessoryView = React.memo(
-  ({ nativeID, onSave }: SaveButtonAccessoryViewProps) => {
+    // 버튼이 나타날 때 애니메이션을 적용합니다.
+    useEffect(() => {
+      opacity.value = withTiming(1, { duration: 250 });
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        opacity: opacity.value,
+      };
+    });
+
     return (
-      <InputAccessoryView nativeID={nativeID}>
-        <View style={styles.accessoryContainer}>
-          <TouchableOpacity onPress={onSave} style={styles.accessorySaveButton}>
-            <Text style={styles.accessorySaveButtonText}>저장</Text>
-          </TouchableOpacity>
-        </View>
-      </InputAccessoryView>
+      <Animated.View
+        style={[styles.floatingContainer, { bottom }, animatedStyle]}
+      >
+        <TouchableOpacity onPress={onSave} style={styles.floatingSaveButton}>
+          <Text style={styles.floatingSaveButtonText}>저장</Text>
+        </TouchableOpacity>
+      </Animated.View>
     );
   }
 );
@@ -63,12 +80,11 @@ export default function ProblemEdit({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const titleInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
-  const inputAccessoryViewID = "saveButtonAccessoryView";
 
-  // 내용(description) 입력창으로 포커스를 옮기는 함수
   const focusDescriptionInput = () => {
     descriptionInputRef.current?.focus();
   };
@@ -89,7 +105,6 @@ export default function ProblemEdit({
     ? getPersonaById(finalPersonaId)
     : undefined;
 
-  // 폼 상태 초기화 로직
   useEffect(() => {
     if (isVisible) {
       if (problemId && problemToEdit) {
@@ -104,16 +119,41 @@ export default function ProblemEdit({
     }
   }, [isVisible, problemId, problemToEdit]);
 
-  // 모달이 활성화될 때 제목 입력창에 자동으로 포커스를 주는 로직
   useEffect(() => {
     if (isVisible) {
-      // formSheet 애니메이션이 끝난 후 포커스를 주기 위해 약간의 딜레이를 줍니다.
       const timer = setTimeout(() => {
         titleInputRef.current?.focus();
       }, 150);
-      return () => clearTimeout(timer); // 컴포넌트 unmount 시 타이머 정리
+      return () => clearTimeout(timer);
     }
   }, [isVisible]);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+
+    // [수정] e의 타입을 import한 KeyboardEvent로 명시합니다.
+    const onKeyboardDidShow = (e: KeyboardEvent) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    };
+
+    const onKeyboardDidHide = () => {
+      setKeyboardHeight(0);
+    };
+
+    const showSubscription = Keyboard.addListener(
+      "keyboardDidShow",
+      onKeyboardDidShow
+    );
+    const hideSubscription = Keyboard.addListener(
+      "keyboardDidHide",
+      onKeyboardDidHide
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const handleChangePriority = () => {
     Alert.alert(
@@ -129,7 +169,6 @@ export default function ProblemEdit({
     );
   };
 
-  // handleSave 함수를 useCallback으로 감싸서 불필요한 재생성 방지
   const handleSave = useCallback(async () => {
     if (!title.trim()) {
       Alert.alert("알림", "제목을 입력해주세요.");
@@ -201,10 +240,7 @@ export default function ProblemEdit({
             </View>
           </View>
           {/* 콘텐츠 영역 */}
-          <ScrollView
-            style={styles.contentScrollView}
-            keyboardShouldPersistTaps="handled"
-          >
+          <View style={styles.contentContainer}>
             <TextInput
               ref={titleInputRef}
               style={styles.titleInput}
@@ -214,7 +250,6 @@ export default function ProblemEdit({
               onChangeText={setTitle}
               returnKeyType="next"
               onSubmitEditing={focusDescriptionInput}
-              inputAccessoryViewID={inputAccessoryViewID}
             />
             <TextInput
               ref={descriptionInputRef}
@@ -224,28 +259,21 @@ export default function ProblemEdit({
               value={description}
               onChangeText={setDescription}
               multiline
-              inputAccessoryViewID={inputAccessoryViewID}
             />
-          </ScrollView>
+          </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
 
-      {/* 분리된 메모이즈 컴포넌트 사용 */}
-      {Platform.OS === "ios" && (
-        <SaveButtonAccessoryView
-          nativeID={inputAccessoryViewID}
-          onSave={handleSave}
-        />
+      {/* 새로운 플로팅 버튼 (변경 없음) */}
+      {Platform.OS === "ios" && keyboardHeight > 0 && (
+        <FloatingSaveButton onSave={handleSave} bottom={keyboardHeight} />
       )}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  flexContainer: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
+  flexContainer: { flex: 1, backgroundColor: "#ffffff" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -260,24 +288,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 4,
   },
-  personaInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  indicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  metaText: {
-    fontSize: 14,
-    color: "#495057",
-  },
-  contentScrollView: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
+  personaInfo: { flexDirection: "row", alignItems: "center" },
+  indicator: { width: 16, height: 16, borderRadius: 12, marginRight: 12 },
+  metaText: { fontSize: 14, color: "#495057" },
+  contentContainer: { flex: 1, paddingHorizontal: 20 },
   titleInput: {
     fontSize: 24,
     fontWeight: "bold",
@@ -287,19 +301,34 @@ const styles = StyleSheet.create({
   },
   bodyInput: {
     flex: 1,
-    minHeight: 200,
     marginTop: 10,
     fontSize: 17,
     lineHeight: 25,
     color: "#343a40",
     textAlignVertical: "top",
   },
-  accessoryContainer: {
-    backgroundColor: "#ffffff",
+  // [수정] 플로팅 컨테이너 스타일 추가
+  floatingContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderTopWidth: 1,
     borderColor: "#e9ecef",
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     alignItems: "flex-end",
+  },
+  floatingSaveButton: {
+    backgroundColor: "#212529",
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+  },
+  floatingSaveButtonText: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   accessorySaveButton: {
     backgroundColor: "#212529",
