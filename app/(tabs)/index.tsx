@@ -1,26 +1,25 @@
 import PersonaList from "@/components/persona/personaList";
 import ProblemDetail from "@/components/problem/ProblemDetail";
 import ProblemEdit from "@/components/problem/ProblemEdit";
-import ProblemItem from "@/components/problem/ProblemItem";
+import ProblemList from "@/components/problem/ProblemList";
+import ResolvedProblemList from "@/components/problem/ResolvedProblemList";
 import SelectWeeklyProblemModal from "@/components/problem/SelectWeeklyProblemModal";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
 import SessionBox from "@/components/session/SessionBox";
+import AddTodoModal from "@/components/todo/AddTodoModal";
 import TodoList from "@/components/todo/TodoList";
 import FloatingActionButton from "@/components/ui/FloatingActionButton";
 import { useAppStore } from "@/store/store";
-import { Problem } from "@/types";
-import { Feather } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  FlatList,
   Image,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
   useWindowDimensions,
 } from "react-native";
@@ -58,6 +57,7 @@ export default function HomeScreen() {
     { key: "solva", title: "Solva" },
     { key: "todo", title: "Todo" },
   ]);
+  const [isAddTodoModalVisible, setAddTodoModalVisible] = useState(false);
 
   // --- 스토어 데이터 및 액션 (Zustand) ---
   const {
@@ -73,10 +73,10 @@ export default function HomeScreen() {
     fetchWeeklyProblems,
     addWeeklyProblem,
     deleteWeeklyProblem,
-    fetchTodos, // TodoList를 위해 추가
+    fetchTodos,
+    addTodo,
   } = useAppStore(
     useShallow((state) => ({
-      // ... 기존 상태 및 액션들
       personas: state.personas,
       fetchPersonas: state.fetchPersonas,
       selectedPersonaId: state.selectedPersonaId,
@@ -89,7 +89,8 @@ export default function HomeScreen() {
       fetchWeeklyProblems: state.fetchWeeklyProblems,
       addWeeklyProblem: state.addWeeklyProblem,
       deleteWeeklyProblem: state.deleteWeeklyProblem,
-      fetchTodos: state.fetchTodos, // TodoList를 위해 추가
+      fetchTodos: state.fetchTodos,
+      addTodo: state.addTodo,
     }))
   );
 
@@ -148,32 +149,6 @@ export default function HomeScreen() {
         : [],
     [problems, selectedPersonaId]
   );
-  const listData = useMemo(() => {
-    if (!selectedPersona) return [];
-
-    const data: (
-      | { type: "HEADER"; title: string }
-      | { type: "PROBLEM"; data: Problem }
-    )[] = [];
-
-    if (activeProblems.length > 0) {
-      data.push({ type: "HEADER", title: "진행 중인 문제" });
-      // ⬇️ 이 부분을 수정하세요.
-      activeProblems.forEach((p) => {
-        data.push({ type: "PROBLEM", data: p });
-      });
-    }
-
-    if (resolvedProblems.length > 0) {
-      data.push({ type: "HEADER", title: "완료/보관한 문제" });
-      // ⬇️ 이 부분도 수정하세요.
-      resolvedProblems.forEach((p) => {
-        data.push({ type: "PROBLEM", data: p });
-      });
-    }
-
-    return data;
-  }, [selectedPersona, activeProblems, resolvedProblems]);
 
   const currentWeeklyProblem = useMemo(() => {
     if (!selectedPersonaId) return undefined;
@@ -285,53 +260,52 @@ export default function HomeScreen() {
     setWeeklySelectModalVisible(true);
   };
 
-  // ✅ [추가] Todo 탭에서 FAB를 눌렀을 때의 동작 (현재는 로그만 출력)
+  // ✅ [수정] FAB를 누르면 AddTodoModal을 열도록 변경
   const handleCreateTodo = () => {
-    // 이 부분은 나중에 Todo 입력창에 포커스를 주거나,
-    // 별도의 Todo 작성 모달을 여는 로직으로 확장할 수 있습니다.
-    console.log("Create New Todo Pressed!");
+    setAddTodoModalVisible(true);
   };
 
-  // --- 탭 뷰 렌더링 정의 (SceneMap) ---
+  // ✅ [추가] AddTodoModal에서 '저장'을 눌렀을 때 실행될 핸들러
+  const handleSaveNewTodo = (content: string) => {
+    addTodo({ content });
+    setAddTodoModalVisible(false); // 저장 후 모달 닫기
+  };
+
   const SolvaView = () => (
-    <View style={styles.sceneContainer}>
+    // ✅ FlatList 대신 ScrollView를 사용하고, sceneContainer 스타일을 적용합니다.
+    <ScrollView
+      style={styles.sceneContainer}
+      // ✅ 스크롤 콘텐츠 하단에 탭 바 높이만큼의 여백을 추가합니다.
+      contentContainerStyle={{ paddingBottom: tabBarHeight }}
+    >
       {selectedPersona ? (
-        <FlatList
-          data={listData}
-          keyExtractor={(item, index) =>
-            item.type === "PROBLEM" ? item.data.id : item.title + index
-          }
-          ListHeaderComponent={
-            <>
-              <SessionBox />
-              <WeeklyProblemCard
-                persona={selectedPersona}
-                weeklyProblem={currentWeeklyProblem}
-                problem={problemForWeekly}
-                onPress={handleNavigateToProblemDetail}
-                onPressNew={handleNavigateToSetWeeklyProblem}
-                onChangeWeeklyProblem={handleNavigateToSetWeeklyProblem}
-              />
-            </>
-          }
-          renderItem={({ item }) => {
-            if (item.type === "HEADER") {
-              return <Text style={styles.listSectionHeader}>{item.title}</Text>;
-            }
-            if (item.type === "PROBLEM" && item.data) {
-              return (
-                <ProblemItem
-                  problem={item.data}
-                  persona={selectedPersona}
-                  onPress={handleNavigateToProblemDetail}
-                  onLongPress={handleLongPressPersona}
-                />
-              );
-            }
-            return null;
-          }}
-          contentContainerStyle={styles.listContentContainer}
-        />
+        <>
+          <SessionBox />
+          <WeeklyProblemCard
+            persona={selectedPersona}
+            weeklyProblem={currentWeeklyProblem}
+            problem={problemForWeekly}
+            onPress={handleNavigateToProblemDetail}
+            onPressNew={handleNavigateToSetWeeklyProblem}
+            onChangeWeeklyProblem={handleNavigateToSetWeeklyProblem}
+          />
+          {/* ProblemList가 자체 카드 스타일을 가집니다. */}
+          <ProblemList
+            persona={selectedPersona}
+            problems={activeProblems}
+            onPressProblem={handleNavigateToProblemDetail}
+            onPressNewProblem={handleCreateProblem}
+            onLongPressProblem={handleEditProblem}
+          />
+          {/* ResolvedProblemList가 자체 카드 스타일을 가집니다. */}
+          {resolvedProblems.length > 0 && (
+            <ResolvedProblemList
+              persona={selectedPersona}
+              problems={resolvedProblems}
+              onPressProblem={handleNavigateToProblemDetail}
+            />
+          )}
+        </>
       ) : (
         <View style={styles.placeholderContainer}>
           <Image
@@ -343,7 +317,7 @@ export default function HomeScreen() {
           </Text>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 
   const renderScene = SceneMap({
@@ -408,6 +382,11 @@ export default function HomeScreen() {
         onClose={() => setWeeklySelectModalVisible(false)}
         onConfirm={handleConfirmWeeklyProblem}
       />
+      <AddTodoModal
+        isVisible={isAddTodoModalVisible}
+        onClose={() => setAddTodoModalVisible(false)}
+        onSave={handleSaveNewTodo}
+      />
     </SafeAreaView>
   );
 }
@@ -454,17 +433,23 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textTransform: "none",
   },
-  listContentContainer: {
-    paddingBottom: 64,
+  listContentContainer: {},
+  // ✅ [추가] FlatList 자체에 적용할 카드 스타일
+  listCardContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
+    overflow: "hidden",
   },
   listSectionHeader: {
     fontSize: 17,
     fontWeight: "600",
     color: "#212529",
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingHorizontal: 16, // 패딩 조정
+    paddingTop: 16, // 패딩 조정
     paddingBottom: 8,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffff", // ✅ 배경색을 카드의 흰색으로 통일
   },
   newProblemButton: {
     flexDirection: "row",

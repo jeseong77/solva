@@ -20,9 +20,11 @@ interface ResolvedProblemListProps {
 const ResolvedProblemItem = ({
   problem,
   onPress,
+  isLast,
 }: {
   problem: Problem;
   onPress: (problemId: string) => void;
+  isLast: boolean;
 }) => {
   const statusInfo = {
     resolved: {
@@ -55,7 +57,7 @@ const ResolvedProblemItem = ({
 
   return (
     <TouchableOpacity
-      style={styles.itemContainer}
+      style={[styles.itemContainer, isLast && styles.lastItemContainer]}
       onPress={() => onPress(problem.id)}
     >
       {/* ✅ [수정] 아이콘을 '상태 칩' View로 감싸고 텍스트 추가 */}
@@ -91,17 +93,19 @@ export default function ResolvedProblemList({
     <View style={styles.container}>
       <View style={styles.titleContainer}>
         <Text style={styles.titleText}>
-          페르소나 -{" "}
-          <Text style={styles.personaTitle}>
-            {persona.title} {/* ✅ 실제 persona prop 사용 */}
-          </Text>
-          의 이전 문제들:
+          페르소나 - <Text style={styles.personaTitle}>{persona.title}</Text>의
+          해결된 문제들:
         </Text>
       </View>
       <FlatList
         data={problems}
-        renderItem={({ item }) => (
-          <ResolvedProblemItem problem={item} onPress={onPressProblem} />
+        // ✅ renderItem에서 index를 함께 받아 마지막 항목인지 확인
+        renderItem={({ item, index }) => (
+          <ResolvedProblemItem
+            problem={item}
+            onPress={onPressProblem}
+            isLast={index === problems.length - 1} // ✅ isLast prop 전달
+          />
         )}
         keyExtractor={(item) => item.id}
         scrollEnabled={false}
@@ -115,7 +119,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     borderWidth: 1,
     marginHorizontal: 16,
-    marginBottom: 64,
     borderRadius: 8,
     borderColor: "#e9ecef",
     shadowOffset: { width: 0, height: 1 },
@@ -168,5 +171,9 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     fontSize: 12,
     fontWeight: "bold",
+  },
+  lastItemContainer: {
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
 });

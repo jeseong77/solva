@@ -7,8 +7,6 @@ import {
   Keyboard,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
@@ -150,19 +148,6 @@ export default function TodoList() {
         }
         contentContainerStyle={{ paddingBottom: 100 }}
       />
-      {/* 새로운 Todo 추가 입력창 */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="새로운 할 일 추가..."
-          value={newTodoContent}
-          onChangeText={setNewTodoContent}
-          onSubmitEditing={handleAddNewTodo}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddNewTodo}>
-          <Feather name="arrow-up-circle" size={28} color="#1971c2" />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -186,29 +171,5 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: "#868e96",
-  },
-  inputContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  textInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: "#f1f3f5",
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    fontSize: 16,
-  },
-  addButton: {
-    marginLeft: 12,
   },
 });
