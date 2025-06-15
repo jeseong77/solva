@@ -1,3 +1,5 @@
+// store/slices/uiStateSlice.ts
+
 import type {
   AppState,
   UIStateSlice as UIStateSliceInterface,

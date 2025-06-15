@@ -23,11 +23,11 @@ import {
   View,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
+import StarReportWrite from "../report/StarReportWrite";
 import LogSessionModal from "../session/LogSessionModal";
 import ThreadItem from "../thread/ThreadItem";
 import ThreadWrite from "../thread/ThreadWrite";
 import ProblemPost from "./ProblemPost";
-import StarReportWrite from "../report/StarReportWrite";
 
 interface FlatThreadItem {
   id: string;
@@ -45,8 +45,8 @@ export default function ProblemDetail({
   onClose,
   problemId,
 }: ProblemDetailProps) {
+  // ... (컴포넌트 상단 로직은 모두 동일합니다)
   const router = useRouter();
-  // ✅ [수정] 스토어에서 updateThreadItem 함수 가져오기
   const {
     problem,
     persona,
@@ -79,7 +79,7 @@ export default function ProblemDetail({
         deleteThreadItem: state.deleteThreadItem,
         updateThreadItem: state.updateThreadItem,
         updateProblem: state.updateProblem,
-        getStarReportByProblemId: state.getStarReportByProblemId, // ✅ [추가]
+        getStarReportByProblemId: state.getStarReportByProblemId,
         addStarReport: state.addStarReport,
       };
     })
@@ -88,8 +88,8 @@ export default function ProblemDetail({
   const [isWriteModalVisible, setWriteModalVisible] = useState(false);
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
-  const [isLogSessionModalVisible, setLogSessionModalVisible] = useState(false); // ✅ [추가]
-  const [loggingThreadId, setLoggingThreadId] = useState<string | null>(null); // ✅ [추가]
+  const [isLogSessionModalVisible, setLogSessionModalVisible] = useState(false);
+  const [loggingThreadId, setLoggingThreadId] = useState<string | null>(null);
   const [isStarReportModalVisible, setStarReportModalVisible] = useState(false);
   const [reportingProblemId, setReportingProblemId] = useState<string | null>(
     null
@@ -116,15 +116,17 @@ export default function ProblemDetail({
   })();
 
   const handleOpenRootWriteModal = () => {
-    setEditingThreadId(null); // [추가] 수정 모드 해제
+    setEditingThreadId(null);
     setReplyParentId(null);
     setWriteModalVisible(true);
   };
+
   const handleOpenReplyWriteModal = (parentId: string) => {
     setEditingThreadId(null); // [추가] 수정 모드 해제
     setReplyParentId(parentId);
     setWriteModalVisible(true);
   };
+
   const handleStartSession = (threadId: string) => {
     Alert.alert("세션 시작", "어떤 작업을 하시겠습니까?", [
       {
@@ -364,14 +366,19 @@ export default function ProblemDetail({
         onStartSession={handleStartSession}
         onStopSession={handleStopSession}
         onPressMenu={handlePressThreadMenu}
-        onToggleCompletion={handleToggleCompletion} // ✅ 핸들러 함수를 prop으로 전달
+        onToggleCompletion={handleToggleCompletion}
         level={item.level}
       />
     );
   };
 
   return (
-    <Modal visible={isVisible} animationType="slide" onRequestClose={onClose} presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined}>
+    <Modal
+      visible={isVisible}
+      animationType="slide"
+      onRequestClose={onClose}
+      presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined}
+    >
       <SafeAreaView style={styles.modalContainer}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
@@ -381,6 +388,8 @@ export default function ProblemDetail({
         {problem && persona ? (
           <FlatList
             style={styles.contentScrollView}
+            // ✅ 1. 리스트의 하단에 충분한 여백을 주어 플로팅 버튼에 가려지지 않도록 합니다.
+            contentContainerStyle={styles.listContentContainer}
             data={flattenedThreads}
             renderItem={renderThreadItem}
             keyExtractor={(item) => item.id}
@@ -388,7 +397,7 @@ export default function ProblemDetail({
               <ProblemPost
                 problem={problem}
                 persona={persona}
-                onStatusBadgePress={handleChangeStatusPress} // ✅ prop 전달
+                onStatusBadgePress={handleChangeStatusPress}
               />
             }
             ListFooterComponent={
@@ -407,11 +416,15 @@ export default function ProblemDetail({
             <Text>문제 정보를 불러오는 중...</Text>
           </View>
         )}
+
+        {/* ✅ 2. 기존의 하단 바를 제거하고, 새로운 플로팅 버튼을 추가합니다. */}
         <TouchableOpacity
-          style={styles.commentInputContainer}
+          style={styles.fab}
           onPress={handleOpenRootWriteModal}
+          activeOpacity={0.8}
         >
-          <Text style={styles.commentInputPlaceholder}>Add a thread...</Text>
+          <Feather name="plus" size={20} color="#ffffff" />
+          <Text style={styles.fabText}>New thread</Text>
         </TouchableOpacity>
       </SafeAreaView>
       {problem && (
@@ -457,7 +470,14 @@ const styles = StyleSheet.create({
     borderColor: "#e9ecef",
   },
   contentScrollView: { flex: 1, backgroundColor: "#ffffff" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  listContentContainer: {
+    paddingBottom: 60, // 플로팅 버튼의 높이 + 추가 여백
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   emptyContainer: { paddingTop: 16 },
   noThreadsText: {
     paddingHorizontal: 16,
@@ -465,12 +485,30 @@ const styles = StyleSheet.create({
     color: "#868e96",
     textAlign: "center",
   },
-  commentInputContainer: {
-    padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderColor: "#e9ecef",
+  fab: {
+    position: "absolute", // 화면 위에 떠 있도록 설정
+    bottom: 30, // 하단에서의 위치 (SafeAreaView 안이므로 안전)
+    alignSelf: "center", // 가로 중앙 정렬
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#212529", // 검은색 배경
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 50, // 원형 모양
+    // 그림자 효과 (선택 사항)
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  commentInputPlaceholder: { color: "#adb5bd" },
+  fabText: {
+    color: "#ffffff", // 흰색 텍스트
+    fontSize: 16,
+    fontWeight: "bold",
+    marginLeft: 8,
+  },
 });
