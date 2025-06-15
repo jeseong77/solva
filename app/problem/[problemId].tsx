@@ -1,5 +1,5 @@
-import ProblemFormScreen from "@/components/ProblemFormScreen"; // Adjust path
+import ProblemDetail from "@/components/problem/ProblemDetail";
 
 export default function ViewEditProblemRoute() {
-  return <ProblemFormScreen />;
+  return <ProblemDetail />;
 }
