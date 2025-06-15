@@ -294,7 +294,6 @@ export default function HomeScreen() {
             persona={selectedPersona}
             problems={activeProblems}
             onPressProblem={handleNavigateToProblemDetail}
-            onPressNewProblem={handleCreateProblem}
             onLongPressProblem={handleEditProblem}
           />
           {/* ResolvedProblemList가 자체 카드 스타일을 가집니다. */}

@@ -12,17 +12,13 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// Priority에 따른 색상 맵
 const priorityColors: { [key in Priority]: string } = {
-  high: "#ffcdd2",
-  medium: "#ffe0b2",
-  low: "#c8e6c9",
-  none: "#e9ecef",
+  high: "#e57373",
+  medium: "#ffb74d",
+  low: "#81c784",
+  none: "#bdbdbd",
 };
 
-/**
- * 초(seconds)를 HH:MM:SS 또는 MM:SS 형식의 문자열로 변환하는 헬퍼 함수
- */
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
     return "00:00";
@@ -40,7 +36,6 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
-// ✅ [추가] 상태별 이름 및 색상 정보
 const statusInfo: {
   [key in ProblemStatus]: {
     name: string;
@@ -54,12 +49,12 @@ const statusInfo: {
   archived: { name: "Archived", color: "#495057", backgroundColor: "#e9ecef" },
 };
 
-// 컴포넌트가 받을 Props 정의
 interface ProblemItemProps {
   problem: Problem;
   persona: Persona;
   onPress: (id: string) => void;
   onLongPress?: (id: string) => void;
+  isLast?: boolean;
 }
 
 export default function ProblemItem({
@@ -67,10 +62,10 @@ export default function ProblemItem({
   persona,
   onPress,
   onLongPress,
+  isLast,
 }: ProblemItemProps) {
   const threadItems = useAppStore((state) => state.threadItems);
 
-  // ✅ [수정] 문제에 속한 전체 스레드를 대상으로 통계 계산
   const stats = useMemo(() => {
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
@@ -122,14 +117,13 @@ export default function ProblemItem({
 
   return (
     <TouchableOpacity
-      style={styles.itemContainer}
+      style={[styles.itemContainer, isLast && styles.lastItemContainer]}
       onPress={() => onPress(problem.id)}
       onLongPress={() => onLongPress?.(problem.id)}
       delayLongPress={500}
     >
       <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
       <View style={styles.contentContainer}>
-        {/* ✅ [수정] 메타 정보 컨테이너에 상태 태그 추가 */}
         <View style={styles.metaContainer}>
           <Text style={styles.metaText}>persona/{persona.title}</Text>
           <View
@@ -146,7 +140,6 @@ export default function ProblemItem({
           </View>
         </View>
         <Text style={styles.itemTitle}>{problem.title}</Text>
-        {/* ✅ [수정] 통계 표시 방식 변경 */}
         <View style={styles.statsContainer}>
           <Feather name="git-branch" size={14} color="#6c757d" />
           <Text style={styles.statsText}>{stats.totalThreads}</Text>
@@ -174,18 +167,23 @@ export default function ProblemItem({
 const styles = StyleSheet.create({
   itemContainer: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     backgroundColor: "#ffffff",
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
+    borderTopWidth: 1,
     borderColor: "#e9ecef",
   },
+  lastItemContainer: {
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 0,
+  },
   indicator: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginTop: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
   contentContainer: {
     flex: 1,

@@ -1,27 +1,23 @@
 // app/components/problem/ProblemList.tsx
 
-import { useAppStore } from "@/store/store"; // ✅ 스토어 import
+import { useAppStore } from "@/store/store";
 import { Persona, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
-  Alert, // ✅ Alert import
+  Alert,
   Dimensions,
   FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import ProblemItem from "./ProblemItem";
-
-// --- ProblemList 컴포넌트 ---
 
 interface ProblemListProps {
   problems: Problem[];
   persona: Persona;
   onPressProblem: (problemId: string) => void;
-  onPressNewProblem: () => void;
   onLongPressProblem?: (problemId: string) => void;
 }
 
@@ -29,13 +25,10 @@ export default function ProblemList({
   problems,
   persona,
   onPressProblem,
-  onPressNewProblem,
   onLongPressProblem,
 }: ProblemListProps) {
-  // ✅ [수정 1] 스토어에서 deleteProblem 함수 가져오기
   const deleteProblem = useAppStore((state) => state.deleteProblem);
 
-  // ✅ [수정 2] 삭제 확인을 위한 별도 함수
   const showDeleteConfirmation = (problemId: string, title: string) => {
     Alert.alert(
       `"${title}" 문제 삭제`,
@@ -53,17 +46,15 @@ export default function ProblemList({
     );
   };
 
-  // ✅ [수정 3] Problem을 길게 눌렀을 때의 Alert 메뉴 핸들러
   const handleLongPress = (problemId: string) => {
     const problem = problems.find((p) => p.id === problemId);
     if (!problem) return;
 
-    // 부모로부터 받은 onLongPressProblem 함수가 있을 때만 '편집하기' 옵션 표시
     const options = [];
     if (onLongPressProblem) {
       options.push({
         text: "편집하기",
-        onPress: () => onLongPressProblem(problemId), // 부모의 편집 로직 실행
+        onPress: () => onLongPressProblem(problemId),
       });
     }
     options.push({
@@ -90,16 +81,6 @@ export default function ProblemList({
     </View>
   );
 
-  const renderFooter = () => (
-    <TouchableOpacity
-      style={styles.newProblemButton}
-      onPress={onPressNewProblem}
-    >
-      <Feather name="plus" size={18} color="#495057" />
-      <Text style={styles.newProblemButtonText}>New Problem</Text>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -110,25 +91,23 @@ export default function ProblemList({
       </View>
       <FlatList
         data={problems}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ProblemItem
             problem={item}
             persona={persona}
             onPress={onPressProblem}
             onLongPress={handleLongPress}
+            isLast={index === problems.length - 1} // 마지막 아이템인지 확인
           />
         )}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={renderEmptyComponent}
-        ListFooterComponent={renderFooter}
         contentContainerStyle={styles.listContentContainer}
         scrollEnabled={false}
       />
     </View>
   );
 }
-
-// --- 스타일시트 ---
 
 const styles = StyleSheet.create({
   container: {
@@ -145,6 +124,8 @@ const styles = StyleSheet.create({
   listContentContainer: {},
   titleContainer: {
     padding: 16,
+    borderBottomWidth: 1,
+    borderColor: "#e9ecef",
   },
   titleText: {
     fontSize: 17,
@@ -159,6 +140,7 @@ const styles = StyleSheet.create({
     minHeight: Dimensions.get("window").height * 0.2,
     justifyContent: "center",
     alignItems: "center",
+    paddingBottom: 16,
   },
   emptyText: {
     fontSize: 16,
@@ -169,20 +151,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#adb5bd",
     marginTop: 8,
-  },
-  newProblemButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    margin: 16,
-    backgroundColor: "#e9ecef",
-    borderRadius: 8,
-  },
-  newProblemButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#495057",
-    marginLeft: 8,
   },
 });

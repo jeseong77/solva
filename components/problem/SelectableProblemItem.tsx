@@ -4,10 +4,10 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Priority에 따른 색상 맵
 const priorityColors: { [key in Priority]: string } = {
-  high: "#ffcdd2",
-  medium: "#ffe0b2",
-  low: "#c8e6c9",
-  none: "#e9ecef",
+  high: "#e57373", // 연한 빨강 -> 진한 빨강 계열
+  medium: "#ffb74d", // 연한 주황 -> 진한 주황 계열
+  low: "#81c784", // 연한 녹색 -> 진한 녹색 계열
+  none: "#bdbdbd", // 연한 회색 -> 진한 회색 계열
 };
 
 // 컴포넌트가 받을 Props 정의
@@ -61,9 +61,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#e7f5ff",
   },
   indicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 16,
+    height: 16,
+    borderRadius: 11,
     marginRight: 12,
   },
   title: {

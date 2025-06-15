@@ -20,10 +20,10 @@ import { useShallow } from "zustand/react/shallow";
 
 // Priority에 따른 색상 맵
 const priorityColors: { [key in Priority]: string } = {
-  high: "#ffcdd2",
-  medium: "#ffe0b2",
-  low: "#c8e6c9",
-  none: "#e9ecef",
+  high: "#e57373", // 연한 빨강 -> 진한 빨강 계열
+  medium: "#ffb74d", // 연한 주황 -> 진한 주황 계열
+  low: "#81c784", // 연한 녹색 -> 진한 녹색 계열
+  none: "#bdbdbd", // 연한 회색 -> 진한 회색 계열
 };
 
 // Define an interface for the component's props
@@ -265,8 +265,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   indicator: {
-    width: 24,
-    height: 24,
+    width: 16,
+    height: 16,
     borderRadius: 12,
     marginRight: 12,
   },
