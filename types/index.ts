@@ -1,120 +1,175 @@
 // types/index.ts
 
-export type ProblemStatus = "active" | "evaluating" | "resolved" | "archived";
-export type TaskStatus = "todo" | "inProgress" | "completed";
-export type ProjectStatus = "active" | "onHold" | "completed";
-export type ProjectFocusStatus = "unfocused" | "focused" | "superfocused";
-export type GoalStatus = "active" | "completed" | "onHold" | "archived";
+// --- 상태(Status) 및 우선순위(Priority) 타입 정의 ---
+
+export type ProblemStatus = "active" | "onHold" | "resolved" | "archived";
+
+export type Priority = "high" | "medium" | "low" | "none";
+
+export type ThreadItemType =
+  | "General"
+  | "Bottleneck"
+  | "Task"
+  | "Action"
+  | "Session";
+
+export type ActionStatus = "todo" | "inProgress" | "completed" | "cancelled";
+
+// --- 주요 엔티티 타입 정의 ---
 
 /**
- * 사용자가 정의하는 Goal(단기 목표)에 대한 인터페이스
+ * Persona: 사용자의 다양한 역할이나 삶의 영역을 나타내는 최상위 분류
  */
-export interface Goal {
+export interface Persona {
   id: string;
   title: string;
   description?: string;
-  isFeatured?: boolean; // 메인 화면 등에서 강조 표시 여부 (기본값: false)
-  deadline?: Date;      // 목표 마감일 (선택 사항)
-  status: GoalStatus;   // 목표 진행 상태
-  todoIds: string[];    // 이 Goal에 속한 Todo 항목들의 ID 배열
+  personaGoals?: string;
+  avatarImageUri?: string;
+  icon?: string;
+  color?: string;
+  problemIds: string[];
   createdAt: Date;
-  completedAt?: Date;
+  order?: number;
 }
 
 /**
- * Goal 달성을 위한 개별 Todo 항목에 대한 인터페이스
+ * WeeklyProblem: 특정 주에 집중하여 해결할 Problem을 지정하는 기록
  */
-export interface Todo {
-  id: string;
-  goalId: string;      // 이 Todo가 속한 Goal의 ID
-  title: string;
-  isCompleted: boolean; // 완료 여부 (기본값: false)
-  deadline?: Date;     // Todo 마감일 (선택 사항)
-  notes?: string;      // 간단한 메모 (선택 사항)
-  problemIds: string[]; // 이 Todo 수행 중 발견된 Problem(병목)들의 ID 배열
-  order?: number;      // Goal 내 Todo 순서 정렬용 (선택 사항)
-  createdAt: Date;
-  completedAt?: Date;
+export interface WeeklyProblem {
+  id: string; // 이 기록의 고유 ID
+  personaId: string; // 어떤 페르소나에 대한 주간 문제인지
+  problemId: string; // 주간 문제로 지정된 Problem의 ID
+  weekIdentifier: string; // 해당 주를 식별하는 값 (예: "2025-W23")
+  notes?: string; // 해당 주 목표에 대한 간단한 메모 (선택 사항)
+  createdAt: Date; // 이 기록이 생성된 시간
 }
 
+/**
+ * Problem: 사용자가 해결하고자 하는 구체적인 문제 또는 과제
+ */
 export interface Problem {
   id: string;
+  personaId: string;
   title: string;
   description?: string;
-  parentId: string | null;
-  childProblemIds: string[];
   status: ProblemStatus;
-  path?: string;
-  projectId?: string;
-  retrospectiveReportId?: string;
+  priority: Priority;
+  urgency?: number;
+  importance?: number;
+  tags?: string[];
+  childThreadIds: string[];
+  timeSpent: number;
   createdAt: Date;
   resolvedAt?: Date;
   archivedAt?: Date;
+  starReportId?: string | null;
 }
 
-export interface Project {
+/**
+ * BaseThreadItem: 모든 스레드 아이템의 공통 속성을 정의하는 기본 타입
+ */
+export interface BaseThreadItem {
   id: string;
   problemId: string;
-  title: string;
-  completionCriteriaText?: string;
-  numericalTarget?: number;
-  currentNumericalProgress?: number;
-  performanceScore?: number;
-  status: ProjectStatus;
-  isLocked?: boolean;
-  focused: ProjectFocusStatus;
-  doItemIds: string[];
-  dontItemIds: string[];
-  taskIds: string[];
+  parentId: string | null;
+  childThreadIds: string[];
+  type: ThreadItemType;
+  content: string;
+  isImportant?: boolean;
+  resultIds: string[];
   createdAt: Date;
+  authorId?: string;
+}
+
+// --- 5가지 구체적인 Thread Item 타입 정의 ---
+
+export interface GeneralThreadItem extends BaseThreadItem {
+  type: "General";
+}
+
+export interface BottleneckThreadItem extends BaseThreadItem {
+  type: "Bottleneck";
+  isResolved: boolean;
+}
+
+export interface TaskThreadItem extends BaseThreadItem {
+  type: "Task";
+  isCompleted: boolean;
+}
+
+export interface ActionThreadItem extends BaseThreadItem {
+  type: "Action";
+  status: ActionStatus;
+  timeSpent: number;
+  deadline?: Date;
   completedAt?: Date;
 }
 
-export interface DoItem {
+export interface SessionThreadItem extends BaseThreadItem {
+  type: "Session";
+  timeSpent: number;
+  startTime: Date;
+}
+
+/**
+ * 모든 ThreadItem 타입을 하나로 묶는 Discriminated Union
+ */
+export type ThreadItem =
+  | GeneralThreadItem
+  | BottleneckThreadItem
+  | TaskThreadItem
+  | ActionThreadItem
+  | SessionThreadItem;
+
+/**
+ * Result: 각 ThreadItem에 주석처럼 달 수 있는 구체적인 성과 또는 결과물
+ */
+export interface Result {
   id: string;
-  projectId: string;
-  title: string;
-  description?: string;
-  recurrenceRule: string;
-  lastUpdatedDate?: Date;
-  successCount: number;
-  failureCount: number;
-  isLocked?: boolean;
+  parentThreadId: string;
+  content: string;
+  occurredAt?: Date;
   createdAt: Date;
 }
 
-export interface DontItem {
-  id: string;
-  projectId: string;
-  title: string;
-  description?: string;
-  observancePeriod: string;
-  lastUpdatedDate?: Date;
-  successCount: number;
-  failureCount: number;
-  isLocked?: boolean;
-  createdAt: Date;
-}
-
-export interface Task {
-  id: string;
-  projectId: string;
-  title: string;
-  description?: string;
-  isRepeatable: boolean;
-  status: TaskStatus;
-  isLocked?: boolean;
-  createdAt: Date;
-  completedAt?: Date;
-}
-
-export interface RetrospectiveReport {
+/**
+ * StarReport: Problem 해결 후 작성하는 회고
+ */
+export interface StarReport {
   id: string;
   problemId: string;
   situation: string;
-  task: string; // Renamed from starTask
+  task: string;
   action: string;
   result: string;
   learnings?: string;
   createdAt: Date;
+}
+
+/**
+ * Tag: Problem에 연결할 수 있는 태그
+ */
+export interface Tag {
+  id: string;
+  name: string;
+  color?: string;
+}
+
+export interface ActiveSession {
+  threadId: string;
+  startTime: number; // 세션 시작 또는 재시작 시의 타임스탬프 (Date.now())
+  isPaused: boolean;
+  pausedTime: number; // 일시정지 전까지 누적된 시간 (밀리초)
+}
+
+/**
+ * @description 문제에 종속되지 않는 독립적인 할 일
+ */
+export interface Todo {
+  id: string;
+  content: string;
+  isCompleted: boolean;
+  createdAt: Date;
+  completedAt?: Date;
 }
