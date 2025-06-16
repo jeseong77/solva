@@ -53,8 +53,7 @@ export default function RootLayout() {
         await initDatabase();
         setDbInitialized(true);
         console.log("[RootLayout] Database initialized.");
-
-        // ✅ [추가] DB 초기화 후, 초기 페르소나 설정 로직을 실행합니다.
+        await useAppStore.getState().fetchUser();
         await setupInitialPersona();
       } catch (e) {
         console.warn("[RootLayout] Failed to initialize database:", e);

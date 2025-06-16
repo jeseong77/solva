@@ -1,19 +1,22 @@
-import { StateCreator } from "zustand";
+// store/PersonaSlice.ts
+
+import { getDatabase } from "@/lib/db";
 import { Persona } from "@/types";
 import type {
   AppState,
   PersonaSlice as PersonaSliceInterface,
 } from "@/types/storeTypes";
-import { getDatabase } from "@/lib/db";
-import { v4 as uuidv4 } from "uuid";
 import "react-native-get-random-values";
+import { v4 as uuidv4 } from "uuid";
+import { StateCreator } from "zustand";
 
-// Persona DB 데이터를 앱 상태 객체로 변환하는 파서
 const parsePersonaFromDB = (dbItem: any): Persona => ({
   id: dbItem.id,
+  userId: dbItem.userId, // ✅ userId 필드 추가
   title: dbItem.title,
   description: dbItem.description === null ? undefined : dbItem.description,
   personaGoals: dbItem.personaGoals === null ? undefined : dbItem.personaGoals,
+  // ✅ coverImageUri 필드 추가
   coverImageUri:
     dbItem.coverImageUri === null ? undefined : dbItem.coverImageUri,
   avatarImageUri:
@@ -38,6 +41,8 @@ export const createPersonaSlice: StateCreator<
     set({ isLoadingPersonas: true });
     try {
       const db = await getDatabase();
+      // 참고: 현재는 단일 유저 환경이므로 모든 페르소나를 가져옵니다.
+      // 다중 유저를 지원하게 되면 "WHERE userId = ?" 조건이 필요합니다.
       const results = await db.getAllAsync<any>(
         'SELECT * FROM Personas ORDER BY "order" ASC, createdAt ASC;'
       );
@@ -51,12 +56,19 @@ export const createPersonaSlice: StateCreator<
   },
 
   addPersona: async (personaData) => {
+    const currentUser = get().user;
+    if (!currentUser) {
+      console.error("[PersonaSlice] Cannot add persona. User not found.");
+      return null;
+    }
+
     const newPersona: Persona = {
       id: uuidv4(),
+      userId: currentUser.id, // ✅ userId 설정
       title: personaData.title,
       description: personaData.description,
       personaGoals: personaData.personaGoals,
-      coverImageUri: personaData.coverImageUri,
+      coverImageUri: personaData.coverImageUri, // ✅ coverImageUri 설정
       avatarImageUri: personaData.avatarImageUri,
       icon: personaData.icon,
       color: personaData.color,
@@ -68,14 +80,16 @@ export const createPersonaSlice: StateCreator<
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO Personas (id, title, description, personaGoals, coverImageUri, avatarImageUri, icon, color, problemIds, createdAt, "order")
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        // ✅ SQL 쿼리 및 파라미터 개수 수정
+        `INSERT INTO Personas (id, userId, title, description, personaGoals, coverImageUri, avatarImageUri, icon, color, problemIds, createdAt, "order")
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newPersona.id,
+          newPersona.userId,
           newPersona.title,
           newPersona.description ?? null,
           newPersona.personaGoals ?? null,
-          newPersona.coverImageUri ?? null,
+          newPersona.coverImageUri ?? null, // ✅ 파라미터 추가
           newPersona.avatarImageUri ?? null,
           newPersona.icon ?? null,
           newPersona.color ?? null,
@@ -85,6 +99,7 @@ export const createPersonaSlice: StateCreator<
         ]
       );
 
+      // 상태 업데이트 로직은 이전과 동일하게 유지
       const newPersonasList = [...get().personas, newPersona].sort(
         (a, b) =>
           (a.order ?? Infinity) - (b.order ?? Infinity) ||
@@ -100,6 +115,8 @@ export const createPersonaSlice: StateCreator<
     }
   },
 
+  // ✅ updatePersona는 id를 기준으로 업데이트하므로 SQL 쿼리 변경은 불필요.
+  //    넘겨받는 personaToUpdate 객체는 이미 userId를 포함하고 있음.
   updatePersona: async (personaToUpdate) => {
     if (!get().personas.find((p) => p.id === personaToUpdate.id)) {
       console.error(
@@ -145,12 +162,17 @@ export const createPersonaSlice: StateCreator<
     }
   },
 
+  // ✅ deletePersona는 personaId로 동작하므로 변경 불필요.
+  //    연관 데이터 삭제 로직도 personaId를 기반으로 하므로 올바르게 동작함.
   deletePersona: async (personaId) => {
     const db = await getDatabase();
     try {
+      // ON DELETE CASCADE 제약 조건에 의해 하위 데이터(Problems 등)는 DB에서 자동 삭제됨.
       await db.runAsync(`DELETE FROM Personas WHERE id = ?;`, [personaId]);
       console.log("[PersonaSlice] Persona deleted from DB:", personaId);
 
+      // 로컬 Zustand 상태에서 페르소나와 관련된 모든 데이터를 정리합니다.
+      // 이 로직은 DB의 CASCADE와 별개로 클라이언트 상태를 동기화하기 위해 필요합니다.
       const problemIdsToDelete = get()
         .problems.filter((p) => p.personaId === personaId)
         .map((p) => p.id);
@@ -169,6 +191,7 @@ export const createPersonaSlice: StateCreator<
         ),
       }));
 
+      // 재정렬 로직은 불필요해 보이지만, 혹시 모를 의존성을 위해 유지
       const sortedPersonas = get().personas.sort(
         (a, b) =>
           (a.order ?? Infinity) - (b.order ?? Infinity) ||

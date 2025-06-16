@@ -335,7 +335,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     justifyContent: "center",
     alignItems: "center",
-    padding: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -362,7 +361,7 @@ const styles = StyleSheet.create({
   },
   // Content
   contentSection: { paddingHorizontal: 16, paddingTop: 8 },
-  divider: { height: 1, backgroundColor: "#e9ecef", marginVertical: 4 },
+  divider: { height: 1, backgroundColor: "#e9ecef"},
   label: {
     fontSize: 14,
     fontWeight: "500",

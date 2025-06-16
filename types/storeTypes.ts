@@ -17,17 +17,40 @@ import {
   ThreadItem,
   ThreadItemType,
   Todo,
+  User,
   WeeklyProblem,
 } from "@/types";
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
+
+/**
+ * ✅ [추가] 사용자 프로필 상태 관리를 위한 슬라이스
+ */
+export interface UserSlice {
+  user: User | null;
+  isLoadingUser: boolean;
+  fetchUser: () => Promise<void>;
+  // createUser의 인자 타입을 명시적으로 정의
+  createUser: (userData: {
+    displayName: string;
+    bio?: string;
+    introduction?: string;
+    avatarImageUri?: string;
+    coverImageUri?: string;
+  }) => Promise<User | null>;
+  updateUser: (userToUpdate: User) => Promise<User | null>;
+}
 
 export interface PersonaSlice {
   personas: Persona[];
   isLoadingPersonas: boolean;
   fetchPersonas: () => Promise<void>;
   addPersona: (
-    personaData: Omit<Persona, "id" | "createdAt" | "problemIds" | "order"> & {
+    // ✅ Omit에 userId 추가
+    personaData: Omit<
+      Persona,
+      "id" | "userId" | "createdAt" | "problemIds" | "order"
+    > & {
       order?: number;
     }
   ) => Promise<Persona | null>;
@@ -183,18 +206,17 @@ export interface TodoSlice {
   getTodoById: (id: string) => Todo | undefined;
 }
 
-
 // --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---
 export interface AppState
-  extends PersonaSlice,
+  extends UserSlice, // ✅ UserSlice 추가
+    PersonaSlice,
     ProblemSlice,
-    WeeklyProblemSlice, // 새로 추가된 슬라이스
+    WeeklyProblemSlice,
     ThreadSlice,
     ResultSlice,
     TodoSlice,
     TagSlice,
     UIStateSlice,
     StarReportSlice {
-  // UI 상태 등을 위한 별도의 Slice 추가 가능
-  // extends UIStateSlice
+  // ...
 }

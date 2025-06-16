@@ -12,6 +12,7 @@ import { createTagSlice } from "./slices/tagSlice";
 import { createStarReportSlice } from "./slices/starReportSlice";
 import { createUIStateSlice } from "./slices/uiStateSlice";
 import { createTodoSlice } from "./slices/todoSlice";
+import { createUserSlice } from "./slices/userSlice";
 
 export const useAppStore = create<AppState>()(
   // ✅ [수정] 전체 스토어 생성자 함수를 persist 미들웨어로 감쌉니다.
@@ -26,6 +27,7 @@ export const useAppStore = create<AppState>()(
       ...createStarReportSlice(...a),
       ...createUIStateSlice(...a),
       ...createTodoSlice(...a),
+      ...createUserSlice(...a),
     }),
     {
       name: "solva-app-storage", // 디바이스에 저장될 데이터의 고유한 이름
