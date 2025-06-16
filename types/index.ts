@@ -25,6 +25,7 @@ export interface Persona {
   title: string;
   description?: string;
   personaGoals?: string;
+  coverImageUri?: string;
   avatarImageUri?: string;
   icon?: string;
   color?: string;

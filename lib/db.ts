@@ -29,6 +29,7 @@ const initDatabase = async () => {
         title TEXT NOT NULL,
         description TEXT,
         personaGoals TEXT,
+        coverImageUri TEXT, 
         avatarImageUri TEXT,
         icon TEXT,
         color TEXT,

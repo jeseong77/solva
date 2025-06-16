@@ -278,13 +278,18 @@ const styles = StyleSheet.create({
   // 주간 문제가 없을 때의 스타일
   emptyCard: {
     backgroundColor: "#f8f9fa",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
     height: 120,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#dee2e6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   emptyText: {
     marginTop: 8,

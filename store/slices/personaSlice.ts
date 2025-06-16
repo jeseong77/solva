@@ -14,6 +14,8 @@ const parsePersonaFromDB = (dbItem: any): Persona => ({
   title: dbItem.title,
   description: dbItem.description === null ? undefined : dbItem.description,
   personaGoals: dbItem.personaGoals === null ? undefined : dbItem.personaGoals,
+  coverImageUri:
+    dbItem.coverImageUri === null ? undefined : dbItem.coverImageUri,
   avatarImageUri:
     dbItem.avatarImageUri === null ? undefined : dbItem.avatarImageUri,
   icon: dbItem.icon === null ? undefined : dbItem.icon,
@@ -54,6 +56,7 @@ export const createPersonaSlice: StateCreator<
       title: personaData.title,
       description: personaData.description,
       personaGoals: personaData.personaGoals,
+      coverImageUri: personaData.coverImageUri,
       avatarImageUri: personaData.avatarImageUri,
       icon: personaData.icon,
       color: personaData.color,
@@ -65,14 +68,14 @@ export const createPersonaSlice: StateCreator<
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO Personas (id, title, description, personaGoals, avatarImageUri, icon, color, problemIds, createdAt, "order")
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO Personas (id, title, description, personaGoals, coverImageUri, avatarImageUri, icon, color, problemIds, createdAt, "order")
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newPersona.id,
           newPersona.title,
-          // FIX: undefined일 수 있는 모든 값에 '?? null'을 적용하여 DB에 안전하게 전달
           newPersona.description ?? null,
           newPersona.personaGoals ?? null,
+          newPersona.coverImageUri ?? null,
           newPersona.avatarImageUri ?? null,
           newPersona.icon ?? null,
           newPersona.color ?? null,
@@ -108,13 +111,13 @@ export const createPersonaSlice: StateCreator<
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE Personas SET title = ?, description = ?, personaGoals = ?, avatarImageUri = ?, icon = ?, color = ?, problemIds = ?, "order" = ?
-                 WHERE id = ?;`,
+        `UPDATE Personas SET title = ?, description = ?, personaGoals = ?, coverImageUri = ?, avatarImageUri = ?, icon = ?, color = ?, problemIds = ?, "order" = ?
+           WHERE id = ?;`,
         [
           personaToUpdate.title,
-          // FIX: undefined일 수 있는 모든 값에 '?? null'을 적용하여 DB에 안전하게 전달
           personaToUpdate.description ?? null,
           personaToUpdate.personaGoals ?? null,
+          personaToUpdate.coverImageUri ?? null,
           personaToUpdate.avatarImageUri ?? null,
           personaToUpdate.icon ?? null,
           personaToUpdate.color ?? null,
