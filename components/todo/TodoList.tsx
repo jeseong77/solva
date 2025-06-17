@@ -1,14 +1,13 @@
 import { useAppStore } from "@/store/store";
-import { ActionThreadItem, TaskThreadItem, Todo } from "@/types";
-import { Feather } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
 import {
-  FlatList,
-  Keyboard,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+  ActionThreadItem,
+  TaskThreadItem,
+  ThreadItem, // ✅ ThreadItem 유니온 타입 import
+  Todo,
+} from "@/types";
+import { Feather } from "@expo/vector-icons";
+import React, { useMemo } from "react";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 import TodoListItem from "./TodoListItem";
 
@@ -18,44 +17,36 @@ interface UnifiedTodo {
   content: string;
   isCompleted: boolean;
   createdAt: Date;
-  type: "standalone" | "thread"; // 출처 구분
+  type: "standalone" | "thread";
   sourceProblem?: {
     id: string;
     title: string;
   };
 }
 
+// FlatList에서 사용할 데이터 아이템의 타입을 정의합니다.
+type ListItem =
+  | { type: "HEADER"; title: string; id: string }
+  | { type: "TODO_ITEM"; data: UnifiedTodo }
+  | { type: "EMPTY_STATE"; id: string };
+
 export default function TodoList() {
-  const [newTodoContent, setNewTodoContent] = useState("");
+  const { todos, threadItems, problems, updateTodo, updateThreadItem } =
+    useAppStore(
+      useShallow((state) => ({
+        todos: state.todos,
+        threadItems: state.threadItems,
+        problems: state.problems,
+        updateTodo: state.updateTodo,
+        updateThreadItem: state.updateThreadItem,
+      }))
+    );
 
-  // 1. 스토어에서 필요한 모든 데이터와 액션을 가져옵니다.
-  const {
-    todos,
-    threadItems,
-    problems,
-    addTodo,
-    updateTodo,
-    updateThreadItem,
-  } = useAppStore(
-    useShallow((state) => ({
-      todos: state.todos,
-      threadItems: state.threadItems,
-      problems: state.problems,
-      addTodo: state.addTodo,
-      updateTodo: state.updateTodo,
-      updateThreadItem: state.updateThreadItem,
-    }))
-  );
-
-  // 2. 두 종류의 데이터를 하나의 리스트로 합치고 정렬합니다.
-  const unifiedTodoList = useMemo((): UnifiedTodo[] => {
-    // 독립적인 Todo 목록
+  const { activeTodos, completedTodos } = useMemo(() => {
     const standaloneTodos: UnifiedTodo[] = todos.map((todo) => ({
       ...todo,
       type: "standalone",
     }));
-
-    // 문제에 속한 Task/Action 목록
     const problemTasks: UnifiedTodo[] = threadItems
       .filter(
         (item): item is TaskThreadItem | ActionThreadItem =>
@@ -77,34 +68,31 @@ export default function TodoList() {
             : undefined,
         };
       });
-
-    // 두 리스트를 합치고 최신순으로 정렬
-    return [...standaloneTodos, ...problemTasks].sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    const unifiedList = [...standaloneTodos, ...problemTasks];
+    const active = unifiedList
+      .filter((todo) => !todo.isCompleted)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const completed = unifiedList
+      .filter((todo) => todo.isCompleted)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return { activeTodos: active, completedTodos: completed };
   }, [todos, threadItems, problems]);
 
-  // 3. 완료 상태를 토글하는 핸들러
-  const handleToggleComplete = (
-    id: string,
-    currentStatus: boolean,
-    isStandalone: boolean
-  ) => {
-    if (isStandalone) {
-      // 독립적인 Todo 업데이트
-      const todo = todos.find((t) => t.id === id);
-      if (todo) {
-        updateTodo({
-          ...todo,
-          isCompleted: !currentStatus,
-          completedAt: !currentStatus ? new Date() : undefined,
-        });
-      }
-    } else {
-      // 문제에 속한 Task/Action 업데이트
-      const thread = threadItems.find((t) => t.id === id);
-      if (!thread) return;
+  // ✅ [수정] 타입 에러를 해결한 핸들러 함수
+  const handleToggleComplete = (id: string, currentStatus: boolean) => {
+    // 모든 아이템을 한 배열에 넣어 탐색
+    const allItems: (Todo | ThreadItem)[] = [...todos, ...threadItems];
+    const itemToUpdate = allItems.find((item) => item.id === id);
 
+    if (!itemToUpdate) {
+      console.error("토글할 아이템을 찾지 못했습니다:", id);
+      return;
+    }
+
+    // 'type' 속성의 존재 여부로 ThreadItem과 Todo를 구분하는 타입 가드
+    if ("type" in itemToUpdate && "problemId" in itemToUpdate) {
+      // 'type' 속성이 있으면 ThreadItem으로 간주
+      const thread = itemToUpdate as ThreadItem;
       if (thread.type === "Task") {
         updateThreadItem({ ...thread, isCompleted: !currentStatus });
       } else if (thread.type === "Action") {
@@ -114,37 +102,82 @@ export default function TodoList() {
           completedAt: !currentStatus ? new Date() : undefined,
         });
       }
+    } else {
+      // 'type' 속성이 없으면 독립적인 Todo로 간주
+      const todo = itemToUpdate as Todo;
+      updateTodo({
+        ...todo,
+        isCompleted: !currentStatus,
+        completedAt: !currentStatus ? new Date() : undefined,
+      });
     }
   };
 
-  // 4. 새로운 독립 Todo를 추가하는 핸들러
-  const handleAddNewTodo = () => {
-    const content = newTodoContent.trim();
-    if (!content) return;
-    addTodo({ content });
-    setNewTodoContent("");
-    Keyboard.dismiss();
+  const listData = useMemo<ListItem[]>(() => {
+    const data: ListItem[] = [];
+
+    data.push({ type: "HEADER", title: "나의 할 일", id: "header-active" });
+
+    if (activeTodos.length === 0) {
+      data.push({ type: "EMPTY_STATE", id: "empty-active" });
+    } else {
+      activeTodos.forEach((todo) => {
+        data.push({ type: "TODO_ITEM", data: todo });
+      });
+    }
+
+    if (completedTodos.length > 0) {
+      data.push({
+        type: "HEADER",
+        title: `완료된 할 일 (${completedTodos.length})`,
+        id: "header-completed",
+      });
+      completedTodos.forEach((todo) => {
+        data.push({ type: "TODO_ITEM", data: todo });
+      });
+    }
+
+    return data;
+  }, [activeTodos, completedTodos]);
+
+  const renderListItem = ({ item }: { item: ListItem }) => {
+    switch (item.type) {
+      case "HEADER":
+        const style =
+          item.title === "나의 할 일"
+            ? styles.mainSectionHeader
+            : styles.subSectionHeader;
+        return <Text style={style}>{item.title}</Text>;
+      case "TODO_ITEM":
+        const todo = item.data;
+        return (
+          <TodoListItem
+            id={todo.id}
+            content={todo.content}
+            isCompleted={todo.isCompleted}
+            sourceProblem={todo.sourceProblem}
+            onToggleComplete={handleToggleComplete}
+          />
+        );
+      case "EMPTY_STATE":
+        return (
+          <View style={styles.emptyContainer}>
+            <Feather name="flag" size={32} color="#ced4da" />
+            <Text style={styles.emptyText}>아직 등록된 할 일이 없어요.</Text>
+          </View>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={unifiedTodoList}
-        renderItem={({ item }) => (
-          <TodoListItem
-            id={item.id}
-            content={item.content}
-            isCompleted={item.isCompleted}
-            sourceProblem={item.sourceProblem}
-            onToggleComplete={handleToggleComplete}
-          />
-        )}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={<Text style={styles.title}>모든 할 일</Text>}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>모든 할 일을 마치셨어요! 🎉</Text>
-          </View>
+        data={listData}
+        renderItem={renderListItem}
+        keyExtractor={(item) =>
+          item.type === "TODO_ITEM" ? item.data.id : item.id
         }
         contentContainerStyle={{ paddingBottom: 100 }}
       />
@@ -155,21 +188,36 @@ export default function TodoList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffff",
   },
-  title: {
+  mainSectionHeader: {
     fontSize: 22,
     fontWeight: "bold",
-    padding: 16,
-    paddingBottom: 8,
     color: "#212529",
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 12,
+    backgroundColor: "#ffffff",
+  },
+  subSectionHeader: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#495057",
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 8,
+    backgroundColor: "#ffffff",
   },
   emptyContainer: {
-    marginTop: 50,
+    paddingVertical: 40,
     alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     color: "#868e96",
+    marginTop: 12,
+    textAlign: "center",
   },
 });
