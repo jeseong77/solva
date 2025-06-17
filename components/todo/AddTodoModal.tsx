@@ -1,12 +1,10 @@
-import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Alert,
-  InputAccessoryView, // ✅ InputAccessoryView 임포트
   KeyboardAvoidingView,
   Modal,
   Platform,
-  SafeAreaView,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -26,132 +24,100 @@ export default function AddTodoModal({
   onSave,
 }: AddTodoModalProps) {
   const [content, setContent] = useState("");
-  const inputAccessoryViewID = "saveButtonAccessoryView"; // ✅ Accessory View ID 선언
 
+  // 모달이 닫힐 때 내용 초기화
   useEffect(() => {
     if (!isVisible) {
       setContent("");
     }
   }, [isVisible]);
 
-  const handleSave = () => {
+  // 저장 핸들러 (useCallback으로 최적화)
+  const handleSave = useCallback(() => {
     const trimmedContent = content.trim();
     if (!trimmedContent) {
       Alert.alert("알림", "할 일을 입력해주세요.");
       return;
     }
     onSave(trimmedContent);
-  };
+  }, [content, onSave]);
 
   return (
     <Modal
       visible={isVisible}
-      animationType="slide"
-      presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined}
+      transparent // ✅ 배경을 투명하게 설정
+      animationType="slide" // ✅ 슬라이드 애니메이션
       onRequestClose={onClose}
     >
+      {/* ✅ 모달 바깥 영역 터치 시 닫기 위한 Pressable 백드롭 */}
+      <Pressable style={styles.modalBackdrop} onPress={onClose} />
+
+      {/* ✅ 키보드를 피하는 뷰를 화면 하단에 위치 */}
       <KeyboardAvoidingView
-        style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoidingView}
       >
-        <SafeAreaView style={styles.container}>
-          {/* 헤더 */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.headerButton}>
-              <Feather name="x" size={24} color="#343a40" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>새로운 할 일</Text>
-            <View style={{ width: 24 }} />
-          </View>
+        <View style={styles.container}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="새로운 할 일을 입력하세요..."
+            placeholderTextColor="#adb5bd"
+            value={content}
+            onChangeText={setContent}
+            multiline
+            autoFocus
+          />
 
-          {/* 입력창 영역 */}
-          <View style={styles.contentWrapper}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="새로운 할 일을 입력하세요..."
-              placeholderTextColor="#adb5bd"
-              value={content}
-              onChangeText={setContent}
-              autoFocus
-              multiline
-              // ✅ TextInput에 Accessory View ID 연결
-              inputAccessoryViewID={inputAccessoryViewID}
-            />
+          {/* ✅ 하단 컨트롤 영역 (저장 버튼만 위치) */}
+          <View style={styles.bottomControls}>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+              <Text style={styles.saveButtonText}>저장</Text>
+            </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </KeyboardAvoidingView>
-
-      {/* ✅ 3. 키보드 위에 위치할 InputAccessoryView 정의 */}
-      {Platform.OS === "ios" && (
-        <InputAccessoryView nativeID={inputAccessoryViewID}>
-          <View style={styles.accessoryContainer}>
-            <TouchableOpacity
-              onPress={handleSave}
-              style={styles.accessorySaveButton}
-            >
-              <Text style={styles.accessorySaveButtonText}>저장</Text>
-            </TouchableOpacity>
-          </View>
-        </InputAccessoryView>
-      )}
     </Modal>
   );
 }
 
+// ✅ 참조 파일의 스타일을 기반으로 새롭게 작성된 스타일시트
 const styles = StyleSheet.create({
-  keyboardAvoidingContainer: {
+  modalBackdrop: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  keyboardAvoidingView: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   container: {
-    flex: 1,
-    backgroundColor: "#f8f9fa",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#212529",
-  },
-  headerButton: {
-    padding: 4,
-    // ✅ width 속성 제거하여 아이콘 잘림 문제 해결
-  },
-  contentWrapper: {
-    flex: 1,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     padding: 16,
-    paddingTop: 8,
   },
   textInput: {
-    flex: 1,
-    fontSize: 18,
-    lineHeight: 26,
+    minHeight: 90,
+    maxHeight: 250,
+    fontSize: 17,
+    lineHeight: 25,
     textAlignVertical: "top",
   },
-  // ✅ InputAccessoryView 내부에 들어갈 스타일
-  accessoryContainer: {
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderColor: "#e9ecef",
-    padding: 12,
-    // ✅ 버튼을 오른쪽으로 정렬하기 위한 스타일 추가
-    alignItems: "flex-end",
+  bottomControls: {
+    flexDirection: "row",
+    justifyContent: "flex-end", // 버튼을 오른쪽으로 정렬
+    alignItems: "center",
+    marginTop: 12,
   },
-  accessorySaveButton: {
-    backgroundColor: "#1971c2",
+  saveButton: {
+    backgroundColor: "#212529",
     paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
   },
-  accessorySaveButtonText: {
+  saveButtonText: {
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "bold",

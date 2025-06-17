@@ -7,6 +7,7 @@ import {
   BaseThreadItem,
   BottleneckThreadItem,
   GeneralThreadItem,
+  InsightThreadItem,
   Problem,
   SessionThreadItem,
   TaskThreadItem,
@@ -38,10 +39,12 @@ const parseThreadItemFromDB = (dbItem: any): ThreadItem => {
     createdAt: new Date(dbItem.createdAt),
     authorId: dbItem.authorId,
   };
-
   switch (baseItem.type) {
     case "General":
       return baseItem as GeneralThreadItem;
+    // ✅ [수정] Insight 타입 처리 케이스 추가
+    case "Insight":
+      return baseItem as InsightThreadItem;
     case "Bottleneck":
       return {
         ...baseItem,
@@ -175,6 +178,9 @@ export const createThreadSlice: StateCreator<
 
     let newThreadItem: ThreadItem;
     switch (baseItem.type) {
+      case "Insight":
+        newThreadItem = baseItem as InsightThreadItem;
+        break;
       case "Bottleneck":
         newThreadItem = {
           ...baseItem,

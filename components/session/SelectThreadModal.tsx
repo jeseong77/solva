@@ -1,9 +1,12 @@
+// components/session/SelectThreadScreen.tsx
+
 import { useAppStore } from "@/store/store";
-import { Problem, ThreadItem } from "@/types";
+import { ThreadItem } from "@/types";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  Modal,
+  ActivityIndicator,
   SafeAreaView,
   SectionList,
   StyleSheet,
@@ -13,75 +16,56 @@ import {
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-// 컴포넌트가 받을 Props 정의
-interface SelectThreadModalProps {
-  isVisible: boolean;
-  onClose: () => void;
-  onConfirm: (threadId: string) => void;
-}
-
 // SectionList에 사용될 데이터 형식 정의
 interface ThreadSection {
-  title: string; // Problem 제목
+  title: string;
   data: ThreadItem[];
 }
 
-export default function SelectThreadModal({
-  isVisible,
-  onClose,
-  onConfirm,
-}: SelectThreadModalProps) {
-  // 현재 선택된 스레드를 추적하기 위한 상태
+export default function SelectThreadScreen() {
+  const router = useRouter();
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
-  // 스토어에서 필요한 데이터 가져오기
-  const { problems, threadItems, selectedPersonaId } = useAppStore(
-    useShallow((state) => ({
-      problems: state.problems,
-      threadItems: state.threadItems,
-      selectedPersonaId: state.selectedPersonaId,
-    }))
-  );
+  const { problems, threadItems, selectedPersonaId, startSession } =
+    useAppStore(
+      useShallow((state) => ({
+        problems: state.problems,
+        threadItems: state.threadItems,
+        selectedPersonaId: state.selectedPersonaId,
+        startSession: state.startSession,
+      }))
+    );
 
-  // 현재 선택된 페르소나의 문제 및 스레드 목록을 SectionList 형식으로 가공
   const threadSections = useMemo((): ThreadSection[] => {
     if (!selectedPersonaId) return [];
 
-    // 1. 현재 페르소나에 속한 문제들을 필터링
     const personaProblems = problems.filter(
       (p) => p.personaId === selectedPersonaId
     );
 
-    // 2. 각 문제별로 스레드 목록을 구성하여 섹션 데이터 생성
     return personaProblems
       .map((problem) => {
-        // 문제에 속한 모든 스레드 필터링 ('Session' 타입 제외)
         const threadsForProblem = threadItems.filter(
           (t) => t.problemId === problem.id && t.type !== "Session"
         );
-        // 스레드가 있는 경우에만 섹션에 포함
         return threadsForProblem.length > 0
           ? { title: problem.title, data: threadsForProblem }
           : null;
       })
-      .filter((section): section is ThreadSection => section !== null); // null인 항목 제거
+      .filter((section): section is ThreadSection => section !== null);
   }, [selectedPersonaId, problems, threadItems]);
 
-  // 확인 버튼 클릭 핸들러
-  const handleConfirm = () => {
-    if (selectedThreadId) {
-      onConfirm(selectedThreadId);
-      handleClose(); // 모달 닫기
+  const handleConfirm = async () => {
+    if (!selectedThreadId) return;
+    setIsStarting(true);
+    await startSession(selectedThreadId);
+    setIsStarting(false);
+    if (router.canGoBack()) {
+      router.back();
     }
   };
 
-  // 모달 닫기 핸들러 (선택 상태 초기화)
-  const handleClose = () => {
-    setSelectedThreadId(null);
-    onClose();
-  };
-
-  // 각 스레드 아이템 렌더링
   const renderThreadItem = ({ item }: { item: ThreadItem }) => {
     const isSelected = item.id === selectedThreadId;
     return (
@@ -95,70 +79,63 @@ export default function SelectThreadModal({
         >
           {item.content}
         </Text>
+        {isSelected && (
+          <Feather name="check-circle" size={20} color="#ffffff" />
+        )}
       </TouchableOpacity>
     );
   };
 
   return (
-    <Modal
-      visible={isVisible}
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        {/* 헤더 */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>작업할 스레드 선택</Text>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Feather name="x" size={24} color="#343a40" />
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={styles.modalContainer}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>작업할 스레드 선택</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.closeButton}
+        >
+          <Feather name="x" size={24} color="#343a40" />
+        </TouchableOpacity>
+      </View>
 
-        {/* 스레드 목록 */}
-        <SectionList
-          sections={threadSections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderThreadItem}
-          renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.sectionHeader}>{title}</Text>
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                현재 페르소나에 작업할 스레드가 없습니다.
-              </Text>
-            </View>
-          }
-          contentContainerStyle={styles.listContentContainer}
-        />
-
-        {/* 푸터 */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.button, styles.confirmButton]}
-            onPress={handleConfirm}
-            disabled={!selectedThreadId} // 스레드가 선택되지 않으면 비활성화
-          >
-            <Text
-              style={[
-                styles.buttonText,
-                styles.confirmButtonText,
-                !selectedThreadId && styles.buttonDisabledText,
-              ]}
-            >
-              선택하고 세션 시작
+      <SectionList
+        sections={threadSections}
+        keyExtractor={(item) => item.id}
+        renderItem={renderThreadItem}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{title}</Text>
+        )}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              현재 페르소나에 작업할 스레드가 없습니다.
             </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </Modal>
+          </View>
+        }
+        contentContainerStyle={styles.listContentContainer}
+      />
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.button, !selectedThreadId && styles.buttonDisabled]}
+          onPress={handleConfirm}
+          disabled={!selectedThreadId || isStarting}
+        >
+          {isStarting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.buttonText}>선택하고 세션 시작</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
   },
   header: {
     flexDirection: "row",
@@ -170,50 +147,48 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 17,
+    fontWeight: "600",
   },
   closeButton: {
     position: "absolute",
-    left: 16,
+    right: 16,
   },
   listContentContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 100, // 푸터에 가려지지 않도록
+    paddingBottom: 120,
   },
   sectionHeader: {
-    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 8,
+    fontSize: 15,
     fontWeight: "bold",
     color: "#495057",
-    paddingVertical: 12,
-    marginTop: 8,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
   },
   itemContainer: {
-    backgroundColor: "#ffffff",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    marginBottom: 8,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderColor: "#f1f3f5",
   },
   itemSelected: {
-    borderColor: "#1971c2",
-    backgroundColor: "#e7f5ff",
+    backgroundColor: "#1971c2",
   },
   itemText: {
-    fontSize: 15,
+    fontSize: 16,
     color: "#212529",
   },
   itemTextSelected: {
-    color: "#1971c2",
-    fontWeight: "500",
+    color: "#ffffff",
+    fontWeight: "600",
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
+    paddingTop: 80,
     alignItems: "center",
-    marginTop: 50,
   },
   emptyText: {
     fontSize: 16,
@@ -224,29 +199,24 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    paddingBottom: 32, // iOS 하단 노치 고려
+    padding: 20,
+    paddingBottom: 40, // SafeArea 고려
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderColor: "#e9ecef",
   },
   button: {
+    backgroundColor: "#1971c2",
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
   },
-  confirmButton: {
-    backgroundColor: "#1971c2",
+  buttonDisabled: {
+    backgroundColor: "#adb5bd",
   },
   buttonText: {
+    color: "#ffffff",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  confirmButtonText: {
-    color: "#ffffff",
-  },
-  buttonDisabledText: {
-    color: "#ffffff",
-    opacity: 0.5,
   },
 });

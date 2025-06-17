@@ -46,6 +46,7 @@ const typeStyles: {
   Bottleneck: { color: "#f76707", backgroundColor: "#fff4e6", name: "병목" },
   Task: { color: "#2b8a3e", backgroundColor: "#e6fcf5", name: "할 일" },
   Action: { color: "#d9480f", backgroundColor: "#fff0f6", name: "액션" },
+  Insight: { color: "#845ef7", backgroundColor: "#f3f0ff", name: "인사이트" },
 };
 
 interface StarReportWriteProps {
@@ -162,7 +163,7 @@ export default function StarReportWrite({
                 <ReferenceThreadItem
                   key={thread.id}
                   thread={thread}
-                  allThreads={problemThreads} // ✅ 전체 스레드 목록을 prop으로 전달
+                  allThreads={problemThreads}
                   level={0}
                 />
               ))}

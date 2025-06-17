@@ -21,6 +21,7 @@ const SELECTABLE_TYPES: Exclude<ThreadItemType, "Session">[] = [
   "Bottleneck",
   "Task",
   "Action",
+  "Insight",
 ];
 
 const typeInfo: {
@@ -30,6 +31,7 @@ const typeInfo: {
   Bottleneck: { color: "#f76707", name: "병목" },
   Task: { color: "#2b8a3e", name: "할 일" },
   Action: { color: "#d9480f", name: "액션" },
+  Insight: { color: "#845ef7", name: "인사이트" },
 };
 
 interface ThreadWriteProps {

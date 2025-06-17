@@ -1,6 +1,6 @@
+// app/(tabs)/index.tsx
+
 import PersonaList from "@/components/persona/personaList";
-import ProblemDetail from "@/components/problem/ProblemDetail";
-import ProblemEdit from "@/components/problem/ProblemEdit";
 import ProblemList from "@/components/problem/ProblemList";
 import ResolvedProblemList from "@/components/problem/ResolvedProblemList";
 import SelectWeeklyProblemModal from "@/components/problem/SelectWeeklyProblemModal";
@@ -59,6 +59,11 @@ export default function HomeScreen() {
   ]);
   const [isAddTodoModalVisible, setAddTodoModalVisible] = useState(false);
 
+  useEffect(() => {
+    console.log(
+      `[Debug] 탭 인덱스 변경: ${index} | 화면 높이: ${layout.height} | 탭바 높이: ${tabBarHeight}`
+    );
+  }, [index, layout.height, tabBarHeight]);
   // --- 스토어 데이터 및 액션 (Zustand) ---
   const {
     personas,
@@ -214,19 +219,25 @@ export default function HomeScreen() {
     );
   };
   const handleNavigateToProblemDetail = (problemId: string) => {
-    setViewingProblemId(problemId);
-    setDetailModalVisible(true);
+    router.push(`/problem/${problemId}`);
   };
   const handleNavigateToCreatePersona = () => {
     router.push("/persona/create");
   };
   const handleCreateProblem = () => {
-    setEditingProblemId(undefined);
-    setEditModalVisible(true);
+    // ✅ 생성 페이지로 이동하면서, 현재 선택된 persona의 ID를 파라미터로 전달합니다.
+    if (selectedPersonaId) {
+      router.push({
+        pathname: "/problem/create",
+        params: { personaId: selectedPersonaId },
+      });
+    } else {
+      Alert.alert("알림", "문제를 생성할 페르소나를 먼저 선택해주세요.");
+    }
   };
   const handleEditProblem = (problemId: string) => {
-    setEditingProblemId(problemId);
-    setEditModalVisible(true);
+    // ✅ 수정 페이지로 이동합니다.
+    router.push(`/problem/${problemId}/edit`);
   };
   const handleCloseEditModal = () => {
     setEditModalVisible(false);
@@ -277,6 +288,7 @@ export default function HomeScreen() {
       style={styles.sceneContainer}
       // ✅ 스크롤 콘텐츠 하단에 탭 바 높이만큼의 여백을 추가합니다.
       contentContainerStyle={{ paddingBottom: tabBarHeight }}
+      showsVerticalScrollIndicator={false}
     >
       {selectedPersona ? (
         <>
@@ -362,20 +374,6 @@ export default function HomeScreen() {
           }
         />
       </View>
-      {/* --- 모달 컴포넌트들 --- */}
-      {selectedPersona && (
-        <ProblemEdit
-          isVisible={isEditModalVisible}
-          onClose={handleCloseEditModal}
-          problemId={editingProblemId}
-          personaId={selectedPersona.id}
-        />
-      )}
-      <ProblemDetail
-        isVisible={isDetailModalVisible}
-        onClose={() => setDetailModalVisible(false)}
-        problemId={viewingProblemId}
-      />
       <SelectWeeklyProblemModal
         isVisible={isWeeklySelectModalVisible}
         onClose={() => setWeeklySelectModalVisible(false)}
