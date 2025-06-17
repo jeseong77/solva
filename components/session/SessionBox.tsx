@@ -163,7 +163,7 @@ export default function SessionBox() {
         <ActiveSessionView session={activeSession} thread={activeThread} />
       ) : (
         <TouchableOpacity
-          style={styles.container} // ✅ idleContainer 대신 공통 container 스타일 사용
+          style={styles.container}
           onPress={() => router.push("/session/select")}
           activeOpacity={0.8}
         >
@@ -184,9 +184,9 @@ export default function SessionBox() {
               <Text style={styles.idleTitle}>탭하여 세션을 시작하세요.</Text>
             )}
           </View>
-          {/* ✅ [수정] 플레이 버튼 UI를 다른 컨트롤 버튼과 통일 */}
-          <View style={styles.controlButton}>
-            <Feather name="play" size={20} color="#f1f3f5" />
+          {/* ✅ [수정] 플레이 버튼 UI 변경 */}
+          <View style={[styles.controlButton, styles.playButtonActive]}>
+            <Feather name="play" size={20} color="#ffffff" />
           </View>
         </TouchableOpacity>
       )}
@@ -204,14 +204,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
-  // ✅ 이제 이 스타일이 '진행 중'과 '기본' 상태 모두에 적용됩니다.
   container: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderRadius: 16,
     padding: 20,
-    backgroundColor: "#212529", // 다크 위젯 배경
+    backgroundColor: "#212529",
     minHeight: 92,
   },
   contentWrapper: {
@@ -255,30 +254,31 @@ const styles = StyleSheet.create({
   stopButton: {
     backgroundColor: "#fa5252",
   },
-  // ❌ idleContainer 스타일은 더 이상 필요 없으므로 삭제
   idleLeft: {
     flex: 1,
     marginRight: 16,
   },
-  // ✅ [수정] idle 상태의 텍스트 색상 및 스타일 통일
   idleTitle: {
-    fontSize: 16, // activeTitle과 통일
-    fontWeight: "600", // activeTitle과 통일
-    color: "#f8f9fa", // 밝은 색으로 변경
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#f8f9fa",
   },
   recentSessionInfo: {
     marginTop: 6,
   },
   recentContent: {
     fontSize: 14,
-    color: "#adb5bd", // 부드러운 회색으로 변경
+    color: "#adb5bd",
   },
   recentTime: {
     fontSize: 14,
-    color: "#adb5bd", // 부드러운 회색으로 변경
+    color: "#adb5bd",
     fontWeight: "500",
     fontVariant: ["tabular-nums"],
     marginTop: 2,
   },
-  // ❌ playButton 스타일은 controlButton으로 대체되었으므로 삭제
+  // ✅ [추가] 시작 버튼에 적용할 포인트 컬러 스타일
+  playButtonActive: {
+    backgroundColor: "#40c057", // 타이머와 동일한 초록색
+  },
 });
