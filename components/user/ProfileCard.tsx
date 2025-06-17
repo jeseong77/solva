@@ -219,6 +219,7 @@ export default function ProfileCard({
           value={`${stats.insightsGained}개`}
         />
       </View>
+      <Divider />
     </View>
   );
 }
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   },
   coverImage: {
     width: "100%",
-    height: 180,
+    height: 240,
     backgroundColor: "#e9ecef",
     justifyContent: "center",
     alignItems: "center",
@@ -257,9 +258,9 @@ const styles = StyleSheet.create({
     marginTop: -40,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: "#f1f3f5",
     borderWidth: 3,
     borderColor: "#ffffff",
@@ -281,8 +282,7 @@ const styles = StyleSheet.create({
   },
   bioSection: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   bioText: {
     fontSize: 15,

@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   coverImage: {
     width: "100%",
-    height: 180, // ✅ 요청하신 높이
+    height: 220,
     backgroundColor: "#e9ecef",
     justifyContent: "center",
     alignItems: "center",

@@ -1,5 +1,7 @@
 import { useAppStore } from "@/store/store";
+import { ActiveSession, ThreadItem } from "@/types";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -10,9 +12,8 @@ import {
   View,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-import SelectThreadModal from "./SelectThreadModal"; // 방금 만든 모달 import
 
-// 초(seconds)를 HH:MM:SS 형식으로 변환
+// --- Helper Functions and Components (변경 없음) ---
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) return "00:00";
   const hours = Math.floor(totalSeconds / 3600);
@@ -26,7 +27,6 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
-// 밀리초(ms)를 MM:SS 형식으로 변환 (실시간 타이머용)
 const formatTime = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -37,56 +37,42 @@ const formatTime = (ms: number) => {
   )}`;
 };
 
-export default function SessionBox() {
-  const {
-    activeSession,
-    getMostRecentSession,
-    getThreadItemById,
-    startSession,
-    stopSession,
-    pauseSession,
-    resumeSession,
-    addThreadItem,
-  } = useAppStore(
-    useShallow((state) => ({
-      activeSession: state.activeSession,
-      getMostRecentSession: state.getMostRecentSession,
-      getThreadItemById: state.getThreadItemById,
-      startSession: state.startSession,
-      stopSession: state.stopSession,
-      pauseSession: state.pauseSession,
-      resumeSession: state.resumeSession,
-      addThreadItem: state.addThreadItem,
-    }))
-  );
-
-  const [isModalVisible, setModalVisible] = useState(false);
+const ActiveSessionView = ({
+  session,
+  thread,
+}: {
+  session: ActiveSession;
+  thread: ThreadItem;
+}) => {
   const [displayTime, setDisplayTime] = useState("00:00");
 
-  const recentSessionInfo = getMostRecentSession();
-  const activeThread = activeSession
-    ? getThreadItemById(activeSession.threadId)
-    : null;
+  const { pauseSession, resumeSession, stopSession, addThreadItem } =
+    useAppStore(
+      useShallow((state) => ({
+        pauseSession: state.pauseSession,
+        resumeSession: state.resumeSession,
+        stopSession: state.stopSession,
+        addThreadItem: state.addThreadItem,
+      }))
+    );
 
-  // 실시간 타이머 로직
   useEffect(() => {
-    if (!activeSession || activeSession.isPaused) return;
-
+    if (session.isPaused) {
+      setDisplayTime(formatTime(session.pausedTime));
+      return;
+    }
     const interval = setInterval(() => {
-      const elapsedSinceResume = Date.now() - activeSession.startTime;
-      const totalElapsed = activeSession.pausedTime + elapsedSinceResume;
+      const elapsedSinceResume = Date.now() - session.startTime;
+      const totalElapsed = session.pausedTime + elapsedSinceResume;
       setDisplayTime(formatTime(totalElapsed));
     }, 1000);
-
     return () => clearInterval(interval);
-  }, [activeSession]);
+  }, [session]);
 
-  // 세션 중지 핸들러
   const handleStopSession = () => {
-    if (!activeSession || !activeThread) return;
-    const finalElapsedTime = activeSession.isPaused
-      ? activeSession.pausedTime
-      : activeSession.pausedTime + (Date.now() - activeSession.startTime);
+    const finalElapsedTime = session.isPaused
+      ? session.pausedTime
+      : session.pausedTime + (Date.now() - session.startTime);
 
     Alert.alert("세션 종료", "이번 세션의 작업 내용을 기록하시겠습니까?", [
       {
@@ -102,7 +88,6 @@ export default function SessionBox() {
               saveSession(text || "")
             );
           } else {
-            // 안드로이드는 별도 입력 모달 구현 필요. 현재는 내용 없이 저장.
             saveSession("홈 화면에서 세션 종료");
             Alert.alert("알림", "작업 내용이 기록되었습니다.");
           }
@@ -112,8 +97,8 @@ export default function SessionBox() {
 
     const saveSession = async (content: string) => {
       await addThreadItem({
-        problemId: activeThread.problemId,
-        parentId: activeThread.id,
+        problemId: thread.problemId,
+        parentId: thread.id,
         type: "Session",
         content,
         timeSpent: Math.round(finalElapsedTime / 1000),
@@ -123,76 +108,88 @@ export default function SessionBox() {
     };
   };
 
-  // 세션 시작 핸들러
-  const handleStartSession = (threadId: string) => {
-    startSession(threadId);
-  };
+  return (
+    <View style={styles.container}>
+      <View style={styles.contentWrapper}>
+        <View style={styles.statusIndicator} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.activeTitle} numberOfLines={1}>
+            {thread.content}
+          </Text>
+          <Text style={styles.timerText}>{displayTime}</Text>
+        </View>
+      </View>
+      <View style={styles.buttonsWrapper}>
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={session.isPaused ? resumeSession : pauseSession}
+        >
+          <Feather
+            name={session.isPaused ? "play" : "pause"}
+            size={20}
+            color="#f1f3f5"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.controlButton, styles.stopButton]}
+          onPress={handleStopSession}
+        >
+          <Feather name="square" size={20} color="#181818" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
-  // UI 렌더링
+export default function SessionBox() {
+  const router = useRouter();
+  const { activeSession, getMostRecentSession, getThreadItemById } =
+    useAppStore(
+      useShallow((state) => ({
+        activeSession: state.activeSession,
+        getMostRecentSession: state.getMostRecentSession,
+        getThreadItemById: state.getThreadItemById,
+      }))
+    );
+
+  const activeThread = activeSession
+    ? getThreadItemById(activeSession.threadId)
+    : null;
+  const recentSessionInfo = getMostRecentSession();
+
   return (
     <View style={styles.wrapper}>
       {activeSession && activeThread ? (
-        // --- 세션 진행 중 UI ---
-        <View style={[styles.container, styles.activeContainer]}>
-          <View>
-            <Text style={styles.activeTitle}>세션 진행 중</Text>
-            <Text style={styles.activeContent} numberOfLines={1}>
-              {activeThread.content}
-            </Text>
-            <View style={styles.timerWrapper}>
-              <Feather name="clock" size={16} color="#1971c2" />
-              <Text style={styles.timerText}>{displayTime}</Text>
-            </View>
-          </View>
-          <View style={styles.buttonsWrapper}>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={activeSession.isPaused ? resumeSession : pauseSession}
-            >
-              <Feather
-                name={activeSession.isPaused ? "play" : "pause"}
-                size={22}
-                color="#495057"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={handleStopSession}>
-              <Feather name="square" size={22} color="#d9480f" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ActiveSessionView session={activeSession} thread={activeThread} />
       ) : (
-        // --- 세션 없을 때 UI ---
-        <View style={[styles.container, styles.idleContainer]}>
+        <TouchableOpacity
+          style={styles.container} // ✅ idleContainer 대신 공통 container 스타일 사용
+          onPress={() => router.push("/session/select")}
+          activeOpacity={0.8}
+        >
           <View style={styles.idleLeft}>
-            <Text style={styles.idleTitle}>현재 진행중인 세션이 없습니다.</Text>
             {recentSessionInfo?.session ? (
-              <View style={styles.recentSessionInfo}>
-                <Text style={styles.recentLabel}>최근 세션:</Text>
-                <Text style={styles.recentContent} numberOfLines={1}>
-                  {recentSessionInfo.parentThread?.content}
-                </Text>
-                <Text style={styles.recentTime}>
-                  ({formatSeconds(recentSessionInfo.session.timeSpent)})
-                </Text>
-              </View>
+              <>
+                <Text style={styles.idleTitle}>최근 세션</Text>
+                <View style={styles.recentSessionInfo}>
+                  <Text style={styles.recentContent} numberOfLines={1}>
+                    {recentSessionInfo.parentThread?.content}
+                  </Text>
+                  <Text style={styles.recentTime}>
+                    ({formatSeconds(recentSessionInfo.session.timeSpent)})
+                  </Text>
+                </View>
+              </>
             ) : (
-              <Text style={styles.recentLabel}>최근 세션 기록이 없습니다.</Text>
+              <Text style={styles.idleTitle}>탭하여 세션을 시작하세요.</Text>
             )}
           </View>
-          <TouchableOpacity
-            style={styles.playButton}
-            onPress={() => setModalVisible(true)}
-          >
-            <Feather name="play-circle" size={36} color="#1971c2" />
-          </TouchableOpacity>
-        </View>
+          {/* ✅ [수정] 플레이 버튼 UI를 다른 컨트롤 버튼과 통일 */}
+          <View style={styles.controlButton}>
+            <Feather name="play" size={20} color="#f1f3f5" />
+          </View>
+        </TouchableOpacity>
       )}
-
-      <SelectThreadModal
-        isVisible={isModalVisible}
-        onClose={() => setModalVisible(false)}
-        onConfirm={handleStartSession}
-      />
     </View>
   );
 }
@@ -201,86 +198,87 @@ const styles = StyleSheet.create({
   wrapper: {
     marginHorizontal: 16,
     marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
+  // ✅ 이제 이 스타일이 '진행 중'과 '기본' 상태 모두에 적용됩니다.
   container: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#8cc5ed",
+    borderRadius: 16,
+    padding: 20,
+    backgroundColor: "#212529", // 다크 위젯 배경
+    minHeight: 92,
   },
-  activeContainer: {
-    backgroundColor: "#e7f5ff",
-  },
-  idleContainer: {
-    backgroundColor: "#e7f5ff",
-  },
-  // Active State Styles
-  activeTitle: {
-    fontSize: 13,
-    color: "#495057",
-    marginBottom: 4,
-  },
-  activeContent: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#212529",
-    maxWidth: 200, // 말줄임을 위한 너비 제한
-  },
-  timerWrapper: {
+  contentWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
+    flex: 1,
+    marginRight: 16,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#40c057",
+    marginRight: 12,
+  },
+  activeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#f8f9fa",
+    marginBottom: 4,
   },
   timerText: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: "bold",
-    color: "#1971c2",
-    marginLeft: 8,
+    color: "#40c057",
     fontVariant: ["tabular-nums"],
   },
   buttonsWrapper: {
     flexDirection: "row",
     alignItems: "center",
   },
-  button: {
-    marginLeft: 16,
-    padding: 4,
+  controlButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
   },
-  // Idle State Styles
+  stopButton: {
+    backgroundColor: "#fa5252",
+  },
+  // ❌ idleContainer 스타일은 더 이상 필요 없으므로 삭제
   idleLeft: {
     flex: 1,
     marginRight: 16,
   },
+  // ✅ [수정] idle 상태의 텍스트 색상 및 스타일 통일
   idleTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#343a40",
-    marginBottom: 8,
+    fontSize: 16, // activeTitle과 통일
+    fontWeight: "600", // activeTitle과 통일
+    color: "#f8f9fa", // 밝은 색으로 변경
   },
   recentSessionInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  recentLabel: {
-    fontSize: 13,
-    color: "#868e96",
+    marginTop: 6,
   },
   recentContent: {
-    fontSize: 13,
-    color: "#495057",
-    flexShrink: 1, // 내용이 길면 줄어들도록
-    marginHorizontal: 4,
+    fontSize: 14,
+    color: "#adb5bd", // 부드러운 회색으로 변경
   },
   recentTime: {
-    fontSize: 13,
-    color: "#868e96",
+    fontSize: 14,
+    color: "#adb5bd", // 부드러운 회색으로 변경
+    fontWeight: "500",
     fontVariant: ["tabular-nums"],
+    marginTop: 2,
   },
-  playButton: {
-    padding: 4,
-  },
+  // ❌ playButton 스타일은 controlButton으로 대체되었으므로 삭제
 });

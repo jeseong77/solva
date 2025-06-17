@@ -42,6 +42,7 @@ export default function StarReportList({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "#ffffff",
+    paddingTop: 24,
     paddingBottom: 16,
   },
   titleText: {

@@ -126,11 +126,8 @@ export default function ThreadItem({
                 </Text>
               </View>
             )}
-            <Text style={styles.metaText} numberOfLines={1}>
-              {persona.title}/{problem.title}
-            </Text>
             <Text style={[styles.metaText, { marginLeft: 8 }]}>
-              · {formattedDate}
+              {formattedDate}
             </Text>
           </View>
           <View style={styles.headerRight}>
