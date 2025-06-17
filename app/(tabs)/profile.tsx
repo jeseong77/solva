@@ -1,30 +1,100 @@
+import ProfileCard from "@/components/user/ProfileCard";
 import StarReportList from "@/components/report/StarReportList";
 import { useAppStore } from "@/store/store";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useMemo } from "react";
-import { SafeAreaView, ScrollView, StyleSheet } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 import { useShallow } from "zustand/react/shallow";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const bottom = useBottomTabOverflow();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { starReports, fetchStarReports, problems, fetchProblems } =
-    useAppStore(
-      useShallow((state) => ({
-        starReports: state.starReports,
-        fetchStarReports: state.fetchStarReports,
-        problems: state.problems, // ✅ [추가]
-        fetchProblems: state.fetchProblems, // ✅ [추가]
-      }))
-    );
-  useFocusEffect(
-    useCallback(() => {
-      // ✅ [수정] 모든 리포트와 모든 문제를 병렬로 가져옵니다.
-      Promise.all([fetchStarReports(), fetchProblems()]);
-    }, [fetchStarReports, fetchProblems])
+  const {
+    user,
+    personas,
+    problems,
+    threadItems,
+    starReports,
+    fetchStarReports,
+    fetchProblems,
+    fetchPersonas,
+    fetchThreads,
+  } = useAppStore(
+    useShallow((state) => ({
+      user: state.user,
+      personas: state.personas,
+      problems: state.problems,
+      threadItems: state.threadItems,
+      starReports: state.starReports,
+      fetchStarReports: state.fetchStarReports,
+      fetchProblems: state.fetchProblems,
+      fetchPersonas: state.fetchPersonas,
+      fetchThreads: state.fetchThreads,
+    }))
   );
 
-  // ✅ [추가] 유효한 리포트만 필터링하고 최신순으로 정렬합니다.
+  const loadProfileData = useCallback(async () => {
+    await Promise.all([fetchPersonas(), fetchProblems(), fetchStarReports()]);
+    const currentProblems = useAppStore.getState().problems;
+    if (currentProblems.length > 0) {
+      const threadFetchPromises = currentProblems.map((p) =>
+        fetchThreads({ problemId: p.id })
+      );
+      await Promise.all(threadFetchPromises);
+    }
+  }, [fetchPersonas, fetchProblems, fetchStarReports, fetchThreads]);
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadProfileData();
+    } catch (error) {
+      console.error("Failed to refresh profile data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [loadProfileData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfileData();
+    }, [loadProfileData])
+  );
+
+  const profileStats = useMemo(() => {
+    if (!user) return null;
+    const userPersonas = personas.filter((p) => p.userId === user.id);
+    const userProblemIds = new Set(userPersonas.flatMap((p) => p.problemIds));
+    const userProblems = problems.filter((p) => userProblemIds.has(p.id));
+    const problemsSolved = userProblems.filter(
+      (p) => p.status === "resolved"
+    ).length;
+    const totalSeconds = threadItems
+      .filter((t) => userProblemIds.has(t.problemId)) // 현재 유저의 문제에 속한 스레드만 필터링
+      .reduce((sum, item) => {
+        // 'Action' 또는 'Session' 타입에만 timeSpent가 존재
+        if (item.type === "Action" || item.type === "Session") {
+          return sum + (item.timeSpent || 0);
+        }
+        return sum;
+      }, 0);
+    const totalHours = totalSeconds / 3600; // 초 단위를 시간으로
+    const activePersonas = userPersonas.length;
+    const insightsGained = threadItems.filter(
+      (t) => t.type === "Insight"
+    ).length;
+    return { problemsSolved, totalHours, activePersonas, insightsGained };
+  }, [user, personas, problems, threadItems]);
+
   const validAndSortedReports = useMemo(() => {
     const problemIdSet = new Set(problems.map((p) => p.id));
     return starReports
@@ -32,34 +102,54 @@ export default function ProfileScreen() {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }, [starReports, problems]);
 
-  // 3. 리스트 아이템을 눌렀을 때 실행될 핸들러 함수를 정의합니다.
   const handlePressReportItem = (reportId: string) => {
-    // 해당 리포트의 상세 페이지로 이동합니다.
     router.push(`/report/${reportId}`);
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* 여기에 프로필 사진, 사용자 이름 등 
-          다른 프로필 관련 컴포넌트들이 추가될 수 있습니다. 
-        */}
+  const handleEditProfile = () => {
+    router.push("/profile/edit");
+  };
 
+  return (
+    <View style={[styles.container, { paddingBottom: bottom }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor="#868e96"
+            colors={["#868e96"]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <ProfileCard
+          user={user}
+          stats={profileStats}
+          onEditProfile={handleEditProfile}
+          onEditCover={handleEditProfile}
+          onEditAvatar={handleEditProfile}
+        />
         <StarReportList
-          reports={validAndSortedReports} // ✅ 필터링 및 정렬된 데이터 전달
+          reports={validAndSortedReports}
           onPressItem={handlePressReportItem}
         />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa", // 배경색을 홈 화면과 유사하게 설정
+    backgroundColor: "#ffffff",
   },
   scrollView: {
     flex: 1,
+  },
+  contentContainer: {
+    flexGrow: 1,
   },
 });

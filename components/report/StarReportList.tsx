@@ -1,9 +1,10 @@
+// components/report/StarReportList.tsx
+
 import { StarReport } from "@/types";
 import React from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import StarReportListItem from "./StarReportListItem";
 
-// 컴포넌트가 받을 Props 정의
 interface StarReportListProps {
   reports: StarReport[];
   onPressItem: (reportId: string) => void;
@@ -13,7 +14,7 @@ export default function StarReportList({
   reports,
   onPressItem,
 }: StarReportListProps) {
-  // 리스트가 비어있을 때 보여줄 컴포넌트
+  // --- 기존 로직은 변경하지 않습니다 ---
   const renderEmptyComponent = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>아직 작성한 리포트가 없습니다.</Text>
@@ -22,50 +23,47 @@ export default function StarReportList({
 
   return (
     <View style={styles.container}>
-      <View style={styles.titleContainer}>
-        <Text style={styles.titleText}>작성한 STAR 리포트</Text>
-      </View>
+      <Text style={styles.titleText}>작성한 STAR 리포트</Text>
       <FlatList
         data={reports}
         renderItem={({ item }) => (
           <StarReportListItem report={item} onPress={onPressItem} />
         )}
         keyExtractor={(item) => item.id}
+        ItemSeparatorComponent={() => <View style={styles.divider} />}
         ListEmptyComponent={renderEmptyComponent}
-        scrollEnabled={false} // 부모 스크롤을 사용
+        scrollEnabled={false}
       />
     </View>
   );
 }
 
+// ✅ [스타일 수정] 플랫 디자인에 맞게 변경
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#f8f9fa",
-    borderWidth: 1,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 8,
-    borderColor: "#e9ecef",
-    overflow: "hidden", // 자식 컴포넌트의 모서리가 삐져나오지 않도록
-  },
-  titleContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: "#e9ecef",
+    backgroundColor: "#ffffff",
+    paddingBottom: 16,
   },
   titleText: {
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "bold",
     color: "#212529",
+    paddingHorizontal: 20,
+    paddingBottom: 4,
   },
   emptyContainer: {
-    paddingVertical: 40,
+    paddingVertical: 60, // 높이감 확보
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#ffffff",
   },
   emptyText: {
     fontSize: 15,
     color: "#868e96",
+  },
+  // ✅ 구분선 스타일 추가
+  divider: {
+    height: 1,
+    backgroundColor: "#f1f3f5",
+    marginHorizontal: 20, // 좌우 여백
   },
 });

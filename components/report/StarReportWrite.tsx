@@ -163,7 +163,7 @@ export default function StarReportWrite({
                 <ReferenceThreadItem
                   key={thread.id}
                   thread={thread}
-                  allThreads={problemThreads} // ✅ 전체 스레드 목록을 prop으로 전달
+                  allThreads={problemThreads}
                   level={0}
                 />
               ))}

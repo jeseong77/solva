@@ -288,6 +288,7 @@ export default function HomeScreen() {
       style={styles.sceneContainer}
       // ✅ 스크롤 콘텐츠 하단에 탭 바 높이만큼의 여백을 추가합니다.
       contentContainerStyle={{ paddingBottom: tabBarHeight }}
+      showsVerticalScrollIndicator={false}
     >
       {selectedPersona ? (
         <>
