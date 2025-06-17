@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: "flex-start",
     paddingHorizontal: 16,
-    marginTop: -40,
+    marginTop: -50,
   },
   avatar: {
     width: 100,

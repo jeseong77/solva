@@ -1,5 +1,3 @@
-// components/session/SelectThreadScreen.tsx
-
 import { useAppStore } from "@/store/store";
 import { ThreadItem } from "@/types";
 import { Feather } from "@expo/vector-icons";
@@ -16,7 +14,6 @@ import {
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-// SectionList에 사용될 데이터 형식 정의
 interface ThreadSection {
   title: string;
   data: ThreadItem[];
@@ -46,8 +43,11 @@ export default function SelectThreadScreen() {
 
     return personaProblems
       .map((problem) => {
+        // ✅ [수정] 'Task'와 'Action' 타입의 스레드만 필터링하도록 변경
         const threadsForProblem = threadItems.filter(
-          (t) => t.problemId === problem.id && t.type !== "Session"
+          (t) =>
+            t.problemId === problem.id &&
+            (t.type === "Task" || t.type === "Action")
         );
         return threadsForProblem.length > 0
           ? { title: problem.title, data: threadsForProblem }
@@ -73,14 +73,16 @@ export default function SelectThreadScreen() {
         style={[styles.itemContainer, isSelected && styles.itemSelected]}
         onPress={() => setSelectedThreadId(item.id)}
       >
-        <Text
-          style={[styles.itemText, isSelected && styles.itemTextSelected]}
-          numberOfLines={1}
-        >
-          {item.content}
-        </Text>
+        <View style={styles.itemTextContainer}>
+          <Text
+            style={[styles.itemText, isSelected && styles.itemTextSelected]}
+            numberOfLines={1}
+          >
+            {item.content}
+          </Text>
+        </View>
         {isSelected && (
-          <Feather name="check-circle" size={20} color="#ffffff" />
+          <Feather name="check-circle" size={22} color="#ffffff" />
         )}
       </TouchableOpacity>
     );
@@ -103,16 +105,21 @@ export default function SelectThreadScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderThreadItem}
         renderSectionHeader={({ section: { title } }) => (
-          <Text style={styles.sectionHeader}>{title}</Text>
+          <View style={styles.sectionHeaderContainer}>
+            <Feather name="folder" size={16} color="#868e96" />
+            <Text style={styles.sectionHeaderText}>{title}</Text>
+          </View>
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              현재 페르소나에 작업할 스레드가 없습니다.
+              실행할 Task 또는 Action이 없습니다.
             </Text>
           </View>
         }
         contentContainerStyle={styles.listContentContainer}
+        // ✅ [추가] 각 아이템 사이에 구분선을 렌더링
+        ItemSeparatorComponent={() => <View style={styles.divider} />}
       />
 
       <View style={styles.footer}>
@@ -135,7 +142,7 @@ export default function SelectThreadScreen() {
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffff",
   },
   header: {
     flexDirection: "row",
@@ -157,26 +164,34 @@ const styles = StyleSheet.create({
   listContentContainer: {
     paddingBottom: 120,
   },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "#495057",
+  sectionHeaderContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 10,
     backgroundColor: "#f8f9fa",
+  },
+  sectionHeaderText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#495057",
+    marginLeft: 8,
   },
   itemContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderColor: "#f1f3f5",
   },
   itemSelected: {
-    backgroundColor: "#1971c2",
+    backgroundColor: "#2b8a3e",
+  },
+  itemTextContainer: {
+    flex: 1,
+    marginRight: 12,
   },
   itemText: {
     fontSize: 16,
@@ -200,13 +215,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 20,
-    paddingBottom: 40, // SafeArea 고려
+    paddingBottom: 40,
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderColor: "#e9ecef",
   },
   button: {
-    backgroundColor: "#1971c2",
+    backgroundColor: "#2b8a3e",
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -218,5 +233,11 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  // ✅ [추가] 아이템 구분선 스타일
+  divider: {
+    height: 1,
+    backgroundColor: "#f1f3f5",
+    marginLeft: 20, // 왼쪽 여백
   },
 });

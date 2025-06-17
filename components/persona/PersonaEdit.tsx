@@ -1,5 +1,6 @@
 // components/persona/PersonaEdit.tsx
 
+import { pickAndSaveImage } from "@/lib/imageUtils";
 import { useAppStore } from "@/store/store";
 import { Persona } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +10,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ImageBackground,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -18,11 +21,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Modal,
-  ImageBackground,
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-import { pickAndSaveImage } from "@/lib/imageUtils";
 
 export default function PersonaEdit() {
   const router = useRouter();
@@ -159,7 +159,8 @@ export default function PersonaEdit() {
           style={styles.headerButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="chevron-back" size={26} color="#007AFF" />
+          {/* ✅ [수정] 아이콘 색상을 검은 계통으로 변경 */}
+          <Ionicons name="chevron-back" size={26} color="#343a40" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {isEditMode ? "페르소나 편집" : "새 페르소나"}
@@ -305,7 +306,12 @@ const styles = StyleSheet.create({
     color: "#212529",
   },
   scrollView: { flex: 1 },
-  headerSaveButton: { fontSize: 17, fontWeight: "600", color: "#007AFF" },
+  // ✅ [수정] 저장 버튼 색상을 녹색으로 변경
+  headerSaveButton: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#2b8a3e"
+  },
   // ✅ [수정] Cover
   coverContainer: {
     // 이 View가 자식 컴포넌트의 absolute 위치 기준이 됨
@@ -361,7 +367,7 @@ const styles = StyleSheet.create({
   },
   // Content
   contentSection: { paddingHorizontal: 16, paddingTop: 8 },
-  divider: { height: 1, backgroundColor: "#e9ecef"},
+  divider: { height: 1, backgroundColor: "#e9ecef" },
   label: {
     fontSize: 14,
     fontWeight: "500",

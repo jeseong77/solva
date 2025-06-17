@@ -9,6 +9,7 @@ import SessionBox from "@/components/session/SessionBox";
 import AddTodoModal from "@/components/todo/AddTodoModal";
 import TodoList from "@/components/todo/TodoList";
 import FloatingActionButton from "@/components/ui/FloatingActionButton";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import { useAppStore } from "@/store/store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -43,13 +44,7 @@ export default function HomeScreen() {
   const layout = useWindowDimensions();
   const tabBarHeight = useBottomTabBarHeight();
 
-  // --- 상태 관리 (State) ---
-  const [isEditModalVisible, setEditModalVisible] = useState(false);
-  const [editingProblemId, setEditingProblemId] = useState<
-    string | undefined
-  >();
-  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
-  const [viewingProblemId, setViewingProblemId] = useState<string | null>(null);
+  const bottom = useBottomTabOverflow();
   const [isWeeklySelectModalVisible, setWeeklySelectModalVisible] =
     useState(false);
   const [index, setIndex] = useState(0);
@@ -239,9 +234,6 @@ export default function HomeScreen() {
     // ✅ 수정 페이지로 이동합니다.
     router.push(`/problem/${problemId}/edit`);
   };
-  const handleCloseEditModal = () => {
-    setEditModalVisible(false);
-  };
 
   const handleConfirmWeeklyProblem = (problemId: string) => {
     if (!selectedPersonaId) return;
@@ -287,7 +279,7 @@ export default function HomeScreen() {
     <ScrollView
       style={styles.sceneContainer}
       // ✅ 스크롤 콘텐츠 하단에 탭 바 높이만큼의 여백을 추가합니다.
-      contentContainerStyle={{ paddingBottom: tabBarHeight }}
+      contentContainerStyle={{ paddingBottom: bottom }}
       showsVerticalScrollIndicator={false}
     >
       {selectedPersona ? (

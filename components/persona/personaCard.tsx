@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   selectedAvatarContainer: {
-    borderColor: "#1971c2",
+    borderColor: "#40c057",
     borderWidth: 3, // 약간 더 두꺼운 테두리
   },
   avatar: {
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   // 선택되었을 때 텍스트 스타일 추가
   selectedTitle: {
-    color: "#1971c2",
+    color: "#40c057",
     fontWeight: "bold",
   },
 });

@@ -17,7 +17,7 @@ interface FloatingActionButtonProps {
 
 // 각 모드에 따른 색상 정의
 const COLORS = {
-  solva: "#1971c2", // 파란색
+  solva: "#40c057", // 파란색
   todo: "#212529", // 검은색
 };
 

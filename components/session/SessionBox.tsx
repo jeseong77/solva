@@ -93,6 +93,11 @@ const ActiveSessionView = ({
           }
         },
       },
+      {
+        text: "취소",
+        style: "cancel", // '취소' 역할을 하는 버튼
+        onPress: () => console.log("세션 종료 취소됨"),
+      },
     ]);
 
     const saveSession = async (content: string) => {
@@ -277,8 +282,7 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
     marginTop: 2,
   },
-  // ✅ [추가] 시작 버튼에 적용할 포인트 컬러 스타일
   playButtonActive: {
-    backgroundColor: "#40c057", // 타이머와 동일한 초록색
+    backgroundColor: "#40c057",
   },
 });
