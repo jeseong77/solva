@@ -5,7 +5,9 @@ import {
   ActiveSession,
   BaseThreadItem,
   BottleneckThreadItem,
-  Persona,
+  Objective, // ✅ Persona -> Objective
+  ObjectiveType, // ✅ ObjectiveType 추가
+  Gap, // ✅ Gap 추가
   Priority,
   Problem,
   ProblemStatus,
@@ -23,14 +25,10 @@ import {
 
 // --- 각 Slice 가 가질 상태와 액션들에 대한 인터페이스 정의 ---
 
-/**
- * ✅ [추가] 사용자 프로필 상태 관리를 위한 슬라이스
- */
 export interface UserSlice {
   user: User | null;
   isLoadingUser: boolean;
   fetchUser: () => Promise<void>;
-  // createUser의 인자 타입을 명시적으로 정의
   createUser: (userData: {
     displayName: string;
     bio?: string;
@@ -41,28 +39,37 @@ export interface UserSlice {
   updateUser: (userToUpdate: User) => Promise<User | null>;
 }
 
-export interface PersonaSlice {
-  personas: Persona[];
-  isLoadingPersonas: boolean;
-  fetchPersonas: () => Promise<void>;
-  addPersona: (
-    // ✅ Omit에 userId 추가
-    personaData: Omit<
-      Persona,
-      "id" | "userId" | "createdAt" | "problemIds" | "order"
-    > & {
-      order?: number;
-    }
-  ) => Promise<Persona | null>;
-  updatePersona: (personaToUpdate: Persona) => Promise<Persona | null>;
-  deletePersona: (personaId: string) => Promise<boolean>;
-  getPersonaById: (id: string) => Persona | undefined;
+// ✅ [변경] PersonaSlice -> ObjectiveSlice
+export interface ObjectiveSlice {
+  objectives: Objective[];
+  isLoadingObjectives: boolean;
+  fetchObjectives: () => Promise<void>;
+  addObjective: (
+    objectiveData: Omit<Objective, "id" | "userId" | "createdAt" | "problemIds">
+  ) => Promise<Objective | null>;
+  updateObjective: (objectiveToUpdate: Objective) => Promise<Objective | null>;
+  deleteObjective: (objectiveId: string) => Promise<boolean>;
+  getObjectiveById: (id: string) => Objective | undefined;
+}
+
+// ✅ [추가] GapSlice
+export interface GapSlice {
+  gaps: Gap[];
+  isLoadingGaps: boolean;
+  fetchGaps: (objectiveId: string) => Promise<void>;
+  addGap: (
+    gapData: Omit<Gap, "id" | "createdAt" | "problemIds">
+  ) => Promise<Gap | null>;
+  updateGap: (gapToUpdate: Gap) => Promise<Gap | null>;
+  deleteGap: (gapId: string) => Promise<boolean>;
+  getGapById: (id: string) => Gap | undefined;
 }
 
 export interface ProblemSlice {
   problems: Problem[];
   isLoadingProblems: boolean;
-  fetchProblems: (personaId?: string) => Promise<void>;
+  // ✅ [변경] personaId -> objectiveId
+  fetchProblems: (objectiveId?: string) => Promise<void>;
   addProblem: (
     problemData: Omit<
       Problem,
@@ -85,14 +92,12 @@ export interface ProblemSlice {
   getProblemById: (id: string) => Problem | undefined;
 }
 
-/**
- * @description 주간 문제(WeeklyProblem) 상태 관리를 위한 슬라이스
- */
 export interface WeeklyProblemSlice {
   weeklyProblems: WeeklyProblem[];
   isLoadingWeeklyProblems: boolean;
   fetchWeeklyProblems: (options: {
-    personaId?: string;
+    // ✅ [변경] personaId -> objectiveId
+    objectiveId?: string;
     weekIdentifier?: string;
   }) => Promise<void>;
   addWeeklyProblem: (
@@ -104,9 +109,7 @@ export interface WeeklyProblemSlice {
   deleteWeeklyProblem: (weeklyProblemId: string) => Promise<boolean>;
   getWeeklyProblemById: (id: string) => WeeklyProblem | undefined;
 }
-/**
- * ✅ [추가] 가장 최근 세션 정보를 담는 객체 타입
- */
+
 export interface RecentSessionInfo {
   session: SessionThreadItem;
   parentThread: ThreadItem | undefined;
@@ -124,7 +127,6 @@ export interface ThreadSlice {
       BaseThreadItem,
       "id" | "createdAt" | "childThreadIds" | "resultIds"
     > &
-      // 각 하위 타입의 고유한 필드들을 옵셔널하게 추가
       Partial<Pick<BottleneckThreadItem, "isResolved">> &
       Partial<Pick<TaskThreadItem, "isCompleted">> &
       Partial<
@@ -142,9 +144,6 @@ export interface ThreadSlice {
     problemId: string;
     type: T;
   }) => (ThreadItem & { type: T })[];
-  /**
-   * ✅ [추가] 가장 최근에 완료된 세션과 그 부모 스레드 정보를 가져옵니다.
-   */
   getMostRecentSession: () => RecentSessionInfo | null;
 }
 
@@ -183,13 +182,14 @@ export interface StarReportSlice {
   getStarReportByProblemId: (problemId: string) => StarReport | undefined;
 }
 
-// --- 새로 추가될 UI 상태 Slice 인터페이스 정의 ---
 export interface UIStateSlice {
-  selectedPersonaId: string | null; // 현재 선택된 페르소나의 ID
-  isLoading: boolean; // 앱의 전반적인 UI 로딩 상태 (선택적)
+  // ✅ [변경] personaId -> objectiveId
+  selectedObjectiveId: string | null;
+  isLoading: boolean;
   activeSession: ActiveSession | null;
-  setSelectedPersonaId: (personaId: string | null) => void; // 선택된 페르소나 ID를 변경하는 액션
-  setGlobalLoading: (isLoading: boolean) => void; // 로딩 상태 변경 액션
+  // ✅ [변경] personaId -> objectiveId
+  setSelectedObjectiveId: (objectiveId: string | null) => void;
+  setGlobalLoading: (isLoading: boolean) => void;
   startSession: (threadId: string) => void;
   pauseSession: () => void;
   resumeSession: () => void;
@@ -208,8 +208,9 @@ export interface TodoSlice {
 
 // --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---
 export interface AppState
-  extends UserSlice, // ✅ UserSlice 추가
-    PersonaSlice,
+  extends UserSlice,
+    ObjectiveSlice, // ✅ PersonaSlice -> ObjectiveSlice
+    GapSlice, // ✅ GapSlice 추가
     ProblemSlice,
     WeeklyProblemSlice,
     ThreadSlice,
@@ -217,6 +218,4 @@ export interface AppState
     TodoSlice,
     TagSlice,
     UIStateSlice,
-    StarReportSlice {
-  // ...
-}
+    StarReportSlice {}

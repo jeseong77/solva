@@ -1,7 +1,7 @@
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
-  Persona,
+  Objective,
   Priority,
   Problem,
   ProblemStatus,
@@ -56,13 +56,13 @@ const statusInfo: {
 // 컴포넌트가 받을 Props 정의
 interface ProblemPostProps {
   problem: Problem;
-  persona: Persona;
+  objective: Objective;
   onStatusBadgePress: () => void;
 }
 
 export default function ProblemPost({
   problem,
-  persona,
+  objective,
   onStatusBadgePress,
 }: ProblemPostProps) {
   const router = useRouter(); // ✅ [추가] 라우터 훅 초기화
@@ -133,7 +133,8 @@ export default function ProblemPost({
           />
           <View style={styles.metaContainer}>
             <Text style={styles.metaText}>
-              persona/<Text style={styles.personaTitle}>{persona.title}</Text>
+              {objective.type}/
+              <Text style={styles.objectiveTitle}>{objective.title}</Text>
             </Text>
             <Text style={styles.metaText}>{formattedDate}</Text>
           </View>
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#868e96",
   },
-  personaTitle: {
+  objectiveTitle: {
     fontWeight: "bold",
   },
   body: {

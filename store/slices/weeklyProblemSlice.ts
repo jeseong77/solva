@@ -12,12 +12,10 @@ import { StateCreator } from "zustand";
 
 /**
  * 데이터베이스에서 가져온 데이터를 WeeklyProblem 타입으로 변환합니다.
- * @param dbItem - 데이터베이스의 row 아이템
- * @returns WeeklyProblem 타입 객체
  */
 const parseWeeklyProblemFromDB = (dbItem: any): WeeklyProblem => ({
   id: dbItem.id,
-  personaId: dbItem.personaId,
+  objectiveId: dbItem.objectiveId,
   problemId: dbItem.problemId,
   weekIdentifier: dbItem.weekIdentifier,
   notes: dbItem.notes === null ? undefined : dbItem.notes,
@@ -35,7 +33,7 @@ export const createWeeklyProblemSlice: StateCreator<
 
   /**
    * 데이터베이스에서 주간 문제 목록을 가져옵니다.
-   * 페르소나 ID 또는 주간 식별자로 필터링할 수 있습니다.
+   * Objective ID 또는 주간 식별자로 필터링할 수 있습니다.
    */
   fetchWeeklyProblems: async (options) => {
     set({ isLoadingWeeklyProblems: true });
@@ -45,9 +43,9 @@ export const createWeeklyProblemSlice: StateCreator<
       const params: string[] = [];
       const conditions: string[] = [];
 
-      if (options.personaId) {
-        conditions.push("personaId = ?");
-        params.push(options.personaId);
+      if (options.objectiveId) {
+        conditions.push("objectiveId = ?");
+        params.push(options.objectiveId);
       }
       if (options.weekIdentifier) {
         conditions.push("weekIdentifier = ?");
@@ -62,7 +60,6 @@ export const createWeeklyProblemSlice: StateCreator<
       const results = await db.getAllAsync<any>(query, params);
       const fetchedProblems = results.map(parseWeeklyProblemFromDB);
 
-      // 기존 상태와 병합하여 중복 방지
       const existingIds = new Set(fetchedProblems.map((p) => p.id));
       const filteredOldProblems = get().weeklyProblems.filter(
         (p) => !existingIds.has(p.id)
@@ -98,14 +95,14 @@ export const createWeeklyProblemSlice: StateCreator<
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO WeeklyProblems (id, personaId, problemId, weekIdentifier, notes, createdAt)
+        `INSERT INTO WeeklyProblems (id, objectiveId, problemId, weekIdentifier, notes, createdAt)
          VALUES (?, ?, ?, ?, ?, ?);`,
         [
           newWeeklyProblem.id,
-          newWeeklyProblem.personaId,
+          newWeeklyProblem.objectiveId,
           newWeeklyProblem.problemId,
           newWeeklyProblem.weekIdentifier,
-          newWeeklyProblem.notes ?? null, // undefined를 null로 변환
+          newWeeklyProblem.notes ?? null,
           newWeeklyProblem.createdAt.toISOString(),
         ]
       );
@@ -178,12 +175,13 @@ export const createWeeklyProblemSlice: StateCreator<
       );
       return true;
     } catch (error) {
+      // ✅ 이 부분에 { } 중괄호가 추가되었습니다.
       console.error(
         "[WeeklyProblemSlice] Error deleting weekly problem:",
         error
       );
       return false;
-    }
+    } // ✅ 이 부분에 { } 중괄호가 추가되었습니다.
   },
 
   /**

@@ -1,7 +1,7 @@
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
-  Persona,
+  Objective,
   Problem,
   SessionThreadItem,
   TaskThreadItem,
@@ -31,20 +31,20 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
-// WeeklyProblem 컴포넌트가 받을 Props 정의
 interface WeeklyProblemProps {
   weeklyProblem: WeeklyProblem | null | undefined;
   problem: Problem | null | undefined;
-  persona: Persona | null | undefined;
+  objective: Objective | null | undefined; // persona -> objective
   onPress: (problemId: string) => void;
   onPressNew: () => void;
   onChangeWeeklyProblem: () => void;
 }
 
+// ✅ [변경] persona -> objective
 export default function WeeklyProblemCard({
   weeklyProblem,
   problem,
-  persona,
+  objective,
   onPress,
   onPressNew,
   onChangeWeeklyProblem,
@@ -103,7 +103,7 @@ export default function WeeklyProblemCard({
   if (
     !weeklyProblem ||
     !problem ||
-    !persona ||
+    !objective ||
     problem.status === "resolved" ||
     problem.status === "archived"
   ) {
@@ -129,7 +129,9 @@ export default function WeeklyProblemCard({
           onPress={() => onPress(problem.id)}
         >
           <View style={styles.cardHeader}>
-            <Text style={styles.metaText}>persona/{persona.title}</Text>
+            <Text style={styles.metaText}>
+              {objective.type}/{objective.title}
+            </Text>
             <View style={styles.dDayChip}>
               <Text style={styles.dDayText}>{dDay}</Text>
             </View>

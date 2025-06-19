@@ -1,7 +1,7 @@
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
-  Persona,
+  Objective,
   Priority,
   Problem,
   ProblemStatus,
@@ -51,7 +51,7 @@ const statusInfo: {
 
 interface ProblemItemProps {
   problem: Problem;
-  persona: Persona;
+  objective: Objective;
   onPress: (id: string) => void;
   onLongPress?: (id: string) => void;
   isLast?: boolean;
@@ -59,7 +59,7 @@ interface ProblemItemProps {
 
 export default function ProblemItem({
   problem,
-  persona,
+  objective,
   onPress,
   onLongPress,
   isLast,
@@ -125,7 +125,9 @@ export default function ProblemItem({
       <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
       <View style={styles.contentContainer}>
         <View style={styles.metaContainer}>
-          <Text style={styles.metaText}>persona/{persona.title}</Text>
+          <Text style={styles.metaText}>
+            {objective.type}/{objective.title}
+          </Text>
           <View
             style={[
               styles.statusTag,

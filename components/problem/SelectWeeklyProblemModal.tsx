@@ -33,19 +33,19 @@ export default function SelectWeeklyProblemModal({
     null
   );
 
-  const { problems, selectedPersonaId } = useAppStore(
+  const { problems, selectedObjectiveId } = useAppStore(
     useShallow((state) => ({
       problems: state.problems,
-      selectedPersonaId: state.selectedPersonaId,
+      selectedObjectiveId: state.selectedObjectiveId,
     }))
   );
 
   const selectableProblems = useMemo(() => {
-    if (!selectedPersonaId) return [];
+    if (!selectedObjectiveId) return [];
     return problems.filter(
-      (p) => p.personaId === selectedPersonaId && p.status === "active"
+      (p) => p.objectiveId === selectedObjectiveId && p.status === "active"
     );
-  }, [selectedPersonaId, problems]);
+  }, [selectedObjectiveId, problems]);
 
   const handleConfirm = () => {
     if (selectedProblemId) {

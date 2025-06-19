@@ -3,6 +3,7 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ImageBackground,
   Linking,
@@ -12,18 +13,17 @@ import {
   View,
 } from "react-native";
 
-// ✅ [추가] 통계 데이터 타입을 명확하게 정의
+// ✅ [수정] 통계 데이터 타입을 새로운 모델에 맞게 변경
 interface ProfileStats {
   problemsSolved: number;
   totalHours: number;
-  activePersonas: number;
+  activeObjectives: number; // activePersonas -> activeObjectives
   insightsGained: number;
 }
 
-// ✅ [수정] ProfileCard가 받을 Props 정의
 interface ProfileCardProps {
-  user: User | null; // 실제 User 객체를 받음
-  stats: ProfileStats | null; // 실제 통계 객체를 받음
+  user: User | null;
+  stats: ProfileStats | null;
   onEditProfile?: () => void;
   onEditCover?: () => void;
   onEditAvatar?: () => void;
@@ -79,7 +79,6 @@ export default function ProfileCard({
   onEditCover,
   onEditAvatar,
 }: ProfileCardProps) {
-  // ✅ 로딩 중이거나 user 데이터가 없을 경우 로딩 인디케이터 표시
   if (!user || !stats) {
     return (
       <View style={styles.loadingContainer}>
@@ -94,9 +93,30 @@ export default function ProfileCard({
     return `${h}시간 ${m}분`;
   };
 
+  const handleLinkPress = async (url: string) => {
+    if (!url) {
+      Alert.alert("알림", "연결된 링크가 없습니다.");
+      return;
+    }
+    let fullUrl = url;
+    if (!fullUrl.startsWith("http://") && !fullUrl.startsWith("https://")) {
+      fullUrl = `https://${fullUrl}`;
+    }
+    const supported = await Linking.canOpenURL(fullUrl);
+    if (supported) {
+      try {
+        await Linking.openURL(fullUrl);
+      } catch (error) {
+        Alert.alert("오류", `링크를 여는 데 실패했습니다: ${fullUrl}`);
+      }
+    } else {
+      Alert.alert("오류", `이 링크를 열 수 없습니다: ${fullUrl}`);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* --- 커버 및 프로필 헤더 --- */}
+      {/* ... 커버 및 프로필 헤더 ... */}
       <View>
         <ImageBackground
           source={user.coverImageUri ? { uri: user.coverImageUri } : undefined}
@@ -132,10 +152,9 @@ export default function ProfileCard({
         </View>
       </View>
 
-      {/* --- 자기소개, 링크, 프로필 편집 버튼 --- */}
+      {/* ... 자기소개, 링크, 프로필 편집 버튼 ... */}
       <View style={styles.bioSection}>
         <Text style={styles.bioText}>
-          {/* ✅ bio가 없으면 안내 텍스트 표시 */}
           {user.bio || (
             <Text style={styles.placeholderText}>
               한 줄 소개를 작성하여 자신을 표현해보세요.
@@ -143,7 +162,6 @@ export default function ProfileCard({
           )}
         </Text>
 
-        {/* ✅ location이 있을 때만 표시 */}
         {user.location && (
           <View style={styles.locationContainer}>
             <Feather name="map-pin" size={14} color="#868e96" />
@@ -151,14 +169,13 @@ export default function ProfileCard({
           </View>
         )}
 
-        {/* ✅ links 배열이 존재하고 비어있지 않을 때만 렌더링 */}
         {user.links && user.links.length > 0 && (
           <View style={styles.linksContainer}>
             {user.links.map((link) => (
               <TouchableOpacity
                 key={link.id}
                 style={styles.linkButton}
-                onPress={() => Linking.openURL(link.url)}
+                onPress={() => handleLinkPress(link.url)}
               >
                 <Feather
                   name={getIconForPlatform(link.platform)}
@@ -180,11 +197,10 @@ export default function ProfileCard({
 
       <Divider />
 
-      {/* --- 상세 소개 --- */}
+      {/* ... 상세 소개 ... */}
       <View style={styles.introductionSection}>
         <Text style={styles.sectionTitle}>자기소개</Text>
         <Text style={styles.introductionText}>
-          {/* ✅ introduction이 없으면 안내 텍스트 표시 */}
           {user.introduction || (
             <Text style={styles.placeholderText}>
               프로필 편집에서 자기소개를 추가할 수 있습니다.
@@ -208,10 +224,11 @@ export default function ProfileCard({
           label="총 작업 시간"
           value={formatHours(stats.totalHours)}
         />
+        {/* ✅ [수정] 라벨과 값을 새로운 데이터에 맞게 변경 */}
         <StatRow
-          icon="users"
-          label="활성 페르소나"
-          value={`${stats.activePersonas}개`}
+          icon="target"
+          label="활성 목표"
+          value={`${stats.activeObjectives}개`}
         />
         <StatRow
           icon="star"
@@ -226,6 +243,7 @@ export default function ProfileCard({
 
 // --- Styles ---
 const styles = StyleSheet.create({
+  // ... 모든 스타일은 기존과 동일
   container: { width: "100%", backgroundColor: "#ffffff" },
   loadingContainer: {
     height: 300,
@@ -263,7 +281,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     backgroundColor: "#f1f3f5",
     borderWidth: 3,
-    borderColor: "#ffffff",
+    borderColor: "#40c057",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -290,7 +308,6 @@ const styles = StyleSheet.create({
     color: "#495057",
   },
   placeholderText: {
-    // ✅ 안내 텍스트를 위한 스타일
     fontStyle: "italic",
     color: "#adb5bd",
   },
@@ -314,7 +331,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     width: "100%",
     paddingVertical: 10,
-    backgroundColor: "#e9ecef",
+    backgroundColor: "#40c057",
     borderRadius: 8,
     alignItems: "center",
   },
@@ -357,6 +374,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
     width: 22,
     textAlign: "center",
+    color: "#40c057",
   },
   statLabel: {
     fontSize: 16,

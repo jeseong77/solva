@@ -1,7 +1,7 @@
 // app/components/problem/ProblemList.tsx
 
 import { useAppStore } from "@/store/store";
-import { Persona, Problem } from "@/types";
+import { Objective, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
@@ -14,16 +14,18 @@ import {
 } from "react-native";
 import ProblemItem from "./ProblemItem";
 
+// ✅ [변경] Props 정의
 interface ProblemListProps {
   problems: Problem[];
-  persona: Persona;
+  objective: Objective; // persona -> objective
   onPressProblem: (problemId: string) => void;
   onLongPressProblem?: (problemId: string) => void;
 }
 
+// ✅ [변경] props 이름 변경
 export default function ProblemList({
   problems,
-  persona,
+  objective,
   onPressProblem,
   onLongPressProblem,
 }: ProblemListProps) {
@@ -75,7 +77,7 @@ export default function ProblemList({
   const renderEmptyComponent = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyText}>
-        '{persona.title}'에 정의된 문제가 없습니다.
+        '{objective.title}'에 정의된 문제가 없습니다.
       </Text>
       <Text style={styles.emptySubText}>새로운 문제를 추가해보세요.</Text>
     </View>
@@ -85,8 +87,8 @@ export default function ProblemList({
     <View style={styles.container}>
       <View style={styles.titleContainer}>
         <Text style={styles.titleText}>
-          페르소나 - <Text style={styles.personaTitle}>{persona.title}</Text>의
-          문제들:
+          <Text style={styles.objectiveTitle}>'{objective.title}'</Text> 목표의
+          문제들
         </Text>
       </View>
       <FlatList
@@ -94,7 +96,7 @@ export default function ProblemList({
         renderItem={({ item, index }) => (
           <ProblemItem
             problem={item}
-            persona={persona}
+            objective={objective}
             onPress={onPressProblem}
             onLongPress={handleLongPress}
             isLast={index === problems.length - 1} // 마지막 아이템인지 확인
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#495057",
   },
-  personaTitle: {
+  objectiveTitle: {
     fontWeight: "700",
     color: "#212529",
   },

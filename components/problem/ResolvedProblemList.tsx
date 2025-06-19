@@ -1,4 +1,4 @@
-import { Persona, Problem } from "@/types";
+import { Objective, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
@@ -9,10 +9,9 @@ import {
   View,
 } from "react-native";
 
-// 컴포넌트가 받을 Props 정의
 interface ResolvedProblemListProps {
   problems: Problem[];
-  persona: Persona;
+  objective: Objective; // persona -> objective
   onPressProblem: (problemId: string) => void;
 }
 
@@ -84,17 +83,19 @@ const ResolvedProblemItem = ({
   );
 };
 
+// ✅ [변경] props 이름 변경
 export default function ResolvedProblemList({
   problems,
-  persona,
+  objective,
   onPressProblem,
 }: ResolvedProblemListProps) {
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
+        {/* ✅ [변경] 제목 텍스트 및 스타일 수정 */}
         <Text style={styles.titleText}>
-          페르소나 - <Text style={styles.personaTitle}>{persona.title}</Text>의
-          해결된 문제들:
+          <Text style={styles.objectiveTitle}>'{objective.title}'</Text> 목표의
+          해결된 문제들
         </Text>
       </View>
       <FlatList
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#495057",
   },
-  personaTitle: {
+  objectiveTitle: {
     fontWeight: "700",
     color: "#212529",
   },

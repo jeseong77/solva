@@ -1,7 +1,7 @@
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
-  Persona,
+  Objective,
   Problem,
   SessionThreadItem,
   TaskThreadItem,
@@ -47,7 +47,7 @@ const formatSeconds = (totalSeconds: number): string => {
 
 interface ThreadItemProps {
   thread: ThreadItemData;
-  persona: Persona;
+  objective: Objective;
   problem: Problem;
   onReply: (threadId: string) => void;
   onStartSession: (threadId: string) => void;
@@ -59,7 +59,7 @@ interface ThreadItemProps {
 
 export default function ThreadItem({
   thread,
-  persona,
+  objective,
   problem,
   onReply,
   onStartSession,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 13,
     color: "#868e96",
-    flexShrink: 1
+    flexShrink: 1,
   },
   menuTrigger: {
     padding: 4,
@@ -270,12 +270,12 @@ const styles = StyleSheet.create({
   },
   typeTagText: {
     fontSize: 12,
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   contentText: {
     fontSize: 15,
     lineHeight: 22,
-    color: "#343a40"
+    color: "#343a40",
   },
   completedText: {
     textDecorationLine: "line-through",
@@ -303,12 +303,12 @@ const styles = StyleSheet.create({
   summaryText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#495057"
+    color: "#495057",
   },
   sessionList: {
     borderTopWidth: 1,
     borderColor: "#e9ecef",
-    padding: 12
+    padding: 12,
   },
   sessionItem: {
     flexDirection: "row",
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   sessionContent: {
     fontSize: 14,
     color: "#495057",
-    flex: 1
+    flex: 1,
   },
   sessionTime: {
     fontSize: 14,

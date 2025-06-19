@@ -5,7 +5,6 @@
 export type ProblemStatus = "active" | "onHold" | "resolved" | "archived";
 export type Priority = "high" | "medium" | "low" | "none";
 
-// ✅ ThreadItemType에 'Insight' 추가
 export type ThreadItemType =
   | "General"
   | "Insight"
@@ -16,11 +15,11 @@ export type ThreadItemType =
 
 export type ActionStatus = "todo" | "inProgress" | "completed" | "cancelled";
 
+// ✅ [추가] Objective의 타입을 정의합니다.
+export type ObjectiveType = "persona" | "product";
+
 // --- 주요 엔티티 타입 정의 ---
 
-/**
- * UserLink: 사용자의 외부 링크 (웹사이트, SNS 등)
- */
 export interface UserLink {
   id: string;
   platform:
@@ -34,9 +33,6 @@ export interface UserLink {
   title?: string;
 }
 
-/**
- * User: 앱을 사용하는 단일 사용자. MVP에서는 로컬에 유일한 사용자로 존재.
- */
 export interface User {
   id: string;
   displayName: string;
@@ -53,14 +49,16 @@ export interface User {
 }
 
 /**
- * Persona: 사용자의 다양한 역할이나 삶의 영역을 나타내는 최상위 분류
+ * ✅ [변경] Persona -> Objective
+ * 사용자의 역할(페르소나) 뿐만 아니라, 달성하고자 하는 모든 대상(프로덕트 등)을 포함합니다.
  */
-export interface Persona {
+export interface Objective {
   id: string;
   userId: string;
+  type: ObjectiveType; // ✅ 'persona' 또는 'product'
   title: string;
   description?: string;
-  personaGoals?: string;
+  objectiveGoals?: string; // personaGoals -> objectiveGoals
   coverImageUri?: string;
   avatarImageUri?: string;
   icon?: string;
@@ -71,11 +69,27 @@ export interface Persona {
 }
 
 /**
- * WeeklyProblem: 특정 주에 집중하여 해결할 Problem을 지정하는 기록
+ * ✅ [추가] Gap
+ * Objective의 '이상'과 '현실' 사이의 격차를 정의합니다.
+ * 예: (목표) SAT 점수, (이상) 1550, (현실) 1300
+ */
+export interface Gap {
+  id: string;
+  objectiveId: string; // 어떤 Objective에 속한 Gap인지
+  title: string; // 이 Gap의 이름 (예: SAT 점수, 월간 활성 사용자 수)
+  idealState: string; // 이상적인 상태/수치
+  currentState: string; // 현재 상태/수치
+  problemIds: string[]; // 이 Gap을 해결하기 위해 생성된 문제들
+  createdAt: Date;
+}
+
+/**
+ * ✅ [변경] WeeklyProblem
+ * personaId -> objectiveId
  */
 export interface WeeklyProblem {
   id: string;
-  personaId: string;
+  objectiveId: string; // 👩‍💻
   problemId: string;
   weekIdentifier: string;
   notes?: string;
@@ -83,11 +97,12 @@ export interface WeeklyProblem {
 }
 
 /**
- * Problem: 사용자가 해결하고자 하는 구체적인 문제 또는 과제
+ * ✅ [변경] Problem
+ * personaId -> objectiveId
  */
 export interface Problem {
   id: string;
-  personaId: string;
+  objectiveId: string; // 👩‍💻
   title: string;
   description?: string;
   status: ProblemStatus;

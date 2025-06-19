@@ -1,12 +1,13 @@
 import { useAppStore } from "@/store/store";
 import { Priority, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router"; // ✅ Expo Router 훅 임포트
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
-  KeyboardEvent,
   KeyboardAvoidingView,
+  KeyboardEvent,
   Platform,
   SafeAreaView,
   StyleSheet,
@@ -15,13 +16,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useShallow } from "zustand/react/shallow";
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
+  useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useLocalSearchParams, useRouter } from "expo-router"; // ✅ Expo Router 훅 임포트
+import { useShallow } from "zustand/react/shallow";
 
 // ... (priorityColors, FloatingSaveButton 컴포넌트는 변경 없이 그대로 둡니다)
 const priorityColors: { [key in Priority]: string } = {
@@ -67,7 +67,7 @@ export default function ProblemEdit() {
   // ✅ URL에서 problemId와 personaId를 가져옵니다.
   const params = useLocalSearchParams();
   const problemId = params.problemId as string | undefined;
-  const personaId = params.personaId as string | undefined;
+  const objectiveId = params.objectiveId as string | undefined;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -81,11 +81,12 @@ export default function ProblemEdit() {
     descriptionInputRef.current?.focus();
   };
 
-  const { getProblemById, getPersonaById, addProblem, updateProblem } =
+  // ✅ [변경] getPersonaById -> getObjectiveById
+  const { getProblemById, getObjectiveById, addProblem, updateProblem } =
     useAppStore(
       useShallow((state) => ({
         getProblemById: state.getProblemById,
-        getPersonaById: state.getPersonaById,
+        getObjectiveById: state.getObjectiveById,
         addProblem: state.addProblem,
         updateProblem: state.updateProblem,
       }))
@@ -95,10 +96,12 @@ export default function ProblemEdit() {
   const isEditMode = !!problemId;
   const problemToEdit = isEditMode ? getProblemById(problemId) : undefined;
 
-  // ✅ 생성 모드일 경우 personaId를 URL params에서, 수정 모드일 경우 기존 problem에서 가져옵니다.
-  const finalPersonaId = isEditMode ? problemToEdit?.personaId : personaId;
-  const personaForProblem = finalPersonaId
-    ? getPersonaById(finalPersonaId)
+  // ✅ [변경] personaId -> objectiveId
+  const finalObjectiveId = isEditMode
+    ? problemToEdit?.objectiveId
+    : objectiveId;
+  const objectiveForProblem = finalObjectiveId
+    ? getObjectiveById(finalObjectiveId)
     : undefined;
 
   // ✅ isVisible 대신 problemId를 기준으로 데이터 로딩 로직을 변경합니다.
@@ -177,9 +180,10 @@ export default function ProblemEdit() {
         priority,
       };
       await updateProblem(updatedProblem);
-    } else if (finalPersonaId) {
+    } else if (finalObjectiveId) {
+      // ✅ finalPersonaId -> finalObjectiveId
       await addProblem({
-        personaId: finalPersonaId,
+        objectiveId: finalObjectiveId, // ✅ personaId -> objectiveId
         title: title.trim(),
         description: description.trim(),
         priority,
@@ -192,7 +196,7 @@ export default function ProblemEdit() {
     description,
     priority,
     isEditMode,
-    finalPersonaId,
+    finalObjectiveId,
     problemToEdit,
     updateProblem,
     addProblem,
@@ -226,7 +230,7 @@ export default function ProblemEdit() {
               />
             </TouchableOpacity>
             <Text style={styles.metaText}>
-              페르소나 → {personaForProblem?.title || "선택"}
+              목표 → {objectiveForProblem?.title || "선택"}
             </Text>
           </View>
         </View>

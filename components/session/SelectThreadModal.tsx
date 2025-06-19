@@ -24,26 +24,28 @@ export default function SelectThreadScreen() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
-  const { problems, threadItems, selectedPersonaId, startSession } =
+  // ✅ [변경] selectedPersonaId -> selectedObjectiveId
+  const { problems, threadItems, selectedObjectiveId, startSession } =
     useAppStore(
       useShallow((state) => ({
         problems: state.problems,
         threadItems: state.threadItems,
-        selectedPersonaId: state.selectedPersonaId,
+        selectedObjectiveId: state.selectedObjectiveId,
         startSession: state.startSession,
       }))
     );
 
   const threadSections = useMemo((): ThreadSection[] => {
-    if (!selectedPersonaId) return [];
+    // ✅ [변경] selectedPersonaId -> selectedObjectiveId
+    if (!selectedObjectiveId) return [];
 
-    const personaProblems = problems.filter(
-      (p) => p.personaId === selectedPersonaId
+    // ✅ [변경] personaProblems -> objectiveProblems
+    const objectiveProblems = problems.filter(
+      (p) => p.objectiveId === selectedObjectiveId
     );
 
-    return personaProblems
+    return objectiveProblems
       .map((problem) => {
-        // ✅ [수정] 'Task'와 'Action' 타입의 스레드만 필터링하도록 변경
         const threadsForProblem = threadItems.filter(
           (t) =>
             t.problemId === problem.id &&
@@ -54,7 +56,7 @@ export default function SelectThreadScreen() {
           : null;
       })
       .filter((section): section is ThreadSection => section !== null);
-  }, [selectedPersonaId, problems, threadItems]);
+  }, [selectedObjectiveId, problems, threadItems]); // ✅ [변경] 의존성 배열 업데이트
 
   const handleConfirm = async () => {
     if (!selectedThreadId) return;

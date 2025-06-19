@@ -1,18 +1,19 @@
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
+  Objective, // ✅ [변경] Persona -> Objective
   Problem,
   ProblemStatus,
   StarReport,
   TaskThreadItem,
 } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router"; // ✅ useLocalSearchParams 추가
-import React, { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
-  SafeAreaView, // ✅ Modal, Platform 제거, SafeAreaView 유지
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -30,20 +31,17 @@ interface FlatThreadItem {
   level: number;
 }
 
-// ❌ 더 이상 Props를 받지 않으므로 interface를 제거합니다.
-// interface ProblemDetailProps { ... }
-
 export default function ProblemDetail() {
   const router = useRouter();
-  // ✅ URL 경로에서 파라미터를 가져옵니다. e.g., /problem/123 -> { problemId: '123' }
   const params = useLocalSearchParams();
   const problemId = Array.isArray(params.problemId)
     ? params.problemId[0]
     : params.problemId;
 
+  // ✅ [수정] 데이터 조회 로직을 더 명확하고 정확하게 변경합니다.
   const {
-    problem,
-    persona,
+    problems,
+    objectives, // objectives 배열을 직접 가져옵니다.
     getThreadItemById,
     threadItems,
     startSession,
@@ -55,32 +53,35 @@ export default function ProblemDetail() {
     getStarReportByProblemId,
     addStarReport,
   } = useAppStore(
-    // ✅ Zustand 스토어에서도 props 대신 hook으로 가져온 problemId를 사용합니다.
-    useShallow((state) => {
-      const p = problemId
-        ? state.problems.find((p) => p.id === problemId)
-        : null;
-      const persona = p
-        ? state.personas.find((p) => p.id === p.id)
-        : null;
-      return {
-        problem: p,
-        persona,
-        getThreadItemById: state.getThreadItemById,
-        threadItems: state.threadItems,
-        startSession: state.startSession,
-        stopSession: state.stopSession,
-        addThreadItem: state.addThreadItem,
-        deleteThreadItem: state.deleteThreadItem,
-        updateThreadItem: state.updateThreadItem,
-        updateProblem: state.updateProblem,
-        getStarReportByProblemId: state.getStarReportByProblemId,
-        addStarReport: state.addStarReport,
-      };
-    })
+    useShallow((state) => ({
+      problems: state.problems,
+      objectives: state.objectives, // ✅ objectives 상태 추가
+      getThreadItemById: state.getThreadItemById,
+      threadItems: state.threadItems,
+      startSession: state.startSession,
+      stopSession: state.stopSession,
+      addThreadItem: state.addThreadItem,
+      deleteThreadItem: state.deleteThreadItem,
+      updateThreadItem: state.updateThreadItem,
+      updateProblem: state.updateProblem,
+      getStarReportByProblemId: state.getStarReportByProblemId,
+      addStarReport: state.addStarReport,
+    }))
   );
 
-  // ... 내부 상태(useState)와 핸들러 함수들은 대부분 그대로 유지됩니다 ...
+  // 1. problemId로 현재 problem을 찾습니다.
+  const problem = useMemo(
+    () => (problemId ? problems.find((p) => p.id === problemId) : null),
+    [problems, problemId]
+  );
+
+  // 2. 찾은 problem의 objectiveId로 정확한 부모 objective를 찾습니다. (버그 수정)
+  const objective = useMemo(() => {
+    if (!problem) return null;
+    return objectives.find((o) => o.id === problem.objectiveId);
+  }, [problem, objectives]);
+
+  // --- 내부 상태(useState)와 핸들러 함수들은 대부분 그대로 유지됩니다 ---
   const [isWriteModalVisible, setWriteModalVisible] = useState(false);
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
@@ -320,12 +321,12 @@ export default function ProblemDetail() {
   };
   const renderThreadItem = ({ item }: { item: FlatThreadItem }) => {
     const thread = getThreadItemById(item.id);
-    if (!thread || !problem || !persona) return null;
+    if (!thread || !problem || !objective) return null;
 
     return (
       <ThreadItem
         thread={thread}
-        persona={persona}
+        objective={objective}
         problem={problem}
         onReply={handleOpenReplyWriteModal}
         onStartSession={handleStartSession}
@@ -346,7 +347,7 @@ export default function ProblemDetail() {
           <Feather name="x" size={26} color="#343a40" />
         </TouchableOpacity>
       </View>
-      {problem && persona ? (
+      {problem && objective ? (
         <FlatList
           style={styles.contentScrollView}
           contentContainerStyle={styles.listContentContainer}
@@ -356,7 +357,7 @@ export default function ProblemDetail() {
           ListHeaderComponent={
             <ProblemPost
               problem={problem}
-              persona={persona}
+              objective={objective} // ✅ persona -> objective
               onStatusBadgePress={handleChangeStatusPress}
             />
           }

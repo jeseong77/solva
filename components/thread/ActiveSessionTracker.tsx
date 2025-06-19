@@ -35,6 +35,13 @@ export default function ActiveSessionTracker({
   const [displayTime, setDisplayTime] = useState("00:00");
 
   useEffect(() => {
+    if (activeSession) {
+      const initialTotalElapsed =
+        activeSession.pausedTime +
+        (activeSession.isPaused ? 0 : Date.now() - activeSession.startTime);
+      setDisplayTime(formatTime(initialTotalElapsed));
+    }
+
     if (!activeSession || activeSession.isPaused) {
       return;
     }
@@ -60,7 +67,8 @@ export default function ActiveSessionTracker({
   return (
     <View style={styles.container}>
       <View style={styles.timerWrapper}>
-        <Feather name="clock" size={16} color="#1971c2" />
+        {/* ✅ [수정] 아이콘 색상을 흰색으로 변경 */}
+        <Feather name="clock" size={16} color="#FFFFFF" />
         <Text style={styles.timerText}>{displayTime}</Text>
       </View>
       <View style={styles.buttonsWrapper}>
@@ -70,12 +78,14 @@ export default function ActiveSessionTracker({
         >
           <Feather
             name={activeSession.isPaused ? "play" : "pause"}
-            size={18}
-            color="#495057"
+            size={20}
+            // ✅ [수정] 아이콘 색상을 녹색 계열로 변경
+            color="#2f9e44"
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={handleStop}>
-          <Feather name="square" size={18} color="#d9480f" />
+          {/* ✅ [수정] 아이콘 색상을 녹색 계열로 변경 */}
+          <Feather name="square" size={20} color="#fa5252" />
         </TouchableOpacity>
       </View>
     </View>
@@ -87,20 +97,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#e7f5ff",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    // ✅ [수정] 배경색을 검은색 계열로 변경
+    backgroundColor: "#212529",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     marginVertical: 8,
   },
-  timerWrapper: { flexDirection: "row", alignItems: "center" },
+  timerWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   timerText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "bold",
-    color: "#1971c2",
-    marginLeft: 8,
+    // ✅ [수정] 텍스트 색상을 흰색으로 변경
+    color: "#FFFFFF",
+    marginLeft: 10,
     fontVariant: ["tabular-nums"],
   },
-  buttonsWrapper: { flexDirection: "row", alignItems: "center" },
-  button: { marginLeft: 16, padding: 4 },
+  buttonsWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  button: {
+    marginLeft: 20,
+    padding: 4,
+  },
 });
