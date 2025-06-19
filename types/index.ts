@@ -49,16 +49,15 @@ export interface User {
 }
 
 /**
- * ✅ [변경] Persona -> Objective
- * 사용자의 역할(페르소나) 뿐만 아니라, 달성하고자 하는 모든 대상(프로덕트 등)을 포함합니다.
+ * Objective
  */
 export interface Objective {
   id: string;
   userId: string;
-  type: ObjectiveType; // ✅ 'persona' 또는 'product'
+  type: ObjectiveType;
   title: string;
   description?: string;
-  objectiveGoals?: string; // personaGoals -> objectiveGoals
+  objectiveGoals?: string;
   coverImageUri?: string;
   avatarImageUri?: string;
   icon?: string;
@@ -69,23 +68,20 @@ export interface Objective {
 }
 
 /**
- * ✅ [추가] Gap
- * Objective의 '이상'과 '현실' 사이의 격차를 정의합니다.
- * 예: (목표) SAT 점수, (이상) 1550, (현실) 1300
+ * Gap
  */
 export interface Gap {
   id: string;
-  objectiveId: string; // 어떤 Objective에 속한 Gap인지
-  title: string; // 이 Gap의 이름 (예: SAT 점수, 월간 활성 사용자 수)
-  idealState: string; // 이상적인 상태/수치
-  currentState: string; // 현재 상태/수치
-  problemIds: string[]; // 이 Gap을 해결하기 위해 생성된 문제들
+  objectiveId: string;
+  title: string;
+  idealState: string;
+  currentState: string;
+  problemIds: string[];
   createdAt: Date;
 }
 
 /**
- * ✅ [변경] WeeklyProblem
- * personaId -> objectiveId
+ * WeeklyProblem
  */
 export interface WeeklyProblem {
   id: string;
@@ -97,12 +93,11 @@ export interface WeeklyProblem {
 }
 
 /**
- * ✅ [변경] Problem
- * personaId -> objectiveId
+ * Problem
  */
 export interface Problem {
   id: string;
-  objectiveId: string; // 👩‍💻
+  objectiveId: string;
   title: string;
   description?: string;
   status: ProblemStatus;
@@ -119,7 +114,7 @@ export interface Problem {
 }
 
 /**
- * BaseThreadItem: 모든 스레드 아이템의 공통 속성을 정의하는 기본 타입
+ * BaseThreadItem
  */
 export interface BaseThreadItem {
   id: string;

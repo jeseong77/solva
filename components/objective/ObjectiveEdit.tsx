@@ -2,10 +2,10 @@
 
 import { pickAndSaveImage } from "@/lib/imageUtils";
 import { useAppStore } from "@/store/store";
-import { Objective, ObjectiveType } from "@/types";
+import { Gap, Objective, ObjectiveType } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,46 +25,28 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import GapList from "./GapList";
 
-const FormRow = ({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  multiline = false,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  multiline?: boolean;
-}) => (
-  <View style={styles.formRow}>
-    <Text style={styles.label}>{label}</Text>
-    <TextInput
-      style={styles.input}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor="#adb5bd"
-      multiline={multiline}
-    />
-  </View>
-);
-
 export default function ObjectiveEdit() {
   const router = useRouter();
   const { objectiveId } = useLocalSearchParams<{ objectiveId?: string }>();
   const isEditMode = !!objectiveId;
 
-  const { getObjectiveById, addObjective, updateObjective, fetchGaps } =
-    useAppStore(
-      useShallow((state) => ({
-        getObjectiveById: state.getObjectiveById,
-        addObjective: state.addObjective,
-        updateObjective: state.updateObjective,
-        fetchGaps: state.fetchGaps,
-      }))
-    );
+  const {
+    getObjectiveById,
+    addObjective,
+    updateObjective,
+    fetchGaps,
+    addGap,
+    allGaps,
+  } = useAppStore(
+    useShallow((state) => ({
+      getObjectiveById: state.getObjectiveById,
+      addObjective: state.addObjective,
+      updateObjective: state.updateObjective,
+      fetchGaps: state.fetchGaps,
+      addGap: state.addGap,
+      allGaps: state.gaps,
+    }))
+  );
 
   // --- 상태 관리 ---
   const [title, setTitle] = useState("");
@@ -76,6 +58,8 @@ export default function ObjectiveEdit() {
   const [isLoading, setIsLoading] = useState(isEditMode);
   const [isSaving, setIsSaving] = useState(false);
   const [isCoverViewerVisible, setCoverViewerVisible] = useState(false);
+  // ✅ [추가] 생성 모드에서 Gaps를 임시 저장할 로컬 상태
+  const [localGaps, setLocalGaps] = useState<Partial<Gap>[]>([]);
 
   // --- 데이터 로딩 ---
   useFocusEffect(
@@ -95,10 +79,26 @@ export default function ObjectiveEdit() {
           if (router.canGoBack()) router.back();
         }
       } else {
+        // 생성 모드 진입 시 모든 상태 초기화
+        setTitle("");
+        setDescription("");
+        setObjectiveGoals("");
+        setCoverImageUri(undefined);
+        setAvatarImageUri(undefined);
         setType("persona");
+        setLocalGaps([]);
       }
       setIsLoading(false);
     }, [objectiveId, isEditMode, getObjectiveById, fetchGaps])
+  );
+
+  // ✅ [추가] 화면에 표시될 Gaps 목록 (수정 모드에서는 스토어, 생성 모드에서는 로컬 상태)
+  const gapsToDisplay = useMemo(
+    () =>
+      isEditMode
+        ? allGaps.filter((g) => g.objectiveId === objectiveId)
+        : localGaps,
+    [allGaps, objectiveId, isEditMode, localGaps]
   );
 
   // --- 핸들러 ---
@@ -116,7 +116,7 @@ export default function ObjectiveEdit() {
       return;
     }
     setIsSaving(true);
-    let result: Objective | null = null;
+
     const commonData = {
       type,
       title: title.trim(),
@@ -125,16 +125,30 @@ export default function ObjectiveEdit() {
       coverImageUri,
       avatarImageUri,
     };
+    let objectiveResult: Objective | null = null;
+
     if (isEditMode && objectiveId) {
       const original = getObjectiveById(objectiveId);
       if (original)
-        result = await updateObjective({ ...original, ...commonData });
+        objectiveResult = await updateObjective({ ...original, ...commonData });
     } else {
-      result = await addObjective(commonData);
+      objectiveResult = await addObjective(commonData);
+      // ✅ 생성 모드일 때, Objective 저장 후 로컬 Gaps를 DB에 저장
+      if (objectiveResult) {
+        for (const gap of localGaps) {
+          await addGap({
+            objectiveId: objectiveResult.id,
+            title: gap.title || "",
+            idealState: gap.idealState || "",
+            currentState: gap.currentState || "",
+          });
+        }
+      }
     }
+
     setIsSaving(false);
-    if (result) {
-      Alert.alert("성공", `"${result.title}" 목표가 저장되었습니다.`);
+    if (objectiveResult) {
+      Alert.alert("성공", `"${objectiveResult.title}" 목표가 저장되었습니다.`);
       if (router.canGoBack()) router.back();
     } else {
       Alert.alert("오류", "저장에 실패했습니다.");
@@ -217,76 +231,85 @@ export default function ObjectiveEdit() {
             </TouchableOpacity>
           </View>
 
+          {/* ✅ [변경] 타입 선택 UI 로직 수정 */}
           <View style={styles.typeSelectorContainer}>
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                type === "persona" && styles.typeButtonSelected,
-              ]}
-              onPress={() => setType("persona")}
-              disabled={isEditMode}
-            >
-              <Text
-                style={[
-                  styles.typeButtonText,
-                  type === "persona" && styles.typeButtonTextSelected,
-                ]}
-              >
-                페르소나 (인물)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                type === "product" && styles.typeButtonSelected,
-              ]}
-              onPress={() => setType("product")}
-              disabled={isEditMode}
-            >
-              <Text
-                style={[
-                  styles.typeButtonText,
-                  type === "product" && styles.typeButtonTextSelected,
-                ]}
-              >
-                프로덕트 (사물)
-              </Text>
-            </TouchableOpacity>
+            {isEditMode ? (
+              <View style={[styles.typeButton, styles.typeButtonSelected]}>
+                <Text style={styles.typeButtonTextSelected}>
+                  {type === "persona" ? "페르소나" : "프로덕트"}
+                </Text>
+              </View>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    type === "persona" && styles.typeButtonSelected,
+                  ]}
+                  onPress={() => setType("persona")}
+                >
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      type === "persona" && styles.typeButtonTextSelected,
+                    ]}
+                  >
+                    페르소나
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.typeButton,
+                    type === "product" && styles.typeButtonSelected,
+                  ]}
+                  onPress={() => setType("product")}
+                >
+                  <Text
+                    style={[
+                      styles.typeButtonText,
+                      type === "product" && styles.typeButtonTextSelected,
+                    ]}
+                  >
+                    프로덕트
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
-          <View style={styles.formContainer}>
-            <FormRow
-              label="이름"
-              value={title}
-              onChangeText={setTitle}
-              placeholder="목표의 이름을 입력하세요"
-            />
-            <FormRow
-              label="소개"
-              value={description}
-              onChangeText={setDescription}
-              placeholder="이 목표를 한 문장으로 설명하세요"
-              multiline
-            />
-            <FormRow
-              label="궁극적 목표"
-              value={objectiveGoals}
-              onChangeText={setObjectiveGoals}
-              placeholder="이 목표를 통해 이루고 싶은 궁극적인 모습"
-              multiline
-            />
-          </View>
-
-          {isEditMode && objectiveId && (
-            <View style={styles.gapSection}>
-              <Text style={styles.sectionTitle}>이상과 현실 (Gaps)</Text>
-              <Text style={styles.sectionDescription}>
-                현재 목표의 이상적인 상태와 현실을 비교하여 그 차이(Gap)를
-                정의하세요. 이 차이가 해결해야 할 문제가 됩니다.
-              </Text>
-              <GapList objectiveId={objectiveId} />
+          {/* ✅ [변경] FormRow를 중앙 정렬 TextInput으로 변경 */}
+          <View style={styles.formWrapper}>
+            <View style={styles.formContainer}>
+              <TextInput
+                style={styles.titleInput}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="이름"
+                placeholderTextColor="#adb5bd"
+              />
+              <TextInput
+                style={styles.descriptionInput}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="소개"
+                placeholderTextColor="#adb5bd"
+                multiline
+              />
             </View>
-          )}
+          </View>
+
+          {/* ✅ [변경] Gap 리스트 섹션을 항상 표시 */}
+          <View style={styles.gapSection}>
+            <Text style={styles.sectionDescription}>
+              목표의 이상적인 상태와 현실을 정의하여 그 차이를 명확히 하세요. 이
+              차이가 당신이 해결해야 할 '문제'가 됩니다.
+            </Text>
+            <GapList
+              objectiveId={objectiveId}
+              gaps={gapsToDisplay}
+              setGaps={setLocalGaps}
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -374,7 +397,7 @@ const styles = StyleSheet.create({
   typeSelectorContainer: {
     flexDirection: "row",
     justifyContent: "center",
-    paddingVertical: 24,
+    paddingTop: 16,
   },
   typeButton: {
     paddingHorizontal: 20,
@@ -394,26 +417,34 @@ const styles = StyleSheet.create({
   typeButtonTextSelected: {
     color: "#ffffff",
   },
-  formContainer: { paddingHorizontal: 16 },
-  formRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f3f5",
+  formWrapper: {
+    marginTop: 16,
+    paddingBottom: 16,
   },
-  label: { width: 80, fontSize: 16, color: "#495057", paddingTop: 10 },
-  input: {
-    flex: 1,
-    fontSize: 16,
+  formContainer: {
+    width: "100%",
+    alignItems: "center", // 자식 요소를 중앙 정렬
+  },
+  // ✅ [변경] 중앙 정렬된 이름 입력 스타일
+  titleInput: {
+    fontSize: 28,
+    fontWeight: "bold",
     color: "#212529",
-    paddingVertical: 10,
-    lineHeight: 24, // ✅ 울렁임 현상 방지를 위해 줄 높이 고정
+    textAlign: "center",
+    paddingHorizontal: 24,
+  },
+  // ✅ [변경] 중앙 정렬된 소개 입력 스타일
+  descriptionInput: {
+    fontSize: 16,
+    color: "#495057",
+    textAlign: "center",
+    paddingHorizontal: 24,
+    lineHeight: 24,
   },
   gapSection: {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 8,
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
     borderTopColor: "#f1f3f5",
   },
   sectionTitle: {
