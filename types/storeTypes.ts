@@ -4,10 +4,9 @@ import {
   ActionThreadItem,
   ActiveSession,
   BaseThreadItem,
-  BottleneckThreadItem,
-  Objective, // ✅ Persona -> Objective
-  ObjectiveType, // ✅ ObjectiveType 추가
-  Gap, // ✅ Gap 추가
+  BottleneckThreadItem, // ✅ ObjectiveType 추가
+  Gap,
+  Objective, // ✅ Gap 추가
   Priority,
   Problem,
   ProblemStatus,
@@ -45,7 +44,7 @@ export interface ObjectiveSlice {
   isLoadingObjectives: boolean;
   fetchObjectives: () => Promise<void>;
   addObjective: (
-    objectiveData: Omit<Objective, "id" | "userId" | "createdAt" | "problemIds">
+    objectiveData: Omit<Objective, "id" | "userId" | "createdAt">
   ) => Promise<Objective | null>;
   updateObjective: (objectiveToUpdate: Objective) => Promise<Objective | null>;
   deleteObjective: (objectiveId: string) => Promise<boolean>;
@@ -57,36 +56,28 @@ export interface GapSlice {
   gaps: Gap[];
   isLoadingGaps: boolean;
   fetchGaps: (objectiveId: string) => Promise<void>;
-  addGap: (
-    gapData: Omit<Gap, "id" | "createdAt" | "problemIds">
-  ) => Promise<Gap | null>;
+  addGap: (gapData: Omit<Gap, "id" | "createdAt">) => Promise<Gap | null>;
   updateGap: (gapToUpdate: Gap) => Promise<Gap | null>;
   deleteGap: (gapId: string) => Promise<boolean>;
   getGapById: (id: string) => Gap | undefined;
 }
+
+type AddProblemData = Pick<Problem, "title" | "objectiveId"> & {
+  gapId?: string | null;
+  description?: string;
+  status?: ProblemStatus;
+  priority?: Priority;
+  urgency?: number;
+  importance?: number;
+  tags?: string[];
+};
 
 export interface ProblemSlice {
   problems: Problem[];
   isLoadingProblems: boolean;
   // ✅ [변경] personaId -> objectiveId
   fetchProblems: (objectiveId?: string) => Promise<void>;
-  addProblem: (
-    problemData: Omit<
-      Problem,
-      | "id"
-      | "createdAt"
-      | "childThreadIds"
-      | "timeSpent"
-      | "status"
-      | "priority"
-      | "starReportId"
-      | "resolvedAt"
-      | "archivedAt"
-    > & {
-      status?: ProblemStatus;
-      priority?: Priority;
-    }
-  ) => Promise<Problem | null>;
+  addProblem: (problemData: AddProblemData) => Promise<Problem | null>;
   updateProblem: (problemToUpdate: Problem) => Promise<Problem | null>;
   deleteProblem: (problemId: string) => Promise<boolean>;
   getProblemById: (id: string) => Problem | undefined;

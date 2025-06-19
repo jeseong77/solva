@@ -1,58 +1,48 @@
 // components/objective/GapList.tsx
 
 import { useAppStore } from "@/store/store";
-import { Gap } from "@/types";
+import { Gap, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
   Alert,
-  Platform,
   KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import Modal from "react-native-modal";
 import { useShallow } from "zustand/react/shallow";
 
-// ✅ [변경] onLongPress 핸들러를 props로 받도록 수정
+// --- 타입 정의 ---
+
+interface GapListProps {
+  objectiveId?: string;
+  gaps: (Partial<Gap> & { tempId?: string })[];
+  setGaps: React.Dispatch<React.SetStateAction<GapListProps["gaps"]>>;
+  problems: (Partial<Problem> & { tempId?: string })[];
+  setProblems: React.Dispatch<React.SetStateAction<GapListProps["problems"]>>;
+}
+
+// ✅ [수정] linkedProblems의 타입을 바로잡았습니다.
+interface GapListItemProps {
+  gap: Partial<Gap> & { tempId?: string };
+  linkedProblems: (Partial<Problem> & { tempId?: string })[];
+  onEdit: () => void;
+  onAddProblem: () => void;
+}
+
 const GapListItem = ({
   gap,
-  objectiveId,
-  onLongPress,
-}: {
-  gap: Partial<Gap>;
-  objectiveId?: string;
-  onLongPress: () => void;
-}) => {
-  const router = useRouter();
-  const allProblems = useAppStore(useShallow((state) => state.problems));
-
-  const linkedProblems = useMemo(() => {
-    if (!gap.problemIds || gap.problemIds.length === 0) return [];
-    return allProblems.filter((p) => gap.problemIds!.includes(p.id));
-  }, [allProblems, gap.problemIds]);
-
-  const handleAddProblem = () => {
-    if (!objectiveId || !gap.id || gap.id.startsWith("temp_")) {
-      Alert.alert(
-        "알림",
-        "먼저 목표와 Gap을 저장해야 문제를 추가할 수 있습니다."
-      );
-      return;
-    }
-    router.push({
-      pathname: "/problem/create",
-      params: { objectiveId, gapId: gap.id },
-    });
-  };
-
+  linkedProblems,
+  onEdit,
+  onAddProblem,
+}: GapListItemProps) => {
   return (
-    // ✅ [변경] 길게 누르기 이벤트를 위해 TouchableOpacity로 감쌈
-    <TouchableOpacity onLongPress={onLongPress} delayLongPress={200}>
+    <TouchableOpacity onLongPress={onEdit} delayLongPress={200}>
       <View style={styles.gapItemContainer}>
         <Text style={styles.gapTitle}>{gap.title}</Text>
         <View style={styles.gapDetailsRow}>
@@ -77,7 +67,7 @@ const GapListItem = ({
           <Text style={styles.problemLabel}>원인 문제들</Text>
           {linkedProblems.length > 0 ? (
             linkedProblems.map((p) => (
-              <Text key={p.id} style={styles.problemText}>
+              <Text key={p.id || p.tempId} style={styles.problemText}>
                 - {p.title}
               </Text>
             ))
@@ -88,7 +78,7 @@ const GapListItem = ({
           )}
           <TouchableOpacity
             style={styles.addProblemButton}
-            onPress={handleAddProblem}
+            onPress={onAddProblem}
           >
             <Feather name="plus" size={16} color="#007AFF" />
             <Text style={styles.addProblemButtonText}>문제 정의하기</Text>
@@ -99,106 +89,167 @@ const GapListItem = ({
   );
 };
 
-interface GapListProps {
-  objectiveId?: string;
-  gaps: Partial<Gap>[];
-  setGaps: React.Dispatch<React.SetStateAction<Partial<Gap>[]>>;
-}
-
-export default function GapList({ objectiveId, gaps, setGaps }: GapListProps) {
-  // ✅ [변경] updateGap 액션을 스토어에서 가져옵니다.
-  const { addGap, updateGap } = useAppStore(
+export default function GapList({
+  objectiveId,
+  gaps,
+  setGaps,
+  problems,
+  setProblems,
+}: GapListProps) {
+  const { addGap, updateGap, addProblem } = useAppStore(
     useShallow((state) => ({
       addGap: state.addGap,
       updateGap: state.updateGap,
+      addProblem: state.addProblem,
     }))
   );
 
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [title, setTitle] = useState("");
+  // Gap 추가/수정 모달 상태
+  const [isGapModalVisible, setGapModalVisible] = useState(false);
+  const [editingGap, setEditingGap] = useState<
+    (Partial<Gap> & { tempId?: string }) | null
+  >(null);
+  const [gapTitle, setGapTitle] = useState("");
   const [idealState, setIdealState] = useState("");
   const [currentState, setCurrentState] = useState("");
-  // ✅ [추가] 현재 수정 중인 Gap 객체를 저장할 상태
-  const [editingGap, setEditingGap] = useState<Partial<Gap> | null>(null);
 
-  const handleOpenAddModal = () => {
-    setEditingGap(null); // 수정 모드가 아님을 명시
-    setTitle("");
+  // Problem 추가 모달 상태
+  const [isProblemModalVisible, setProblemModalVisible] = useState(false);
+  const [problemTitle, setProblemTitle] = useState("");
+  const [problemDescription, setProblemDescription] = useState("");
+  const [currentGapId, setCurrentGapId] = useState<string | null>(null);
+
+  // --- Gap 모달 핸들러 ---
+  const handleOpenAddGapModal = () => {
+    setEditingGap(null);
+    setGapTitle("");
     setIdealState("");
     setCurrentState("");
-    setModalVisible(true);
+    setGapModalVisible(true);
   };
 
-  // ✅ [추가] 수정 모달을 여는 핸들러
-  const handleOpenEditModal = (gapToEdit: Partial<Gap>) => {
-    setEditingGap(gapToEdit); // 수정할 Gap을 상태에 저장
-    setTitle(gapToEdit.title || "");
+  const handleOpenEditGapModal = (
+    gapToEdit: Partial<Gap> & { tempId?: string }
+  ) => {
+    setEditingGap(gapToEdit);
+    setGapTitle(gapToEdit.title || "");
     setIdealState(gapToEdit.idealState || "");
     setCurrentState(gapToEdit.currentState || "");
-    setModalVisible(true);
+    setGapModalVisible(true);
   };
 
-  const handleCloseModal = () => {
-    setModalVisible(false);
-    setEditingGap(null); // 모달이 닫히면 수정 상태도 초기화
+  const handleCloseGapModal = () => {
+    setGapModalVisible(false);
+    setEditingGap(null);
   };
 
-  // ✅ [변경] handleAddGap -> handleSaveGap으로 변경하여 생성과 수정을 모두 처리
-  const handleSaveGap = async () => {
-    if (!title.trim() || !idealState.trim() || !currentState.trim()) {
-      Alert.alert("입력 필요", "모든 필드를 입력해주세요.");
+  const handleSaveGap = () => {
+    if (!gapTitle.trim()) {
+      Alert.alert("입력 필요", "Gap 이름을 입력해주세요.");
       return;
     }
 
     const gapData = {
-      title: title.trim(),
+      title: gapTitle.trim(),
       idealState: idealState.trim(),
       currentState: currentState.trim(),
     };
 
-    // 수정 모드일 경우
     if (editingGap) {
-      // 수정 모드에서는 로컬 상태를 직접 수정하지 않고, DB 업데이트 후 스토어를 통해 자동 반영됨
-      await updateGap({ ...editingGap, ...gapData } as Gap);
-    }
-    // 생성 모드일 경우
-    else {
-      if (objectiveId) {
-        // Objective가 DB에 저장된 경우
-        await addGap({ objectiveId, ...gapData });
-      } else {
-        // Objective가 아직 저장되지 않은 경우 (로컬 상태만 업데이트)
-        setGaps((prev) => [
-          ...prev,
-          { id: `temp_${Date.now()}`, problemIds: [], ...gapData },
-        ]);
-      }
+      setGaps((prev) =>
+        prev.map((g) =>
+          g.id === editingGap.id || g.tempId === editingGap.tempId
+            ? { ...g, ...gapData }
+            : g
+        )
+      );
+    } else {
+      const newGap = {
+        tempId: `temp_gap_${Date.now()}`,
+        ...gapData,
+      };
+      setGaps((prev) => [...prev, newGap]);
     }
 
-    handleCloseModal();
+    handleCloseGapModal();
   };
 
+  // --- Problem 모달 핸들러 ---
+  const handleOpenProblemModal = (gapId: string | undefined) => {
+    if (!gapId) {
+      Alert.alert("오류", "Gap 정보가 올바르지 않습니다.");
+      return;
+    }
+    setCurrentGapId(gapId);
+    setProblemTitle("");
+    setProblemDescription("");
+    setProblemModalVisible(true);
+  };
+
+  const handleCloseProblemModal = () => {
+    setProblemModalVisible(false);
+    setCurrentGapId(null);
+  };
+
+  const handleSaveProblem = () => {
+    if (!problemTitle.trim()) {
+      Alert.alert("입력 필요", "문제의 제목을 입력해주세요.");
+      return;
+    }
+    if (!objectiveId) {
+      Alert.alert(
+        "오류",
+        "먼저 목표를 저장해야 합니다. (개발자 참고: objectiveId 없음)"
+      );
+      return;
+    }
+
+    const newProblem = {
+      tempId: `temp_problem_${Date.now()}`,
+      title: problemTitle.trim(),
+      description: problemDescription.trim(),
+      objectiveId: objectiveId,
+      gapId: currentGapId,
+    };
+
+    setProblems((prev) => [...prev, newProblem]);
+
+    handleCloseProblemModal();
+  };
+
+  // --- 렌더링 ---
   return (
     <View>
-      {gaps.map((gap) => (
-        <GapListItem
-          key={gap.id}
-          gap={gap}
-          objectiveId={objectiveId}
-          // ✅ [변경] onLongPress 핸들러 연결
-          onLongPress={() => handleOpenEditModal(gap)}
-        />
-      ))}
+      {gaps.map((gap) => {
+        const linkedProblems = problems.filter(
+          (p) => p.gapId && (p.gapId === gap.id || p.gapId === gap.tempId)
+        );
+        const id = gap.id || gap.tempId;
 
-      <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
+        return (
+          <GapListItem
+            key={id}
+            gap={gap}
+            linkedProblems={linkedProblems}
+            onEdit={() => handleOpenEditGapModal(gap)}
+            onAddProblem={() => handleOpenProblemModal(id)}
+          />
+        );
+      })}
+
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={handleOpenAddGapModal}
+      >
         <Feather name="plus-circle" size={20} color="#2b8a3e" />
         <Text style={styles.addButtonText}>새로운 Gap 정의하기</Text>
       </TouchableOpacity>
 
+      {/* Gap 추가/수정 모달 */}
       <Modal
-        isVisible={isModalVisible}
-        onBackdropPress={handleCloseModal}
-        onBackButtonPress={handleCloseModal}
+        isVisible={isGapModalVisible}
+        onBackdropPress={handleCloseGapModal}
+        onBackButtonPress={handleCloseGapModal}
         avoidKeyboard
         style={styles.modal}
       >
@@ -206,38 +257,67 @@ export default function GapList({ objectiveId, gaps, setGaps }: GapListProps) {
           behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <View style={styles.modalContent}>
-            {/* ✅ [변경] 모달 제목을 동적으로 변경 */}
             <Text style={styles.modalTitle}>
               {editingGap ? "Gap 수정" : "새로운 Gap 정의"}
             </Text>
-            <Text style={styles.modalDescription}>
-              '이상'과 '현재'의 차이를 정의하여 해결할 문제를 명확히 합니다.
-            </Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Gap 이름 (예: 영어 실력, 프로젝트 수익)"
-              value={title}
-              onChangeText={setTitle}
+              placeholder="Gap 이름 (예: 영어 실력)"
+              value={gapTitle}
+              onChangeText={setGapTitle}
             />
             <TextInput
               style={styles.modalInput}
               placeholder="이상적인 상태 (예: 원어민과 편하게 대화)"
               value={idealState}
               onChangeText={setIdealState}
-              multiline
             />
             <TextInput
               style={styles.modalInput}
               placeholder="현재 상태 (예: 간단한 자기소개만 가능)"
               value={currentState}
               onChangeText={setCurrentState}
-              multiline
             />
             <TouchableOpacity style={styles.saveButton} onPress={handleSaveGap}>
-              {/* ✅ [변경] 저장 버튼 텍스트를 동적으로 변경 */}
               <Text style={styles.saveButtonText}>
                 {editingGap ? "변경사항 저장" : "Gap 추가"}
               </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Problem 추가 모달 */}
+      <Modal
+        isVisible={isProblemModalVisible}
+        onBackdropPress={handleCloseProblemModal}
+        onBackButtonPress={handleCloseProblemModal}
+        avoidKeyboard
+        style={styles.modal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>새로운 문제 정의</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="문제 제목 (예: 어휘력 부족)"
+              value={problemTitle}
+              onChangeText={setProblemTitle}
+            />
+            <TextInput
+              style={[styles.modalInput, { height: 100 }]}
+              placeholder="문제에 대한 간단한 설명 (선택 사항)"
+              value={problemDescription}
+              onChangeText={setProblemDescription}
+              multiline
+            />
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSaveProblem}
+            >
+              <Text style={styles.saveButtonText}>문제 추가</Text>
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -246,7 +326,7 @@ export default function GapList({ objectiveId, gaps, setGaps }: GapListProps) {
   );
 }
 
-// ✅ [추가] 생략되었던 전체 스타일시트
+// 전체 스타일시트
 const styles = StyleSheet.create({
   gapItemContainer: {
     backgroundColor: "#ffffff",
@@ -349,7 +429,7 @@ const styles = StyleSheet.create({
     padding: 22,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    paddingBottom: 40, // 키보드와 관계없이 하단 여백 확보
+    paddingBottom: 40,
   },
   modalTitle: {
     fontSize: 18,

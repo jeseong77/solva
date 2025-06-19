@@ -27,7 +27,6 @@ const parseObjectiveFromDB = (dbItem: any): Objective => ({
     dbItem.avatarImageUri === null ? undefined : dbItem.avatarImageUri,
   icon: dbItem.icon === null ? undefined : dbItem.icon,
   color: dbItem.color === null ? undefined : dbItem.color,
-  problemIds: dbItem.problemIds ? JSON.parse(dbItem.problemIds) : [],
   createdAt: new Date(dbItem.createdAt),
   order: dbItem.order === null ? undefined : dbItem.order,
 });
@@ -63,7 +62,7 @@ export const createObjectiveSlice: StateCreator<
   // ✅ [변경] addPersona -> addObjective
   // Omit을 사용하여 id, problemIds 등 서버에서 생성할 필드를 제외
   addObjective: async (
-    objectiveData: Omit<Objective, "id" | "userId" | "problemIds" | "createdAt">
+    objectiveData: Omit<Objective, "id" | "userId" | "createdAt">
   ) => {
     const currentUser = get().user;
     if (!currentUser) {
@@ -82,7 +81,6 @@ export const createObjectiveSlice: StateCreator<
       avatarImageUri: objectiveData.avatarImageUri,
       icon: objectiveData.icon,
       color: objectiveData.color,
-      problemIds: [],
       createdAt: new Date(),
       order: objectiveData.order,
     };
@@ -90,9 +88,8 @@ export const createObjectiveSlice: StateCreator<
     try {
       const db = await getDatabase();
       await db.runAsync(
-        // ✅ SQL 쿼리 및 파라미터 수정
-        `INSERT INTO Objectives (id, userId, type, title, description, objectiveGoals, coverImageUri, avatarImageUri, icon, color, problemIds, createdAt, "order")
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO Objectives (id, userId, type, title, description, objectiveGoals, coverImageUri, avatarImageUri, icon, color, createdAt, "order")
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           newObjective.id,
           newObjective.userId,
@@ -104,7 +101,6 @@ export const createObjectiveSlice: StateCreator<
           newObjective.avatarImageUri ?? null,
           newObjective.icon ?? null,
           newObjective.color ?? null,
-          JSON.stringify(newObjective.problemIds),
           newObjective.createdAt.toISOString(),
           newObjective.order ?? null,
         ]
@@ -136,18 +132,17 @@ export const createObjectiveSlice: StateCreator<
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE Objectives SET type = ?, title = ?, description = ?, objectiveGoals = ?, coverImageUri = ?, avatarImageUri = ?, icon = ?, color = ?, problemIds = ?, "order" = ?
+        `UPDATE Objectives SET type = ?, title = ?, description = ?, objectiveGoals = ?, coverImageUri = ?, avatarImageUri = ?, icon = ?, color = ?, "order" = ?
            WHERE id = ?;`,
         [
-          objectiveToUpdate.type, // ✅ type 업데이트 추가
+          objectiveToUpdate.type,
           objectiveToUpdate.title,
           objectiveToUpdate.description ?? null,
-          objectiveToUpdate.objectiveGoals ?? null, // ✅ 이름 변경
+          objectiveToUpdate.objectiveGoals ?? null,
           objectiveToUpdate.coverImageUri ?? null,
           objectiveToUpdate.avatarImageUri ?? null,
           objectiveToUpdate.icon ?? null,
           objectiveToUpdate.color ?? null,
-          JSON.stringify(objectiveToUpdate.problemIds || []),
           objectiveToUpdate.order ?? null,
           objectiveToUpdate.id,
         ]

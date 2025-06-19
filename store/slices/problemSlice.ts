@@ -13,7 +13,8 @@ import { StateCreator } from "zustand";
 // ✅ [변경] Problem 타입에 맞춰 DB 데이터 파싱
 const parseProblemFromDB = (dbItem: any): Problem => ({
   id: dbItem.id,
-  objectiveId: dbItem.objectiveId, // ✅ personaId -> objectiveId
+  objectiveId: dbItem.objectiveId,
+  gapId: dbItem.gapId === null ? undefined : dbItem.gapId,
   title: dbItem.title,
   description: dbItem.description === null ? undefined : dbItem.description,
   status: dbItem.status as ProblemStatus,
@@ -97,7 +98,8 @@ export const createProblemSlice: StateCreator<
   addProblem: async (problemData) => {
     const newProblem: Problem = {
       id: uuidv4(),
-      objectiveId: problemData.objectiveId, // ✅ personaId -> objectiveId
+      objectiveId: problemData.objectiveId,
+      gapId: problemData.gapId,
       title: problemData.title,
       description: problemData.description,
       status: problemData.status || "active",
@@ -110,42 +112,33 @@ export const createProblemSlice: StateCreator<
       createdAt: new Date(),
     };
 
+    // ✅ 디버깅을 위한 SQL 로그 추가
+    const sql = `INSERT INTO Problems (id, objectiveId, gapId, title, description, status, priority, urgency, importance, tags, childThreadIds, timeSpent, createdAt, resolvedAt, archivedAt, starReportId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`;
+
+    console.log("[ProblemSlice] EXECUTING SQL:", sql);
+
     try {
       const db = await getDatabase();
-      await db.runAsync(
-        // ✅ personaId -> objectiveId
-        `INSERT INTO Problems (id, objectiveId, title, description, status, priority, urgency, importance, tags, childThreadIds, timeSpent, createdAt, resolvedAt, archivedAt, starReportId)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-        [
-          newProblem.id,
-          newProblem.objectiveId, // ✅ personaId -> objectiveId
-          newProblem.title,
-          newProblem.description ?? null,
-          newProblem.status,
-          newProblem.priority,
-          newProblem.urgency ?? null,
-          newProblem.importance ?? null,
-          JSON.stringify(newProblem.tags),
-          JSON.stringify(newProblem.childThreadIds),
-          newProblem.timeSpent,
-          newProblem.createdAt.toISOString(),
-          newProblem.resolvedAt?.toISOString() ?? null,
-          newProblem.archivedAt?.toISOString() ?? null,
-          newProblem.starReportId ?? null,
-        ]
-      );
-
-      // ✅ [변경] 부모 Objective의 problemIds 배열에 새 Problem ID 추가
-      const parentObjective = get().objectives.find(
-        (obj) => obj.id === newProblem.objectiveId
-      );
-      if (parentObjective) {
-        const updatedParentObjective = {
-          ...parentObjective,
-          problemIds: [...parentObjective.problemIds, newProblem.id],
-        };
-        await get().updateObjective(updatedParentObjective); // ✅ updatePersona -> updateObjective
-      }
+      // ✅ 변수로 받은 sql을 실행
+      await db.runAsync(sql, [
+        newProblem.id,
+        newProblem.objectiveId,
+        newProblem.gapId ?? null,
+        newProblem.title,
+        newProblem.description ?? null,
+        newProblem.status,
+        newProblem.priority,
+        newProblem.urgency ?? null,
+        newProblem.importance ?? null,
+        JSON.stringify(newProblem.tags),
+        JSON.stringify(newProblem.childThreadIds),
+        newProblem.timeSpent,
+        newProblem.createdAt.toISOString(),
+        newProblem.resolvedAt?.toISOString() ?? null,
+        newProblem.archivedAt?.toISOString() ?? null,
+        newProblem.starReportId ?? null,
+      ]);
 
       const newProblemList = [...get().problems, newProblem].sort(sortProblems);
       set({ problems: newProblemList });
@@ -169,8 +162,8 @@ export const createProblemSlice: StateCreator<
       const db = await getDatabase();
       await db.runAsync(
         `UPDATE Problems 
-         SET title = ?, description = ?, status = ?, priority = ?, urgency = ?, importance = ?, tags = ?, childThreadIds = ?, timeSpent = ?, resolvedAt = ?, archivedAt = ?, starReportId = ?
-         WHERE id = ?;`,
+          SET title = ?, description = ?, status = ?, priority = ?, urgency = ?, importance = ?, tags = ?, childThreadIds = ?, timeSpent = ?, resolvedAt = ?, archivedAt = ?, starReportId = ?, gapId = ?
+          WHERE id = ?;`,
         [
           problemToUpdate.title,
           problemToUpdate.description ?? null,
@@ -184,6 +177,7 @@ export const createProblemSlice: StateCreator<
           problemToUpdate.resolvedAt?.toISOString() ?? null,
           problemToUpdate.archivedAt?.toISOString() ?? null,
           problemToUpdate.starReportId ?? null,
+          problemToUpdate.gapId ?? null, // ✅ 올바른 위치로 이동
           problemToUpdate.id,
         ]
       );
@@ -208,19 +202,6 @@ export const createProblemSlice: StateCreator<
 
     try {
       const db = await getDatabase();
-      // ✅ [변경] 부모 Objective에서 problemId 제거
-      const parentObjective = get().objectives.find(
-        (obj) => obj.id === problemToDelete.objectiveId
-      );
-      if (parentObjective) {
-        const updatedParentObjective = {
-          ...parentObjective,
-          problemIds: parentObjective.problemIds.filter(
-            (id) => id !== problemId
-          ),
-        };
-        await get().updateObjective(updatedParentObjective); // ✅ updatePersona -> updateObjective
-      }
 
       await db.runAsync(`DELETE FROM Problems WHERE id = ?;`, [problemId]);
 

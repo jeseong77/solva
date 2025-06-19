@@ -14,10 +14,8 @@ const parseGapFromDB = (dbItem: any): Gap => ({
   title: dbItem.title,
   idealState: dbItem.idealState,
   currentState: dbItem.currentState,
-  problemIds: dbItem.problemIds ? JSON.parse(dbItem.problemIds) : [],
   createdAt: new Date(dbItem.createdAt),
 });
-
 export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
   set,
   get
@@ -62,22 +60,20 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
       title: gapData.title,
       idealState: gapData.idealState,
       currentState: gapData.currentState,
-      problemIds: [],
       createdAt: new Date(),
     };
 
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `INSERT INTO Gaps (id, objectiveId, title, idealState, currentState, problemIds, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO Gaps (id, objectiveId, title, idealState, currentState, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?);`,
         [
           newGap.id,
           newGap.objectiveId,
           newGap.title,
           newGap.idealState,
           newGap.currentState,
-          JSON.stringify(newGap.problemIds),
           newGap.createdAt.toISOString(),
         ]
       );
@@ -95,13 +91,12 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
     try {
       const db = await getDatabase();
       await db.runAsync(
-        `UPDATE Gaps SET title = ?, idealState = ?, currentState = ?, problemIds = ?
+        `UPDATE Gaps SET title = ?, idealState = ?, currentState = ?
            WHERE id = ?;`,
         [
           gapToUpdate.title,
           gapToUpdate.idealState,
           gapToUpdate.currentState,
-          JSON.stringify(gapToUpdate.problemIds || []),
           gapToUpdate.id,
         ]
       );
@@ -126,7 +121,11 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
 
       set((state) => ({
         gaps: state.gaps.filter((g) => g.id !== gapId),
+        problems: state.problems.map((p) =>
+          p.gapId === gapId ? { ...p, gapId: undefined } : p
+        ),
       }));
+
       console.log("[GapSlice] Gap deleted:", gapId);
       return true;
     } catch (error) {

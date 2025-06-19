@@ -1,19 +1,13 @@
 // app/(tabs)/profile.tsx
 
-import ProfileCard from "@/components/user/ProfileCard";
 import StarReportList from "@/components/report/StarReportList";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import ProfileCard from "@/components/user/ProfileCard";
 import { useAppStore } from "@/store/store";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -76,13 +70,19 @@ export default function ProfileScreen() {
 
   const profileStats = useMemo(() => {
     if (!user) return null;
-    // ✅ [변경] userPersonas -> userObjectives
-    const userObjectives = objectives.filter((o) => o.userId === user.id);
-    const userProblemIds = new Set(userObjectives.flatMap((o) => o.problemIds));
+
+    // Dynamically derive userProblemIds
+    const userProblemIds = new Set(
+      problems
+        .filter((p) => objectives.some((o) => o.id === p.objectiveId))
+        .map((p) => p.id)
+    );
+
     const userProblems = problems.filter((p) => userProblemIds.has(p.id));
     const problemsSolved = userProblems.filter(
       (p) => p.status === "resolved"
     ).length;
+
     const totalSeconds = threadItems
       .filter((t) => userProblemIds.has(t.problemId))
       .reduce((sum, item) => {
@@ -91,13 +91,15 @@ export default function ProfileScreen() {
         }
         return sum;
       }, 0);
+
     const totalHours = totalSeconds / 3600;
-    // ✅ [변경] activePersonas -> activeObjectives
-    const activeObjectives = userObjectives.length;
+    const activeObjectives = objectives.filter(
+      (o) => o.userId === user.id
+    ).length;
     const insightsGained = threadItems.filter(
       (t) => userProblemIds.has(t.problemId) && t.type === "Insight"
     ).length;
-    // ✅ [변경] 반환 객체의 키 이름도 변경
+
     return { problemsSolved, totalHours, activeObjectives, insightsGained };
   }, [user, objectives, problems, threadItems]);
 

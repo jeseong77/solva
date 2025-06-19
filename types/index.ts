@@ -62,7 +62,6 @@ export interface Objective {
   avatarImageUri?: string;
   icon?: string;
   color?: string;
-  problemIds: string[];
   createdAt: Date;
   order?: number;
 }
@@ -76,7 +75,6 @@ export interface Gap {
   title: string;
   idealState: string;
   currentState: string;
-  problemIds: string[];
   createdAt: Date;
 }
 
@@ -98,6 +96,7 @@ export interface WeeklyProblem {
 export interface Problem {
   id: string;
   objectiveId: string;
+  gapId?: string | null; // ✅ [추가] Gap과의 선택적 관계를 위해 nullable한 gapId 추가
   title: string;
   description?: string;
   status: ProblemStatus;
