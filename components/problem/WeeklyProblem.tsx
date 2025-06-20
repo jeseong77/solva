@@ -1,3 +1,5 @@
+// components/problem/WeeklyProblemCard.tsx
+
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
@@ -34,13 +36,12 @@ const formatSeconds = (totalSeconds: number): string => {
 interface WeeklyProblemProps {
   weeklyProblem: WeeklyProblem | null | undefined;
   problem: Problem | null | undefined;
-  objective: Objective | null | undefined; // persona -> objective
+  objective: Objective | null | undefined;
   onPress: (problemId: string) => void;
   onPressNew: () => void;
   onChangeWeeklyProblem: () => void;
 }
 
-// ✅ [변경] persona -> objective
 export default function WeeklyProblemCard({
   weeklyProblem,
   problem,
@@ -54,10 +55,8 @@ export default function WeeklyProblemCard({
   const dDay = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const dayOfWeek = today.getDay();
     const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-
     if (daysUntilSunday === 0) return "D-Day";
     return `D-${daysUntilSunday}`;
   }, []);
@@ -67,23 +66,21 @@ export default function WeeklyProblemCard({
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
-
     const totalThreads = allThreadsInProblem.filter(
       (item) => item.type !== "Session"
     ).length;
-
     const taskItems = allThreadsInProblem.filter(
       (item): item is TaskThreadItem => item.type === "Task"
     );
-    const completedTasks = taskItems.filter((item) => item.isCompleted).length;
-
+    const completedTasks = taskItems.filter(
+      (item) => !!item.isCompleted
+    ).length;
     const actionItems = allThreadsInProblem.filter(
       (item): item is ActionThreadItem => item.type === "Action"
     );
     const completedActions = actionItems.filter(
       (item) => item.status === "completed"
     ).length;
-
     const sessionItems = allThreadsInProblem.filter(
       (item): item is SessionThreadItem => item.type === "Session"
     );
@@ -91,7 +88,6 @@ export default function WeeklyProblemCard({
       (sum, item) => sum + (item.timeSpent || 0),
       0
     );
-
     return {
       totalThreads,
       tasks: { completed: completedTasks, total: taskItems.length },
@@ -109,9 +105,10 @@ export default function WeeklyProblemCard({
   ) {
     return (
       <View style={styles.container}>
-        <Text style={styles.componentTitle}>이번주에 해결할 문제:</Text>
-        <TouchableOpacity style={styles.emptyCard} onPress={onPressNew}>
-          <Feather name="plus-circle" size={24} color="#adb5bd" />
+        <Text style={styles.componentTitle}>이번 주에 해결할 문제:</Text>
+        <TouchableOpacity style={styles.emptyContainer} onPress={onPressNew}>
+          {/* FIX: 아이콘을 'plus-circle'에서 'target'으로 변경 */}
+          <Feather name="target" size={24} color="#adb5bd" />
           <Text style={styles.emptyText}>
             이번 주에 해결할 문제를 설정해주세요.
           </Text>
@@ -122,66 +119,58 @@ export default function WeeklyProblemCard({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.componentTitle}>이번주에 집중할 문제:</Text>
-      <View style={styles.cardWrapper}>
-        <TouchableOpacity
-          style={styles.cardContainer}
-          onPress={() => onPress(problem.id)}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.metaText}>
-              {objective.type}/{objective.title}
-            </Text>
-            <View style={styles.dDayChip}>
-              <Text style={styles.dDayText}>{dDay}</Text>
-            </View>
-          </View>
-
-          <View style={styles.cardBody}>
-            <Text style={styles.problemTitle}>{problem.title}</Text>
-            {problem.description && (
-              <Text style={styles.problemDescription} numberOfLines={3}>
-                {problem.description}
-              </Text>
-            )}
-          </View>
-
-          {stats && (
-            <View style={styles.statsContainer}>
-              <Feather name="git-branch" size={14} color="#6c757d" />
-              <Text style={styles.statsText}>{stats.totalThreads}</Text>
-              <Text style={styles.separator}>·</Text>
-              <Feather name="check-square" size={14} color="#6c757d" />
-              <Text style={styles.statsText}>
-                {stats.tasks.completed} / {stats.tasks.total}
-              </Text>
-              <Text style={styles.separator}>·</Text>
-              <MaterialCommunityIcons
-                name="run-fast"
-                size={14}
-                color="#6c757d"
-              />
-              <Text style={styles.statsText}>
-                {stats.actions.completed} / {stats.actions.total}
-              </Text>
-              <Text style={styles.separator}>·</Text>
-              <Feather name="clock" size={14} color="#6c757d" />
-              <Text style={styles.statsText}>
-                {formatSeconds(stats.totalSessionTime)}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.changeButton}
-          onPress={onChangeWeeklyProblem}
-        >
-          {/* ✅ [수정] 아이콘 색상을 흰색으로 변경 */}
-          <Feather name="refresh-cw" size={14} color="#ffffff" />
-          <Text style={styles.changeButtonText}>주간 집중 문제 바꾸기</Text>
+      <View style={styles.header}>
+        <Text style={styles.componentTitle}>이번 주에 집중할 문제</Text>
+        <TouchableOpacity onPress={onChangeWeeklyProblem}>
+          <Text style={styles.changeButtonText}>변경</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.contentContainer}
+        onPress={() => onPress(problem.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.contentHeader}>
+          <Text style={styles.metaText}>
+            {objective.type}/{objective.title}
+          </Text>
+          <View style={styles.dDayChip}>
+            <Text style={styles.dDayText}>{dDay}</Text>
+          </View>
+        </View>
+
+        <View style={styles.contentBody}>
+          <Text style={styles.problemTitle}>{problem.title}</Text>
+          {problem.description && (
+            <Text style={styles.problemDescription} numberOfLines={3}>
+              {problem.description}
+            </Text>
+          )}
+        </View>
+
+        {stats && (
+          <View style={styles.statsContainer}>
+            <Feather name="git-branch" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>{stats.totalThreads}</Text>
+            <Text style={styles.separator}>·</Text>
+            <Feather name="check-square" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>
+              {stats.tasks.completed} / {stats.tasks.total}
+            </Text>
+            <Text style={styles.separator}>·</Text>
+            <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>
+              {stats.actions.completed} / {stats.actions.total}
+            </Text>
+            <Text style={styles.separator}>·</Text>
+            <Feather name="clock" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>
+              {formatSeconds(stats.totalSessionTime)}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -190,32 +179,28 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     paddingTop: 24,
+    paddingBottom: 12,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   componentTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#212529",
-    marginBottom: 12,
-    paddingHorizontal: 4,
   },
-  cardWrapper: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cardContainer: {
+  contentContainer: {
     backgroundColor: "#ffffff",
     padding: 16,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e9ecef",
   },
-  cardHeader: {
+  contentHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -236,7 +221,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-  cardBody: {
+  contentBody: {
     marginBottom: 16,
   },
   problemTitle: {
@@ -266,20 +251,17 @@ const styles = StyleSheet.create({
     color: "#ced4da",
     marginHorizontal: 8,
   },
-  emptyCard: {
-    backgroundColor: "#f8f9fa",
+  emptyContainer: {
+    backgroundColor: "transparent",
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
     height: 120,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1.5,
+    borderColor: "#ced4da",
+    borderStyle: "dashed",
+    marginTop: 12,
   },
   emptyText: {
     marginTop: 8,
@@ -287,22 +269,9 @@ const styles = StyleSheet.create({
     color: "#868e96",
     fontWeight: "500",
   },
-  // ✅ [수정] 변경 버튼 스타일
-  changeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14, // 패딩 조정
-    backgroundColor: "#2b8a3e", // 배경색을 녹색으로 변경
-    // 불필요한 테두리 제거
-    borderBottomLeftRadius: 11, // 부모의 borderRadius에 맞춰 조정
-    borderBottomRightRadius: 11,
-  },
-  // ✅ [수정] 변경 버튼 텍스트 스타일
   changeButtonText: {
-    marginLeft: 8,
-    fontSize: 15, // 가독성을 위해 폰트 크기 살짝 키움
-    color: "#ffffff", // 글씨를 흰색으로 변경
-    fontWeight: "bold", // 굵게 하여 강조
+    fontSize: 15,
+    color: "#40c057",
+    fontWeight: "600",
   },
 });

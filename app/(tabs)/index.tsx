@@ -25,6 +25,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SceneMap, TabBar, TabView } from "react-native-tab-view";
+import Toast from "react-native-toast-message";
 import { useShallow } from "zustand/react/shallow";
 
 const getWeekIdentifier = (date: Date): string => {
@@ -201,7 +202,12 @@ export default function HomeScreen() {
           onPress: async () => {
             const success = await deleteObjective(objectiveId);
             if (success) {
-              Alert.alert("성공", "목표가 삭제되었습니다.");
+              Toast.show({
+                text1: "삭제 완료",
+                text2: `"${title}" 목표가 삭제되었습니다.`,
+                position: "top",
+                visibilityTime: 2000,
+              });
             } else {
               Alert.alert("오류", "목표 삭제에 실패했습니다.");
             }
@@ -273,7 +279,7 @@ export default function HomeScreen() {
         <>
           <SessionBox />
           <WeeklyProblemCard
-            objective={selectedObjective} // ✅ persona -> objective
+            objective={selectedObjective}
             weeklyProblem={currentWeeklyProblem}
             problem={problemForWeekly}
             onPress={handleNavigateToProblemDetail}
@@ -281,14 +287,15 @@ export default function HomeScreen() {
             onChangeWeeklyProblem={handleNavigateToSetWeeklyProblem}
           />
           <ProblemList
-            objective={selectedObjective} // ✅ persona -> objective
+            objective={selectedObjective}
             problems={activeProblems}
             onPressProblem={handleNavigateToProblemDetail}
-            onLongPressProblem={handleEditProblem}
+            onPressEdit={handleEditProblem}
+            onPressEmpty={handleCreateProblem}
           />
           {resolvedProblems.length > 0 && (
             <ResolvedProblemList
-              objective={selectedObjective} // ✅ persona -> objective
+              objective={selectedObjective}
               problems={resolvedProblems}
               onPressProblem={handleNavigateToProblemDetail}
             />

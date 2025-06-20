@@ -146,7 +146,7 @@ const ActiveSessionView = ({
           <Feather
             name={session.isPaused ? "play" : "pause"}
             size={20}
-            color="#f1f3f5"
+            color="#40c057"
           />
         </TouchableOpacity>
         <TouchableOpacity
@@ -205,7 +205,7 @@ export default function SessionBox() {
             )}
           </View>
           <View style={[styles.controlButton, styles.playButtonActive]}>
-            <Feather name="play" size={20} color="#ffffff" />
+            <Feather name="play" size={20} color="#212529" />
           </View>
         </TouchableOpacity>
       )}

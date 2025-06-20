@@ -103,7 +103,6 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     alignItems: "center",
-    marginRight: 4,
     width: 72,
   },
   addButton: {

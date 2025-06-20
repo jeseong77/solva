@@ -1,7 +1,6 @@
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
-  Objective,
   Problem,
   ProblemStatus,
   StarReport,
@@ -19,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { useShallow } from "zustand/react/shallow";
 import StarReportWrite from "../report/StarReportWrite";
 import LogSessionModal from "../session/LogSessionModal";
@@ -48,6 +48,7 @@ export default function ProblemDetail() {
     addThreadItem,
     deleteThreadItem,
     updateThreadItem,
+    deleteProblem,
     updateProblem,
     getStarReportByProblemId,
     addStarReport,
@@ -56,6 +57,7 @@ export default function ProblemDetail() {
       problems: state.problems,
       objectives: state.objectives,
       getThreadItemById: state.getThreadItemById,
+      deleteProblem: state.deleteProblem,
       threadItems: state.threadItems,
       startSession: state.startSession,
       stopSession: state.stopSession,
@@ -286,14 +288,31 @@ export default function ProblemDetail() {
           learnings: null,
         });
       }
+      // Now, ask the user what they want to do next.
       if (report) {
         Alert.alert(
           "문제 해결 완료!",
           "문제 해결 경험을 STAR 리포트로 기록하여 자산으로 남겨보시겠어요?",
           [
-            { text: "나중에 하기", style: "cancel" },
+            {
+              text: "나중에 하기",
+              style: "cancel",
+              // FIX: This button now triggers the toast and navigates back.
+              onPress: () => {
+                Toast.show({
+                  type: "success",
+                  text1: "🚀 문제가 해결되었습니다!",
+                  position: "top",
+                  visibilityTime: 3000,
+                });
+                if (router.canGoBack()) {
+                  router.back();
+                }
+              },
+            },
             {
               text: "지금 작성하기",
+              // This button opens the STAR report modal as before.
               onPress: () => {
                 setReportingProblemId(problem.id);
                 setStarReportModalVisible(true);
@@ -339,6 +358,61 @@ export default function ProblemDetail() {
     );
   };
 
+  const handleProblemMenuPress = () => {
+    if (!problem) return;
+
+    Alert.alert(
+      "문제 옵션",
+      "이 문제에 대한 작업을 선택하세요.",
+      [
+        {
+          text: "편집하기",
+          onPress: () => router.push(`/problem/${problem.id}/edit`),
+        },
+        {
+          text: "삭제하기",
+          style: "destructive",
+          onPress: () => showDeleteConfirmation(problem.id, problem.title),
+        },
+        {
+          text: "취소",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const showDeleteConfirmation = (id: string, title: string) => {
+    Alert.alert(
+      `"${title}" 문제 삭제`,
+      "이 문제와 연결된 모든 스레드 데이터가 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            const success = await deleteProblem(id);
+            if (success) {
+              Toast.show({
+                text1: "삭제 완료",
+                text2: `"${title}" 문제가 삭제되었습니다.`,
+                position: "top",
+                visibilityTime: 2000,
+              });
+
+              // Navigate back after deletion
+              if (router.canGoBack()) router.back();
+            } else {
+              Alert.alert("오류", "문제 삭제에 실패했습니다.");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // ✅ <Modal>을 <SafeAreaView>로 교체하고, props를 제거합니다.
   return (
     <SafeAreaView style={styles.container}>
@@ -358,8 +432,9 @@ export default function ProblemDetail() {
           ListHeaderComponent={
             <ProblemPost
               problem={problem}
-              objective={objective} // ✅ persona -> objective
+              objective={objective}
               onStatusBadgePress={handleChangeStatusPress}
+              onPressMenu={handleProblemMenuPress}
             />
           }
           ListFooterComponent={

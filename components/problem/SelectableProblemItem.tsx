@@ -2,12 +2,12 @@ import { Priority, Problem } from "@/types";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// Priority에 따른 색상 맵
+// Priority에 따른 색상 맵 (No changes here)
 const priorityColors: { [key in Priority]: string } = {
-  high: "#e57373", // 연한 빨강 -> 진한 빨강 계열
-  medium: "#ffb74d", // 연한 주황 -> 진한 주황 계열
-  low: "#81c784", // 연한 녹색 -> 진한 녹색 계열
-  none: "#bdbdbd", // 연한 회색 -> 진한 회색 계열
+  high: "#e57373",
+  medium: "#ffb74d",
+  low: "#81c784",
+  none: "#bdbdbd",
 };
 
 // 컴포넌트가 받을 Props 정의
@@ -30,6 +30,7 @@ export default function SelectableProblemItem({
     <TouchableOpacity
       style={[styles.container, isSelected && styles.selectedContainer]}
       onPress={() => onPress(problem.id)}
+      activeOpacity={0.7}
     >
       {/* 우선순위 인디케이터 */}
       <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
@@ -57,8 +58,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   selectedContainer: {
-    borderColor: "#1971c2",
-    backgroundColor: "#e7f5ff",
+    // FIX: Changed border and background color to your main green theme
+    borderColor: "#40c057",
+    backgroundColor: "#e6fcf5", // A light green tint for consistency
   },
   indicator: {
     width: 16,
@@ -67,13 +69,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   title: {
-    flex: 1, // 텍스트가 남은 공간을 모두 차지하도록
+    flex: 1,
     fontSize: 16,
     color: "#212529",
     fontWeight: "500",
   },
   selectedTitle: {
-    color: "#1971c2",
+    // FIX: Changed text color to your main green theme
+    color: "#40c057",
     fontWeight: "bold",
   },
 });

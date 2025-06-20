@@ -1,22 +1,23 @@
 // components/problem/ProblemEdit.tsx
 
-// ADD: Import necessary components for the new feature
-import { FlatList, Image, ActivityIndicator } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-
+// ... (all imports remain the same)
 import { useAppStore } from "@/store/store";
 import { Priority, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   KeyboardEvent,
   Platform,
   SafeAreaView,
-  ScrollView, // FIX: Import ScrollView
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,46 +31,42 @@ import Animated, {
 } from "react-native-reanimated";
 import { useShallow } from "zustand/react/shallow";
 
+// ... (priorityColors and FloatingToolbar components remain the same)
 const priorityColors: { [key in Priority]: string } = {
   high: "#e57373",
   medium: "#ffb74d",
   low: "#81c784",
   none: "#bdbdbd",
 };
-
-// FIX: Update the Floating Toolbar to include an image icon button
 interface FloatingToolbarProps {
   onSave: () => void;
-  onPickImage: () => void; // ADD: Prop for image picking
+  onPickImage: () => void;
   bottom: number;
 }
 const FloatingToolbar = React.memo(
   ({ onSave, onPickImage, bottom }: FloatingToolbarProps) => {
     const opacity = useSharedValue(0);
-
     useEffect(() => {
       opacity.value = withTiming(1, { duration: 250 });
     }, []);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-      opacity: opacity.value,
-    }));
-
+    const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
     return (
       <Animated.View
         style={[styles.floatingContainer, { bottom }, animatedStyle]}
       >
-        {/* ADD: Wrapper for left-side action icons */}
+        
         <View style={styles.floatingActionsWrapper}>
+          
           <TouchableOpacity
             onPress={onPickImage}
             style={styles.floatingIconButton}
           >
+            
             <Feather name="image" size={24} color="#495057" />
           </TouchableOpacity>
         </View>
-
         <TouchableOpacity onPress={onSave} style={styles.floatingSaveButton}>
+          
           <Text style={styles.floatingSaveButtonText}>저장</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -82,21 +79,15 @@ export default function ProblemEdit() {
   const params = useLocalSearchParams();
   const problemId = params.problemId as string | undefined;
   const objectiveId = params.objectiveId as string | undefined;
-
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  // ADD: New state for image URLs and loading indicator
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isPickingImage, setIsPickingImage] = useState(false);
-
   const titleInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
-
   const focusDescriptionInput = () => descriptionInputRef.current?.focus();
-
   const { getProblemById, getObjectiveById, addProblem, updateProblem } =
     useAppStore(
       useShallow((state) => ({
@@ -106,7 +97,6 @@ export default function ProblemEdit() {
         updateProblem: state.updateProblem,
       }))
     );
-
   const isEditMode = !!problemId;
   const problemToEdit = isEditMode ? getProblemById(problemId) : undefined;
   const finalObjectiveId = isEditMode
@@ -121,22 +111,18 @@ export default function ProblemEdit() {
       setTitle(problemToEdit.title);
       setDescription(problemToEdit.description || "");
       setPriority(problemToEdit.priority);
-      // ADD: Initialize imageUrls when editing
       setImageUrls(problemToEdit.imageUrls || []);
     } else {
       setTitle("");
       setDescription("");
       setPriority("none");
-      // ADD: Reset imageUrls for create mode
       setImageUrls([]);
     }
   }, [problemId, problemToEdit, isEditMode]);
-
   useEffect(() => {
     const timer = setTimeout(() => titleInputRef.current?.focus(), 150);
     return () => clearTimeout(timer);
   }, []);
-
   useEffect(() => {
     if (Platform.OS !== "ios") return;
     const onKeyboardDidShow = (e: KeyboardEvent) =>
@@ -156,7 +142,6 @@ export default function ProblemEdit() {
     };
   }, []);
 
-  // ADD: Handler for picking multiple images
   const handlePickImages = async () => {
     const selectionLimit = 20 - imageUrls.length;
     if (selectionLimit <= 0) {
@@ -171,11 +156,8 @@ export default function ProblemEdit() {
         quality: 0.8,
         selectionLimit,
       });
-
       if (!result.canceled) {
         const newUris = result.assets.map((asset) => asset.uri);
-        // Note: This uses temporary URIs. For permanent storage, you'd use a utility
-        // like the one we discussed to copy them to your app's document directory.
         setImageUrls((prevUris) => [...prevUris, ...newUris]);
       }
     } catch (error) {
@@ -185,12 +167,9 @@ export default function ProblemEdit() {
       setIsPickingImage(false);
     }
   };
-
-  // ADD: Handler for removing a selected image
   const handleRemoveImage = (uriToRemove: string) => {
     setImageUrls((prevUris) => prevUris.filter((uri) => uri !== uriToRemove));
   };
-
   const handleChangePriority = () => {
     Alert.alert(
       "우선순위 변경",
@@ -204,14 +183,11 @@ export default function ProblemEdit() {
       { cancelable: true }
     );
   };
-
   const handleSave = useCallback(async () => {
     if (!title.trim()) {
       Alert.alert("알림", "제목을 입력해주세요.");
       return;
     }
-
-    // FIX: Add `imageUrls` to the data being saved
     if (isEditMode && problemToEdit) {
       const updatedProblem: Problem = {
         ...problemToEdit,
@@ -255,23 +231,26 @@ export default function ProblemEdit() {
             <Feather name="x" size={26} color="#343a40" />
           </TouchableOpacity>
         </View>
+
         <View style={styles.subHeader}>
-          <View style={styles.personaInfo}>
-            <TouchableOpacity onPress={handleChangePriority}>
-              <View
-                style={[
-                  styles.indicator,
-                  { backgroundColor: priorityColors[priority] },
-                ]}
-              />
-            </TouchableOpacity>
-            <Text style={styles.metaText}>
-              목표 → {objectiveForProblem?.title || "선택"}
-            </Text>
-          </View>
+          <Text style={styles.metaText}>
+            목표 → {objectiveForProblem?.title || "선택"}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.priorityContainer}
+            onPress={handleChangePriority}
+          >
+            <Text style={styles.metaText}>우선순위: </Text>
+            <View
+              style={[
+                styles.indicator,
+                { backgroundColor: priorityColors[priority] },
+              ]}
+            />
+          </TouchableOpacity>
         </View>
 
-        {/* FIX: Use ScrollView to handle all content including the new image list */}
         <ScrollView
           style={styles.contentScrollView}
           keyboardShouldPersistTaps="handled"
@@ -279,7 +258,7 @@ export default function ProblemEdit() {
           <TextInput
             ref={titleInputRef}
             style={styles.titleInput}
-            placeholder="제목"
+            placeholder="무슨 문제가 있나요?"
             placeholderTextColor="#adb5bd"
             value={title}
             onChangeText={setTitle}
@@ -289,7 +268,7 @@ export default function ProblemEdit() {
           <TextInput
             ref={descriptionInputRef}
             style={styles.bodyInput}
-            placeholder="내용 (선택 사항)"
+            placeholder="이 문제에 대해 더 자세히 알려주세요"
             placeholderTextColor="#adb5bd"
             value={description}
             onChangeText={setDescription}
@@ -348,10 +327,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 4,
   },
-  personaInfo: { flexDirection: "row", alignItems: "center" },
-  indicator: { width: 16, height: 16, borderRadius: 12, marginRight: 12 },
-  metaText: { fontSize: 14, color: "#495057" },
-  // FIX: Change contentContainer to a ScrollView style
+  // REMOVED: personaInfo style is no longer needed
+  // ADD: New container for the priority elements
+  priorityContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  indicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  metaText: {
+    fontSize: 14,
+    color: "#495057",
+  },
   contentScrollView: { flex: 1 },
   titleInput: {
     fontSize: 24,
@@ -383,9 +374,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  // ADD: New styles for the toolbar layout
-  floatingActionsWrapper: { flexDirection: "row", alignItems: "center" },
-  floatingIconButton: { padding: 8 },
+  floatingActionsWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  floatingIconButton: {
+    padding: 8,
+  },
   floatingSaveButton: {
     backgroundColor: "#212529",
     paddingVertical: 10,
@@ -397,12 +392,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  // ADD: New styles for the image list
-  imageList: { marginTop: 16, paddingBottom: 16, maxHeight: 120 },
-  imageContainer: { marginRight: 10, position: "relative" },
+  imageList: {
+    marginTop: 16,
+    paddingBottom: 16,
+    maxHeight: 160, // Adjusted height for 3x4 ratio
+  },
+  imageContainer: {
+    marginRight: 10,
+    position: "relative",
+  },
   image: {
     width: 90,
-    height: 120, // Creates a 4x3 aspect ratio
+    height: 120, // Your new 3x4 aspect ratio
     borderRadius: 8,
     backgroundColor: "#f1f3f5",
   },

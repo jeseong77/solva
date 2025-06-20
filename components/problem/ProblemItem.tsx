@@ -1,10 +1,11 @@
+// components/problem/ProblemItem.tsx
+
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
   Objective,
   Priority,
   Problem,
-  ProblemStatus,
   SessionThreadItem,
   TaskThreadItem,
 } from "@/types";
@@ -36,13 +37,7 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
-const statusInfo: {
-  [key in ProblemStatus]: {
-    name: string;
-    color: string;
-    backgroundColor: string;
-  };
-} = {
+const statusInfo = {
   active: { name: "Active", color: "#2b8a3e", backgroundColor: "#e6fcf5" },
   onHold: { name: "On Hold", color: "#868e96", backgroundColor: "#f1f3f5" },
   resolved: { name: "Resolved", color: "#1971c2", backgroundColor: "#e7f5ff" },
@@ -54,7 +49,6 @@ interface ProblemItemProps {
   objective: Objective;
   onPress: (id: string) => void;
   onLongPress?: (id: string) => void;
-  isLast?: boolean;
 }
 
 export default function ProblemItem({
@@ -62,7 +56,6 @@ export default function ProblemItem({
   objective,
   onPress,
   onLongPress,
-  isLast,
 }: ProblemItemProps) {
   const threadItems = useAppStore((state) => state.threadItems);
 
@@ -70,23 +63,21 @@ export default function ProblemItem({
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
-
     const totalThreads = allThreadsInProblem.filter(
       (item) => item.type !== "Session"
     ).length;
-
     const taskItems = allThreadsInProblem.filter(
       (item): item is TaskThreadItem => item.type === "Task"
     );
-    const completedTasks = taskItems.filter((item) => item.isCompleted).length;
-
+    const completedTasks = taskItems.filter(
+      (item) => !!item.isCompleted
+    ).length;
     const actionItems = allThreadsInProblem.filter(
       (item): item is ActionThreadItem => item.type === "Action"
     );
     const completedActions = actionItems.filter(
       (item) => item.status === "completed"
     ).length;
-
     const sessionItems = allThreadsInProblem.filter(
       (item): item is SessionThreadItem => item.type === "Session"
     );
@@ -94,17 +85,10 @@ export default function ProblemItem({
       (sum, item) => sum + (item.timeSpent || 0),
       0
     );
-
     return {
       totalThreads,
-      tasks: {
-        completed: completedTasks,
-        total: taskItems.length,
-      },
-      actions: {
-        completed: completedActions,
-        total: actionItems.length,
-      },
+      tasks: { completed: completedTasks, total: taskItems.length },
+      actions: { completed: completedActions, total: actionItems.length },
       totalSessionTime,
     };
   }, [problem.id, threadItems]);
@@ -117,15 +101,16 @@ export default function ProblemItem({
 
   return (
     <TouchableOpacity
-      style={[styles.itemContainer, isLast && styles.lastItemContainer]}
+      style={styles.itemContainer}
       onPress={() => onPress(problem.id)}
       onLongPress={() => onLongPress?.(problem.id)}
       delayLongPress={500}
+      activeOpacity={0.7}
     >
       <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
       <View style={styles.contentContainer}>
         <View style={styles.metaContainer}>
-          <Text style={styles.metaText}>
+          <Text style={styles.metaText} numberOfLines={1}>
             {objective.type}/{objective.title}
           </Text>
           <View
@@ -167,20 +152,14 @@ export default function ProblemItem({
 }
 
 const styles = StyleSheet.create({
+  // FIX: Simplified to be a transparent container with padding.
+  // The parent component now provides the background and separators.
   itemContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ffffff",
-    paddingVertical: 12,
+    backgroundColor: "transparent",
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderColor: "#e9ecef",
-  },
-  lastItemContainer: {
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 0,
   },
   indicator: {
     width: 16,
@@ -189,22 +168,23 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 16, // Increased margin for better spacing
   },
   metaContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 6, // Adjusted spacing
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 13, // Slightly larger for readability
     color: "#868e96",
+    flexShrink: 1, // Allow text to shrink if status tag is long
   },
   statusTag: {
-    paddingVertical: 2,
-    paddingHorizontal: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
     borderRadius: 8,
-    marginLeft: 8,
+    marginLeft: "auto", // Pushes the tag to the far right
   },
   statusTagText: {
     fontSize: 11,
@@ -214,7 +194,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#212529",
-    marginBottom: 8,
+    marginBottom: 10, // Adjusted spacing
     lineHeight: 22,
   },
   statsContainer: {

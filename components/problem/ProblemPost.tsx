@@ -1,18 +1,14 @@
 // components/problem/ProblemPost.tsx
 
-// ADD: Import React Native components for the image list and viewer state
+// ... (keep all imports)
 import {
   FlatList,
   Image,
   Modal,
-  SafeAreaView as ModalSafeArea, // Use alias to avoid name conflict
+  SafeAreaView as ModalSafeArea,
 } from "react-native";
-import React, { useMemo, useState } from "react"; // Import useState
-
-// ADD: Import the new image viewer library
+import React, { useMemo, useState } from "react";
 import ImageView from "react-native-image-viewing";
-
-// ... (keep all other imports: useAppStore, Problem, Feather, etc.)
 import { useAppStore } from "@/store/store";
 import {
   Objective,
@@ -27,7 +23,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// ... (keep helper functions like priorityColors, formatSeconds, statusInfo)
+// ... (keep all helper functions)
 const priorityColors: { [key in Priority]: string } = {
   high: "#e57373",
   medium: "#ffb74d",
@@ -63,28 +59,28 @@ const statusInfo: {
   archived: { name: "Archived", color: "#495057", backgroundColor: "#e9ecef" },
 };
 
+// FIX: Add the new onPressMenu prop
 interface ProblemPostProps {
   problem: Problem;
   objective: Objective;
   onStatusBadgePress: () => void;
+  onPressMenu: () => void; // <-- ADD THIS
 }
 
 export default function ProblemPost({
   problem,
   objective,
   onStatusBadgePress,
+  onPressMenu, // <-- ADD THIS
 }: ProblemPostProps) {
+  // ... (keep all existing logic and state inside this component)
   const router = useRouter();
   const threadItems = useAppStore((state) => state.threadItems);
   const currentStatus = problem.status || "active";
   const currentStatusInfo = statusInfo[currentStatus];
-
-  // ADD: State to manage the image viewer modal
   const [isImageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
   const stats = useMemo(() => {
-    // ... (stats calculation logic remains the same)
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
@@ -117,31 +113,23 @@ export default function ProblemPost({
       totalSessionTime,
     };
   }, [problem.id, threadItems]);
-
   const indicatorColor =
     priorityColors[problem.priority] || priorityColors.none;
-
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "long",
     day: "numeric",
   }).format(new Date(problem.createdAt as Date));
-
-  // ADD: Handlers to open and close the image viewer
   const openImageViewer = (index: number) => {
     setCurrentImageIndex(index);
     setImageViewerVisible(true);
   };
-
   const closeImageViewer = () => {
     setImageViewerVisible(false);
   };
-
-  // ADD: Prepare image data for the viewer library
   const imagesForViewer = useMemo(() => {
     return (problem.imageUrls || []).map((url) => ({ uri: url }));
   }, [problem.imageUrls]);
-
   const handleNavigateToStarReport = () => {
     if (problem.starReportId) {
       router.push(`/report/${problem.starReportId}`);
@@ -154,7 +142,6 @@ export default function ProblemPost({
   return (
     <>
       <View style={styles.postContainer}>
-        {/* --- Header --- */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View
@@ -168,38 +155,42 @@ export default function ProblemPost({
               <Text style={styles.metaText}>{formattedDate}</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={[
-              styles.statusBadge,
-              { backgroundColor: currentStatusInfo.backgroundColor },
-            ]}
-            onPress={onStatusBadgePress}
-          >
-            <Text
+
+          <View style={styles.headerRight}>
+            <TouchableOpacity
               style={[
-                styles.statusBadgeText,
-                { color: currentStatusInfo.color },
+                styles.statusBadge,
+                { backgroundColor: currentStatusInfo.backgroundColor },
               ]}
+              onPress={onStatusBadgePress}
             >
-              {currentStatusInfo.name}
-            </Text>
-            <Feather
-              name="chevron-down"
-              size={16}
-              color={currentStatusInfo.color}
-              style={{ marginLeft: 4 }}
-            />
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  { color: currentStatusInfo.color },
+                ]}
+              >
+                {currentStatusInfo.name}
+              </Text>
+              <Feather
+                name="chevron-down"
+                size={16}
+                color={currentStatusInfo.color}
+                style={{ marginLeft: 4 }}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.menuButton} onPress={onPressMenu}>
+              <Feather name="more-vertical" size={22} color="#495057" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* --- Body --- */}
         <View style={styles.body}>
           <Text style={styles.problemTitle}>{problem.title}</Text>
           {problem.description && (
             <Text style={styles.problemDescription}>{problem.description}</Text>
           )}
-
-          {/* ADD: Horizontal image list renderer */}
           {problem.imageUrls && problem.imageUrls.length > 0 && (
             <FlatList
               horizontal
@@ -212,14 +203,16 @@ export default function ProblemPost({
                   onPress={() => openImageViewer(index)}
                   activeOpacity={0.8}
                 >
-                  <Image source={{ uri: item }} style={styles.imageThumbnail} />
+                  
+                  <Image
+                    source={{ uri: item }}
+                    style={styles.imageThumbnail}
+                  />
                 </TouchableOpacity>
               )}
             />
           )}
         </View>
-
-        {/* --- Footer Stats --- */}
         <View style={styles.statsContainer}>
           <Feather name="git-branch" size={14} color="#6c757d" />
           <Text style={styles.statsText}>{stats.totalThreads}</Text>
@@ -239,7 +232,6 @@ export default function ProblemPost({
             {formatSeconds(stats.totalSessionTime)}
           </Text>
         </View>
-
         {problem.status === "resolved" && problem.starReportId && (
           <TouchableOpacity
             style={styles.reportButtonContainer}
@@ -253,14 +245,12 @@ export default function ProblemPost({
         )}
       </View>
 
-      {/* ADD: The full-screen image viewer modal component */}
       <ImageView
         images={imagesForViewer}
         imageIndex={currentImageIndex}
         visible={isImageViewerVisible}
         onRequestClose={closeImageViewer}
         HeaderComponent={({ imageIndex }) => (
-          // This adds the 'X' close button to the top right
           <ModalSafeArea style={styles.imageViewerHeader}>
             <TouchableOpacity onPress={closeImageViewer}>
               <Feather name="x" size={30} color="#ffffff" />
@@ -273,7 +263,7 @@ export default function ProblemPost({
 }
 
 const styles = StyleSheet.create({
-  // ... (all previous styles remain the same)
+  // ... (existing styles)
   postContainer: { padding: 16, backgroundColor: "#ffffff" },
   header: {
     flexDirection: "row",
@@ -338,14 +328,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#ffffff",
   },
-
-  // ADD: New styles for the image list and viewer
-  imageList: {
-    marginTop: 8,
-  },
+  imageList: { marginTop: 8 },
   imageThumbnail: {
     width: 90,
-    height: 120, // 3x4 aspect ratio
+    height: 120,
     borderRadius: 8,
     marginRight: 10,
     backgroundColor: "#f1f3f5",
@@ -358,5 +344,15 @@ const styles = StyleSheet.create({
     padding: 16,
     zIndex: 1,
     alignItems: "flex-end",
+  },
+
+  // ADD: New styles for the right side of the header
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  menuButton: {
+    marginLeft: 8,
+    padding: 4,
   },
 });
