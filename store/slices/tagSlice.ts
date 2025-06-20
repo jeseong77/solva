@@ -1,25 +1,18 @@
 // src/store/slices/tagSlice.ts
 
-import { getDatabase } from "@/lib/db";
+import { db } from "@/lib/db";
+import { tags } from "@/lib/db/schema";
 import { Tag } from "@/types";
 import type {
   AppState,
   TagSlice as TagSliceInterface,
 } from "@/types/storeTypes";
+import { asc, eq } from "drizzle-orm";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-/**
- * 데이터베이스에서 가져온 데이터를 Tag 타입으로 변환합니다.
- * @param dbItem - 데이터베이스의 row 아이템
- * @returns Tag 타입 객체
- */
-const parseTagFromDB = (dbItem: any): Tag => ({
-  id: dbItem.id,
-  name: dbItem.name,
-  color: dbItem.color === null ? undefined : dbItem.color,
-});
+// The parseTagFromDB function is NO LONGER NEEDED.
 
 export const createTagSlice: StateCreator<
   AppState,
@@ -36,11 +29,7 @@ export const createTagSlice: StateCreator<
   fetchTags: async () => {
     set({ isLoadingTags: true });
     try {
-      const db = await getDatabase();
-      const dbResults = await db.getAllAsync<any>(
-        "SELECT * FROM Tags ORDER BY name ASC;"
-      );
-      const fetchedTags = dbResults.map(parseTagFromDB);
+      const fetchedTags = await db.select().from(tags).orderBy(asc(tags.name));
 
       set({
         tags: fetchedTags,
@@ -60,16 +49,16 @@ export const createTagSlice: StateCreator<
   addTag: async (tagData) => {
     const newTag: Tag = {
       id: uuidv4(),
-      ...tagData,
+      name: tagData.name,
+      // Ensure optional color is null, not undefined, for the database
+      color: tagData.color ?? null,
     };
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO Tags (id, name, color) VALUES (?, ?, ?);`,
-        [newTag.id, newTag.name, newTag.color ?? null]
-      );
+      // Drizzle's insert is type-safe
+      await db.insert(tags).values(newTag);
 
+      // State update and sorting logic is preserved
       set((state) => ({
         tags: [...state.tags, newTag].sort((a, b) =>
           a.name.localeCompare(b.name)
@@ -79,7 +68,7 @@ export const createTagSlice: StateCreator<
       console.log("[TagSlice] Tag added:", newTag.name);
       return newTag;
     } catch (error) {
-      // UNIQUE 제약 조건 위반 시 에러가 발생할 수 있습니다.
+      // UNIQUE constraint violation on 'name' will be caught here
       console.error("[TagSlice] Error adding tag:", error);
       return null;
     }
@@ -90,13 +79,16 @@ export const createTagSlice: StateCreator<
    */
   updateTag: async (tagToUpdate) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(`UPDATE Tags SET name = ?, color = ? WHERE id = ?;`, [
-        tagToUpdate.name,
-        tagToUpdate.color ?? null,
-        tagToUpdate.id,
-      ]);
+      // Drizzle's update query
+      await db
+        .update(tags)
+        .set({
+          name: tagToUpdate.name,
+          color: tagToUpdate.color ?? null,
+        })
+        .where(eq(tags.id, tagToUpdate.id));
 
+      // State update and sorting logic is preserved
       set((state) => ({
         tags: state.tags
           .map((t) => (t.id === tagToUpdate.id ? tagToUpdate : t))
@@ -113,12 +105,11 @@ export const createTagSlice: StateCreator<
 
   /**
    * 태그를 삭제합니다.
-   * 참고: 이 작업은 Problem에 연결된 태그 문자열을 자동으로 제거하지 않습니다.
    */
   deleteTag: async (tagId) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(`DELETE FROM Tags WHERE id = ?;`, [tagId]);
+      // Drizzle's delete query
+      await db.delete(tags).where(eq(tags.id, tagId));
 
       set((state) => ({
         tags: state.tags.filter((t) => t.id !== tagId),
@@ -136,6 +127,7 @@ export const createTagSlice: StateCreator<
    * ID로 태그를 동기적으로 조회합니다.
    */
   getTagById: (id: string) => {
+    // No changes needed
     return get().tags.find((t) => t.id === id);
   },
 });

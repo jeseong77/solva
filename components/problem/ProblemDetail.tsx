@@ -7,17 +7,18 @@ import {
   TaskThreadItem,
 } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router"; // ✅ useLocalSearchParams 추가
-import React, { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
-  SafeAreaView, // ✅ Modal, Platform 제거, SafeAreaView 유지
+  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { useShallow } from "zustand/react/shallow";
 import StarReportWrite from "../report/StarReportWrite";
 import LogSessionModal from "../session/LogSessionModal";
@@ -30,20 +31,16 @@ interface FlatThreadItem {
   level: number;
 }
 
-// ❌ 더 이상 Props를 받지 않으므로 interface를 제거합니다.
-// interface ProblemDetailProps { ... }
-
 export default function ProblemDetail() {
   const router = useRouter();
-  // ✅ URL 경로에서 파라미터를 가져옵니다. e.g., /problem/123 -> { problemId: '123' }
   const params = useLocalSearchParams();
   const problemId = Array.isArray(params.problemId)
     ? params.problemId[0]
     : params.problemId;
 
   const {
-    problem,
-    persona,
+    problems,
+    objectives,
     getThreadItemById,
     threadItems,
     startSession,
@@ -51,36 +48,39 @@ export default function ProblemDetail() {
     addThreadItem,
     deleteThreadItem,
     updateThreadItem,
+    deleteProblem,
     updateProblem,
     getStarReportByProblemId,
     addStarReport,
   } = useAppStore(
-    // ✅ Zustand 스토어에서도 props 대신 hook으로 가져온 problemId를 사용합니다.
-    useShallow((state) => {
-      const p = problemId
-        ? state.problems.find((p) => p.id === problemId)
-        : null;
-      const persona = p
-        ? state.personas.find((p) => p.id === p.id)
-        : null;
-      return {
-        problem: p,
-        persona,
-        getThreadItemById: state.getThreadItemById,
-        threadItems: state.threadItems,
-        startSession: state.startSession,
-        stopSession: state.stopSession,
-        addThreadItem: state.addThreadItem,
-        deleteThreadItem: state.deleteThreadItem,
-        updateThreadItem: state.updateThreadItem,
-        updateProblem: state.updateProblem,
-        getStarReportByProblemId: state.getStarReportByProblemId,
-        addStarReport: state.addStarReport,
-      };
-    })
+    useShallow((state) => ({
+      problems: state.problems,
+      objectives: state.objectives,
+      getThreadItemById: state.getThreadItemById,
+      deleteProblem: state.deleteProblem,
+      threadItems: state.threadItems,
+      startSession: state.startSession,
+      stopSession: state.stopSession,
+      addThreadItem: state.addThreadItem,
+      deleteThreadItem: state.deleteThreadItem,
+      updateThreadItem: state.updateThreadItem,
+      updateProblem: state.updateProblem,
+      getStarReportByProblemId: state.getStarReportByProblemId,
+      addStarReport: state.addStarReport,
+    }))
   );
 
-  // ... 내부 상태(useState)와 핸들러 함수들은 대부분 그대로 유지됩니다 ...
+  const problem = useMemo(
+    () => (problemId ? problems.find((p) => p.id === problemId) : null),
+    [problems, problemId]
+  );
+
+  const objective = useMemo(() => {
+    if (!problem) return null;
+    return objectives.find((o) => o.id === problem.objectiveId);
+  }, [problem, objectives]);
+
+  // ... (useState and flattenedThreads logic are the same)
   const [isWriteModalVisible, setWriteModalVisible] = useState(false);
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
@@ -91,7 +91,6 @@ export default function ProblemDetail() {
     null
   );
 
-  // ... (flattenedThreads 및 나머지 핸들러 함수들 모두 동일)
   const flattenedThreads = ((): FlatThreadItem[] => {
     if (!problem) return [];
     const allThreadsById = new Map(threadItems.map((item) => [item.id, item]));
@@ -109,26 +108,22 @@ export default function ProblemDetail() {
       }
       return result;
     };
-    return flatten(problem.childThreadIds, 0);
+    return flatten(problem.childThreadIds || [], 0);
   })();
+
   const handleOpenRootWriteModal = () => {
     setEditingThreadId(null);
     setReplyParentId(null);
     setWriteModalVisible(true);
   };
-  // ... (다른 모든 핸들러 함수들은 변경 없이 그대로 여기에 위치합니다)
   const handleOpenReplyWriteModal = (parentId: string) => {
     setEditingThreadId(null);
     setReplyParentId(parentId);
     setWriteModalVisible(true);
   };
-
   const handleStartSession = (threadId: string) => {
     Alert.alert("세션 시작", "어떤 작업을 하시겠습니까?", [
-      {
-        text: "바로 시작하기",
-        onPress: () => startSession(threadId),
-      },
+      { text: "바로 시작하기", onPress: () => startSession(threadId) },
       {
         text: "놓친 세션 기록하기",
         onPress: () => {
@@ -136,10 +131,7 @@ export default function ProblemDetail() {
           setLogSessionModalVisible(true);
         },
       },
-      {
-        text: "취소",
-        style: "cancel",
-      },
+      { text: "취소", style: "cancel" },
     ]);
   };
 
@@ -149,11 +141,19 @@ export default function ProblemDetail() {
   ) => {
     if (!loggingThreadId || !problem) return;
 
+    // FIX: Add ALL required properties for a BaseThreadItem, setting irrelevant ones to null.
     addThreadItem({
       problemId: problem.id,
       parentId: loggingThreadId,
       type: "Session",
       content: description || "기록된 세션",
+      isImportant: false,
+      authorId: null,
+      isResolved: null,
+      isCompleted: null,
+      status: null,
+      deadline: null,
+      completedAt: null,
       timeSpent: durationInSeconds,
       startTime: new Date(Date.now() - durationInSeconds * 1000),
     });
@@ -181,11 +181,19 @@ export default function ProblemDetail() {
     ]);
     const saveSession = async (content: string) => {
       if (!problem) return;
+      // FIX: Add ALL required properties for a BaseThreadItem, setting irrelevant ones to null.
       await addThreadItem({
         problemId: problem.id,
         parentId: threadId,
         type: "Session",
         content: content || "작업 세션 기록",
+        isImportant: false,
+        authorId: null,
+        isResolved: null,
+        isCompleted: null,
+        status: null,
+        deadline: null,
+        completedAt: null,
         timeSpent: Math.round(elapsedTime / 1000),
         startTime: new Date(Date.now() - elapsedTime),
       });
@@ -198,13 +206,9 @@ export default function ProblemDetail() {
     setReplyParentId(null);
     setWriteModalVisible(true);
   };
-
   const handlePressThreadMenu = (threadId: string) => {
     const options = [
-      {
-        text: "수정하기",
-        onPress: () => handleOpenEditModal(threadId),
-      },
+      { text: "수정하기", onPress: () => handleOpenEditModal(threadId) },
       {
         text: "삭제하기",
         onPress: () => {
@@ -227,6 +231,7 @@ export default function ProblemDetail() {
     ];
     Alert.alert("스레드 옵션", "이 스레드에 대한 작업을 선택하세요.", options);
   };
+
   const handleToggleCompletion = (threadId: string) => {
     const thread = getThreadItemById(threadId);
     if (!thread) return;
@@ -242,28 +247,29 @@ export default function ProblemDetail() {
       const updatedAction: ActionThreadItem = {
         ...thread,
         status: newStatus,
-        completedAt: newStatus === "completed" ? new Date() : undefined,
+        // FIX: Use null instead of undefined for the date.
+        completedAt: newStatus === "completed" ? new Date() : null,
       };
       updateThreadItem(updatedAction);
     }
   };
+
   const handleStatusUpdate = async (newStatus: ProblemStatus) => {
     if (!problem) return;
-
     const isNewlyResolved =
       newStatus === "resolved" && problem.status !== "resolved";
-
     const updatedProblemData: Problem = {
       ...problem,
       status: newStatus,
+      // FIX: Use null instead of undefined for dates.
       resolvedAt: newStatus === "resolved" ? new Date() : problem.resolvedAt,
       archivedAt: newStatus === "archived" ? new Date() : problem.archivedAt,
     };
     if (problem.status === "resolved" && newStatus !== "resolved") {
-      updatedProblemData.resolvedAt = undefined;
+      updatedProblemData.resolvedAt = null;
     }
     if (problem.status === "archived" && newStatus !== "archived") {
-      updatedProblemData.archivedAt = undefined;
+      updatedProblemData.archivedAt = null;
     }
     await updateProblem(updatedProblemData);
 
@@ -271,17 +277,18 @@ export default function ProblemDetail() {
       let report: StarReport | undefined | null = getStarReportByProblemId(
         problem.id
       );
-
       if (!report) {
+        // FIX: Add the required 'learnings' property.
         report = await addStarReport({
           problemId: problem.id,
           situation: "",
           task: "",
           action: "",
           result: "",
+          learnings: null,
         });
       }
-
+      // Now, ask the user what they want to do next.
       if (report) {
         Alert.alert(
           "문제 해결 완료!",
@@ -290,9 +297,22 @@ export default function ProblemDetail() {
             {
               text: "나중에 하기",
               style: "cancel",
+              // FIX: This button now triggers the toast and navigates back.
+              onPress: () => {
+                Toast.show({
+                  type: "success",
+                  text1: "🚀 문제가 해결되었습니다!",
+                  position: "top",
+                  visibilityTime: 3000,
+                });
+                if (router.canGoBack()) {
+                  router.back();
+                }
+              },
             },
             {
               text: "지금 작성하기",
+              // This button opens the STAR report modal as before.
               onPress: () => {
                 setReportingProblemId(problem.id);
                 setStarReportModalVisible(true);
@@ -303,6 +323,7 @@ export default function ProblemDetail() {
       }
     }
   };
+
   const handleChangeStatusPress = () => {
     if (!problem) return;
     const options = [
@@ -318,14 +339,14 @@ export default function ProblemDetail() {
       options
     );
   };
+
   const renderThreadItem = ({ item }: { item: FlatThreadItem }) => {
     const thread = getThreadItemById(item.id);
-    if (!thread || !problem || !persona) return null;
-
+    if (!thread || !problem || !objective) return null;
     return (
       <ThreadItem
         thread={thread}
-        persona={persona}
+        objective={objective}
         problem={problem}
         onReply={handleOpenReplyWriteModal}
         onStartSession={handleStartSession}
@@ -334,6 +355,61 @@ export default function ProblemDetail() {
         onToggleCompletion={handleToggleCompletion}
         level={item.level}
       />
+    );
+  };
+
+  const handleProblemMenuPress = () => {
+    if (!problem) return;
+
+    Alert.alert(
+      "문제 옵션",
+      "이 문제에 대한 작업을 선택하세요.",
+      [
+        {
+          text: "편집하기",
+          onPress: () => router.push(`/problem/${problem.id}/edit`),
+        },
+        {
+          text: "삭제하기",
+          style: "destructive",
+          onPress: () => showDeleteConfirmation(problem.id, problem.title),
+        },
+        {
+          text: "취소",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const showDeleteConfirmation = (id: string, title: string) => {
+    Alert.alert(
+      `"${title}" 문제 삭제`,
+      "이 문제와 연결된 모든 스레드 데이터가 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            const success = await deleteProblem(id);
+            if (success) {
+              Toast.show({
+                text1: "삭제 완료",
+                text2: `"${title}" 문제가 삭제되었습니다.`,
+                position: "top",
+                visibilityTime: 2000,
+              });
+
+              // Navigate back after deletion
+              if (router.canGoBack()) router.back();
+            } else {
+              Alert.alert("오류", "문제 삭제에 실패했습니다.");
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -346,7 +422,7 @@ export default function ProblemDetail() {
           <Feather name="x" size={26} color="#343a40" />
         </TouchableOpacity>
       </View>
-      {problem && persona ? (
+      {problem && objective ? (
         <FlatList
           style={styles.contentScrollView}
           contentContainerStyle={styles.listContentContainer}
@@ -356,8 +432,9 @@ export default function ProblemDetail() {
           ListHeaderComponent={
             <ProblemPost
               problem={problem}
-              persona={persona}
+              objective={objective}
               onStatusBadgePress={handleChangeStatusPress}
+              onPressMenu={handleProblemMenuPress}
             />
           }
           ListFooterComponent={

@@ -1,6 +1,6 @@
 // app/(tabs)/index.tsx
 
-import PersonaList from "@/components/persona/personaList";
+import ObjectiveList from "@/components/objective/ObjectiveList"; // ✅ [변경] PersonaList -> ObjectiveList
 import ProblemList from "@/components/problem/ProblemList";
 import ResolvedProblemList from "@/components/problem/ResolvedProblemList";
 import SelectWeeklyProblemModal from "@/components/problem/SelectWeeklyProblemModal";
@@ -9,6 +9,7 @@ import SessionBox from "@/components/session/SessionBox";
 import AddTodoModal from "@/components/todo/AddTodoModal";
 import TodoList from "@/components/todo/TodoList";
 import FloatingActionButton from "@/components/ui/FloatingActionButton";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import { useAppStore } from "@/store/store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -24,6 +25,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SceneMap, TabBar, TabView } from "react-native-tab-view";
+import Toast from "react-native-toast-message";
 import { useShallow } from "zustand/react/shallow";
 
 const getWeekIdentifier = (date: Date): string => {
@@ -42,14 +44,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const layout = useWindowDimensions();
   const tabBarHeight = useBottomTabBarHeight();
+  const bottom = useBottomTabOverflow();
 
-  // --- 상태 관리 (State) ---
-  const [isEditModalVisible, setEditModalVisible] = useState(false);
-  const [editingProblemId, setEditingProblemId] = useState<
-    string | undefined
-  >();
-  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
-  const [viewingProblemId, setViewingProblemId] = useState<string | null>(null);
   const [isWeeklySelectModalVisible, setWeeklySelectModalVisible] =
     useState(false);
   const [index, setIndex] = useState(0);
@@ -59,18 +55,14 @@ export default function HomeScreen() {
   ]);
   const [isAddTodoModalVisible, setAddTodoModalVisible] = useState(false);
 
-  useEffect(() => {
-    console.log(
-      `[Debug] 탭 인덱스 변경: ${index} | 화면 높이: ${layout.height} | 탭바 높이: ${tabBarHeight}`
-    );
-  }, [index, layout.height, tabBarHeight]);
   // --- 스토어 데이터 및 액션 (Zustand) ---
+  // ✅ [변경] Persona -> Objective 관련 상태와 액션으로 모두 변경
   const {
-    personas,
-    fetchPersonas,
-    selectedPersonaId,
-    setSelectedPersonaId,
-    deletePersona,
+    objectives,
+    fetchObjectives,
+    selectedObjectiveId,
+    setSelectedObjectiveId,
+    deleteObjective,
     problems,
     fetchProblems,
     fetchThreads,
@@ -82,11 +74,11 @@ export default function HomeScreen() {
     addTodo,
   } = useAppStore(
     useShallow((state) => ({
-      personas: state.personas,
-      fetchPersonas: state.fetchPersonas,
-      selectedPersonaId: state.selectedPersonaId,
-      setSelectedPersonaId: state.setSelectedPersonaId,
-      deletePersona: state.deletePersona,
+      objectives: state.objectives,
+      fetchObjectives: state.fetchObjectives,
+      selectedObjectiveId: state.selectedObjectiveId,
+      setSelectedObjectiveId: state.setSelectedObjectiveId,
+      deleteObjective: state.deleteObjective,
       problems: state.problems,
       fetchProblems: state.fetchProblems,
       fetchThreads: state.fetchThreads,
@@ -102,68 +94,68 @@ export default function HomeScreen() {
   // --- 데이터 로딩 (useEffect / useFocusEffect) ---
   useFocusEffect(
     useCallback(() => {
-      fetchPersonas();
-      fetchTodos(); // Todo 목록도 함께 불러옴
-    }, [fetchPersonas, fetchTodos])
+      fetchObjectives();
+      fetchTodos();
+    }, [fetchObjectives, fetchTodos])
   );
 
   useEffect(() => {
-    if (selectedPersonaId) {
-      const loadDataForPersona = async () => {
+    if (selectedObjectiveId) {
+      const loadDataForObjective = async () => {
         await Promise.all([
-          fetchProblems(selectedPersonaId),
-          fetchWeeklyProblems({ personaId: selectedPersonaId }),
+          fetchProblems(selectedObjectiveId),
+          fetchWeeklyProblems({ objectiveId: selectedObjectiveId }),
         ]);
         const currentProblems = useAppStore
           .getState()
-          .problems.filter((p) => p.personaId === selectedPersonaId);
+          .problems.filter((p) => p.objectiveId === selectedObjectiveId);
         for (const problem of currentProblems) {
           await fetchThreads({ problemId: problem.id });
         }
       };
-      loadDataForPersona();
+      loadDataForObjective();
     }
-  }, [selectedPersonaId, fetchProblems, fetchWeeklyProblems, fetchThreads]);
+  }, [selectedObjectiveId, fetchProblems, fetchWeeklyProblems, fetchThreads]);
 
   // --- 데이터 가공 (useMemo) ---
-  const selectedPersona = useMemo(
-    () => personas.find((p) => p.id === selectedPersonaId),
-    [personas, selectedPersonaId]
+  const selectedObjective = useMemo(
+    () => objectives.find((p) => p.id === selectedObjectiveId),
+    [objectives, selectedObjectiveId]
   );
 
   const activeProblems = useMemo(
     () =>
-      selectedPersonaId
+      selectedObjectiveId
         ? problems.filter(
             (p) =>
-              p.personaId === selectedPersonaId &&
+              p.objectiveId === selectedObjectiveId &&
               (p.status === "active" || p.status === "onHold")
           )
         : [],
-    [problems, selectedPersonaId]
+    [problems, selectedObjectiveId]
   );
 
   const resolvedProblems = useMemo(
     () =>
-      selectedPersonaId
+      selectedObjectiveId
         ? problems.filter(
             (p) =>
-              p.personaId === selectedPersonaId &&
+              p.objectiveId === selectedObjectiveId &&
               (p.status === "resolved" || p.status === "archived")
           )
         : [],
-    [problems, selectedPersonaId]
+    [problems, selectedObjectiveId]
   );
 
   const currentWeeklyProblem = useMemo(() => {
-    if (!selectedPersonaId) return undefined;
+    if (!selectedObjectiveId) return undefined;
     const weekIdentifier = getWeekIdentifier(new Date());
     return weeklyProblems.find(
       (wp) =>
-        wp.personaId === selectedPersonaId &&
+        wp.objectiveId === selectedObjectiveId &&
         wp.weekIdentifier === weekIdentifier
     );
-  }, [weeklyProblems, selectedPersonaId]);
+  }, [weeklyProblems, selectedObjectiveId]);
 
   const problemForWeekly = useMemo(() => {
     if (!currentWeeklyProblem) return undefined;
@@ -171,24 +163,26 @@ export default function HomeScreen() {
   }, [problems, currentWeeklyProblem]);
 
   // --- 핸들러 함수 (Handlers) ---
-  const handleSelectPersona = (personaId: string) => {
-    setSelectedPersonaId(selectedPersonaId === personaId ? null : personaId);
+  const handleSelectObjective = (objectiveId: string) => {
+    setSelectedObjectiveId(
+      selectedObjectiveId === objectiveId ? null : objectiveId
+    );
   };
 
-  const handleLongPressPersona = (personaId: string) => {
-    const persona = personas.find((p) => p.id === personaId);
-    if (!persona) return;
+  const handleLongPressObjective = (objectiveId: string) => {
+    const objective = objectives.find((p) => p.id === objectiveId);
+    if (!objective) return;
     Alert.alert(
-      `"${persona.title}"`,
+      `"${objective.title}"`,
       "어떤 작업을 하시겠습니까?",
       [
         {
           text: "편집하기",
-          onPress: () => router.push(`/persona/${personaId}`),
+          onPress: () => router.push(`/objective/${objectiveId}`), // ✅ 경로 변경
         },
         {
           text: "삭제하기",
-          onPress: () => showDeleteConfirmation(personaId, persona.title),
+          onPress: () => showDeleteConfirmation(objectiveId, objective.title),
           style: "destructive",
         },
         { text: "취소", style: "cancel" },
@@ -197,20 +191,25 @@ export default function HomeScreen() {
     );
   };
 
-  const showDeleteConfirmation = (personaId: string, title: string) => {
+  const showDeleteConfirmation = (objectiveId: string, title: string) => {
     Alert.alert(
-      `"${title}" 페르소나 삭제`,
-      "이 페르소나와 연결된 모든 데이터가 함께 삭제됩니다. 정말 삭제하시겠습니까?",
+      `"${title}" 목표 삭제`, // ✅ 텍스트 변경
+      "이 목표와 연결된 모든 데이터(문제, 스레드 등)가 함께 삭제됩니다. 정말 삭제하시겠습니까?", // ✅ 텍스트 변경
       [
         { text: "취소", style: "cancel" },
         {
           text: "삭제",
           onPress: async () => {
-            const success = await deletePersona(personaId);
+            const success = await deleteObjective(objectiveId);
             if (success) {
-              Alert.alert("성공", "페르소나가 삭제되었습니다.");
+              Toast.show({
+                text1: "삭제 완료",
+                text2: `"${title}" 목표가 삭제되었습니다.`,
+                position: "top",
+                visibilityTime: 2000,
+              });
             } else {
-              Alert.alert("오류", "페르소나 삭제에 실패했습니다.");
+              Alert.alert("오류", "목표 삭제에 실패했습니다.");
             }
           },
           style: "destructive",
@@ -221,97 +220,82 @@ export default function HomeScreen() {
   const handleNavigateToProblemDetail = (problemId: string) => {
     router.push(`/problem/${problemId}`);
   };
-  const handleNavigateToCreatePersona = () => {
-    router.push("/persona/create");
+  const handleNavigateToCreateObjective = () => {
+    router.push("/objective/create");
   };
   const handleCreateProblem = () => {
-    // ✅ 생성 페이지로 이동하면서, 현재 선택된 persona의 ID를 파라미터로 전달합니다.
-    if (selectedPersonaId) {
+    if (selectedObjectiveId) {
       router.push({
         pathname: "/problem/create",
-        params: { personaId: selectedPersonaId },
+        params: { objectiveId: selectedObjectiveId },
       });
     } else {
-      Alert.alert("알림", "문제를 생성할 페르소나를 먼저 선택해주세요.");
+      Alert.alert("알림", "문제를 생성할 목표를 먼저 선택해주세요.");
     }
   };
   const handleEditProblem = (problemId: string) => {
-    // ✅ 수정 페이지로 이동합니다.
     router.push(`/problem/${problemId}/edit`);
-  };
-  const handleCloseEditModal = () => {
-    setEditModalVisible(false);
   };
 
   const handleConfirmWeeklyProblem = (problemId: string) => {
-    if (!selectedPersonaId) return;
-
+    if (!selectedObjectiveId) return;
     const weekIdentifier = getWeekIdentifier(new Date());
-
-    // ✅ [추가] 기존 주간 문제가 있으면 ID를 찾아서 삭제 먼저 실행
     const existingWeeklyProblem = weeklyProblems.find(
       (wp) =>
-        wp.personaId === selectedPersonaId &&
+        wp.objectiveId === selectedObjectiveId &&
         wp.weekIdentifier === weekIdentifier
     );
     if (existingWeeklyProblem) {
       deleteWeeklyProblem(existingWeeklyProblem.id);
     }
 
-    // 새로운 주간 문제 추가
+    // FIX: Add the required 'notes' property with a value of null.
     addWeeklyProblem({
-      personaId: selectedPersonaId,
+      objectiveId: selectedObjectiveId,
       problemId,
       weekIdentifier,
+      notes: null,
     });
   };
 
-  // ✅ [수정] 기존 핸들러가 Alert 대신 모달을 열도록 변경
   const handleNavigateToSetWeeklyProblem = () => {
     setWeeklySelectModalVisible(true);
   };
-
-  // ✅ [수정] FAB를 누르면 AddTodoModal을 열도록 변경
   const handleCreateTodo = () => {
     setAddTodoModalVisible(true);
   };
-
-  // ✅ [추가] AddTodoModal에서 '저장'을 눌렀을 때 실행될 핸들러
   const handleSaveNewTodo = (content: string) => {
     addTodo({ content });
-    setAddTodoModalVisible(false); // 저장 후 모달 닫기
+    setAddTodoModalVisible(false);
   };
 
   const SolvaView = () => (
-    // ✅ FlatList 대신 ScrollView를 사용하고, sceneContainer 스타일을 적용합니다.
     <ScrollView
       style={styles.sceneContainer}
-      // ✅ 스크롤 콘텐츠 하단에 탭 바 높이만큼의 여백을 추가합니다.
-      contentContainerStyle={{ paddingBottom: tabBarHeight }}
+      contentContainerStyle={{ paddingBottom: bottom }}
       showsVerticalScrollIndicator={false}
     >
-      {selectedPersona ? (
+      {selectedObjective ? (
         <>
           <SessionBox />
           <WeeklyProblemCard
-            persona={selectedPersona}
+            objective={selectedObjective}
             weeklyProblem={currentWeeklyProblem}
             problem={problemForWeekly}
             onPress={handleNavigateToProblemDetail}
             onPressNew={handleNavigateToSetWeeklyProblem}
             onChangeWeeklyProblem={handleNavigateToSetWeeklyProblem}
           />
-          {/* ProblemList가 자체 카드 스타일을 가집니다. */}
           <ProblemList
-            persona={selectedPersona}
+            objective={selectedObjective}
             problems={activeProblems}
             onPressProblem={handleNavigateToProblemDetail}
-            onLongPressProblem={handleEditProblem}
+            onPressEdit={handleEditProblem}
+            onPressEmpty={handleCreateProblem}
           />
-          {/* ResolvedProblemList가 자체 카드 스타일을 가집니다. */}
           {resolvedProblems.length > 0 && (
             <ResolvedProblemList
-              persona={selectedPersona}
+              objective={selectedObjective}
               problems={resolvedProblems}
               onPressProblem={handleNavigateToProblemDetail}
             />
@@ -324,7 +308,7 @@ export default function HomeScreen() {
             style={styles.placeholderImage}
           />
           <Text style={styles.placeholderText}>
-            페르소나를 추가하거나 선택하여 작업을 시작해 보세요!
+            목표를 추가하거나 선택하여 작업을 시작해 보세요!
           </Text>
         </View>
       )}
@@ -340,18 +324,18 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <PersonaList
-        selectedPersonaId={selectedPersonaId}
-        onSelectPersona={handleSelectPersona}
-        onLongPressPersona={handleLongPressPersona}
-        onPressAddPersona={handleNavigateToCreatePersona}
+      {/* ✅ [변경] ObjectiveList 컴포넌트와 관련 props로 모두 변경 */}
+      <ObjectiveList
+        selectedObjectiveId={selectedObjectiveId}
+        onSelectObjective={handleSelectObjective}
+        onLongPressObjective={handleLongPressObjective}
+        onPressAddObjective={handleNavigateToCreateObjective}
       />
       <TabView
         navigationState={{ index, routes }}
         renderScene={renderScene}
         onIndexChange={setIndex}
         initialLayout={{ width: layout.width }}
-        // 1. TabBar의 컨테이너, 인디케이터, 색상 등을 설정합니다.
         renderTabBar={(props) => (
           <TabBar
             {...props}
@@ -365,7 +349,6 @@ export default function HomeScreen() {
           labelStyle: styles.tabLabel,
         }}
       />
-
       <View style={[styles.fabContainer, { bottom: tabBarHeight + 16 }]}>
         <FloatingActionButton
           mode={activeView}
@@ -388,32 +371,12 @@ export default function HomeScreen() {
   );
 }
 
-// ✅ 스타일 정의는 반드시 컴포넌트 선언 이후에 위치해야 합니다.
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
-  sceneContainer: {
-    flex: 1,
-    backgroundColor: "#f8f9fa",
-  },
-  placeholderContainer: {
-    flex: 1,
-    paddingTop: 70,
-    alignItems: "center",
-  },
-  placeholderText: {
-    fontSize: 16,
-    color: "#6c757d",
-    textAlign: "center",
-  },
-  placeholderImage: {
-    width: 180,
-    height: 180,
-    marginBottom: 24,
-    opacity: 0.8,
-  },
+  container: { flex: 1, backgroundColor: "#ffffff" },
+  sceneContainer: { flex: 1, backgroundColor: "#f8f9fa" },
+  placeholderContainer: { flex: 1, paddingTop: 70, alignItems: "center" },
+  placeholderText: { fontSize: 16, color: "#6c757d", textAlign: "center" },
+  placeholderImage: { width: 180, height: 180, marginBottom: 24, opacity: 0.8 },
   tabBar: {
     backgroundColor: "#ffffff",
     elevation: 0,
@@ -421,17 +384,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#e9ecef",
   },
-  tabIndicator: {
-    backgroundColor: "#212529",
-    height: 3,
-  },
-  tabLabel: {
-    fontSize: 15,
-    fontWeight: "bold",
-    textTransform: "none",
-  },
+  tabIndicator: { backgroundColor: "#212529", height: 3 },
+  tabLabel: { fontSize: 15, fontWeight: "bold", textTransform: "none" },
   listContentContainer: {},
-  // ✅ [추가] FlatList 자체에 적용할 카드 스타일
   listCardContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 8,
@@ -443,10 +398,10 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600",
     color: "#212529",
-    paddingHorizontal: 16, // 패딩 조정
-    paddingTop: 16, // 패딩 조정
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 8,
-    backgroundColor: "#ffffff", // ✅ 배경색을 카드의 흰색으로 통일
+    backgroundColor: "#ffffff",
   },
   newProblemButton: {
     flexDirection: "row",
@@ -465,8 +420,5 @@ const styles = StyleSheet.create({
     color: "#495057",
     marginLeft: 8,
   },
-  fabContainer: {
-    position: "absolute",
-    right: 16,
-  },
+  fabContainer: { position: "absolute", right: 16 },
 });

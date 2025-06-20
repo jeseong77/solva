@@ -12,13 +12,13 @@ export const createUIStateSlice: StateCreator<
   [],
   UIStateSliceInterface
 > = (set, get) => ({
-  selectedPersonaId: null, // 초기에는 아무것도 선택되지 않음
-  isLoading: false, // UI 관련 로딩 상태 (예: 페르소나 변경 시 등)
+  selectedObjectiveId: null,
+  isLoading: false,
   activeSession: null,
 
-  setSelectedPersonaId: (personaId) => {
-    console.log("[UIStateSlice] Selected Persona ID set to:", personaId);
-    set({ selectedPersonaId: personaId });
+  setSelectedObjectiveId: (objectiveId) => {
+    console.log("[UIStateSlice] Selected Objective ID set to:", objectiveId);
+    set({ selectedObjectiveId: objectiveId });
   },
 
   setGlobalLoading: (isLoading) => {
@@ -26,7 +26,6 @@ export const createUIStateSlice: StateCreator<
   },
 
   startSession: (threadId) => {
-    // 이미 다른 세션이 진행중이면 경고 (혹은 자동으로 중지)
     if (get().activeSession) {
       alert("이미 다른 세션이 진행 중입니다.");
       return;
@@ -34,9 +33,11 @@ export const createUIStateSlice: StateCreator<
     set({
       activeSession: {
         threadId,
-        startTime: Date.now(),
+        // FIX: Use new Date() instead of the number from Date.now()
+        startTime: new Date(),
         isPaused: false,
-        pausedTime: 0,
+        // FIX: Use a "zero" Date object for the initial paused time
+        pausedTime: new Date(0),
       },
     });
   },
@@ -45,12 +46,15 @@ export const createUIStateSlice: StateCreator<
     const session = get().activeSession;
     if (!session || session.isPaused) return;
 
-    const elapsed = Date.now() - session.startTime;
+    // FIX: Get numeric values from dates to do arithmetic
+    const elapsed = new Date().getTime() - session.startTime.getTime();
+
     set({
       activeSession: {
         ...session,
         isPaused: true,
-        pausedTime: session.pausedTime + elapsed,
+        // FIX: Get numeric values, add them, and create a new Date object
+        pausedTime: new Date(session.pausedTime.getTime() + elapsed),
       },
     });
   },
@@ -63,7 +67,8 @@ export const createUIStateSlice: StateCreator<
       activeSession: {
         ...session,
         isPaused: false,
-        startTime: Date.now(), // 타이머 기준 시간을 현재로 재설정
+        // FIX: Use new Date() to reset the start time for the new active period
+        startTime: new Date(),
       },
     });
   },

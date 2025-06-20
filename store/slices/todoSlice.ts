@@ -1,23 +1,18 @@
-import { getDatabase } from "@/lib/db";
+// src/store/slices/todoSlice.ts
+
+import { db } from "@/lib/db";
+import { todos } from "@/lib/db/schema";
 import { Todo } from "@/types";
 import type {
   AppState,
   TodoSlice as TodoSliceInterface,
 } from "@/types/storeTypes";
+import { desc, eq } from "drizzle-orm";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-/**
- * 데이터베이스에서 가져온 데이터를 Todo 타입으로 변환합니다.
- */
-const parseTodoFromDB = (dbItem: any): Todo => ({
-  id: dbItem.id,
-  content: dbItem.content,
-  isCompleted: !!dbItem.isCompleted,
-  createdAt: new Date(dbItem.createdAt),
-  completedAt: dbItem.completedAt ? new Date(dbItem.completedAt) : undefined,
-});
+// The parseTodoFromDB function is NO LONGER NEEDED.
 
 export const createTodoSlice: StateCreator<
   AppState,
@@ -34,11 +29,11 @@ export const createTodoSlice: StateCreator<
   fetchTodos: async () => {
     set({ isLoadingTodos: true });
     try {
-      const db = await getDatabase();
-      const results = await db.getAllAsync<any>(
-        "SELECT * FROM Todos ORDER BY createdAt DESC;"
-      );
-      const fetchedTodos = results.map(parseTodoFromDB);
+      const fetchedTodos = await db
+        .select()
+        .from(todos)
+        .orderBy(desc(todos.createdAt));
+
       set({ todos: fetchedTodos, isLoadingTodos: false });
       console.log(`[TodoSlice] ${fetchedTodos.length} todos fetched.`);
     } catch (error) {
@@ -56,19 +51,12 @@ export const createTodoSlice: StateCreator<
       content: todoData.content,
       isCompleted: false,
       createdAt: new Date(),
+      completedAt: null, // Explicitly set to null for the DB
     };
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO Todos (id, content, isCompleted, createdAt) VALUES (?, ?, ?, ?);`,
-        [
-          newTodo.id,
-          newTodo.content,
-          newTodo.isCompleted ? 1 : 0,
-          newTodo.createdAt.toISOString(),
-        ]
-      );
+      // Drizzle's type-safe insert
+      await db.insert(todos).values(newTodo);
 
       set((state) => ({ todos: [newTodo, ...state.todos] }));
       console.log("[TodoSlice] Todo added:", newTodo.id);
@@ -84,16 +72,15 @@ export const createTodoSlice: StateCreator<
    */
   updateTodo: async (todoToUpdate) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `UPDATE Todos SET content = ?, isCompleted = ?, completedAt = ? WHERE id = ?;`,
-        [
-          todoToUpdate.content,
-          todoToUpdate.isCompleted ? 1 : 0,
-          todoToUpdate.completedAt?.toISOString() ?? null,
-          todoToUpdate.id,
-        ]
-      );
+      // Drizzle's type-safe update
+      await db
+        .update(todos)
+        .set({
+          content: todoToUpdate.content,
+          isCompleted: todoToUpdate.isCompleted,
+          completedAt: todoToUpdate.completedAt,
+        })
+        .where(eq(todos.id, todoToUpdate.id));
 
       set((state) => ({
         todos: state.todos.map((t) =>
@@ -113,8 +100,9 @@ export const createTodoSlice: StateCreator<
    */
   deleteTodo: async (todoId) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(`DELETE FROM Todos WHERE id = ?;`, [todoId]);
+      // Drizzle's type-safe delete
+      await db.delete(todos).where(eq(todos.id, todoId));
+
       set((state) => ({
         todos: state.todos.filter((t) => t.id !== todoId),
       }));
@@ -130,6 +118,7 @@ export const createTodoSlice: StateCreator<
    * ID로 Todo를 동기적으로 조회합니다.
    */
   getTodoById: (id: string) => {
+    // No changes needed
     return get().todos.find((t) => t.id === id);
   },
 });

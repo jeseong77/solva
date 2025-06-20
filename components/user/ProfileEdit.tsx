@@ -1,5 +1,8 @@
+// components/profile/ProfileEdit.tsx
+
+import { pickAndSaveImage } from "@/lib/imageUtils";
 import { useAppStore } from "@/store/store";
-import { User } from "@/types";
+import { User, UserLink } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -18,13 +21,58 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { v4 as uuidv4 } from "uuid";
 import { useShallow } from "zustand/react/shallow";
-import { pickAndSaveImage } from "@/lib/imageUtils";
+
+// FormRow and LINK_PLATFORMS components remain the same...
+const FormRow = ({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = false,
+  autoCapitalize = "none",
+  keyboardType = "default",
+  numberOfLines,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder: string;
+  multiline?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  keyboardType?: "default" | "url" | "email-address";
+  numberOfLines?: number;
+}) => (
+  <View style={[styles.formRow, multiline && styles.formRowMultiline]}>
+    <Text style={styles.label}>{label}</Text>
+    <TextInput
+      style={[styles.input, multiline && styles.inputMultiline]}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="#adb5bd"
+      multiline={multiline}
+      autoCapitalize={autoCapitalize}
+      keyboardType={keyboardType}
+      numberOfLines={numberOfLines}
+      autoCorrect={false}
+      textContentType={keyboardType === "url" ? "URL" : "none"}
+    />
+  </View>
+);
+
+const LINK_PLATFORMS: UserLink["platform"][] = [
+  "website",
+  "github",
+  "linkedin",
+  "twitter",
+  "instagram",
+];
 
 export default function ProfileEdit() {
   const router = useRouter();
 
-  // 스토어에서 현재 user 정보와 updateUser 액션을 가져옵니다.
   const { user, updateUser } = useAppStore(
     useShallow((state) => ({
       user: state.user,
@@ -32,19 +80,16 @@ export default function ProfileEdit() {
     }))
   );
 
-  // --- UI 및 데이터 상태 관리 ---
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [introduction, setIntroduction] = useState("");
   const [location, setLocation] = useState("");
+  const [links, setLinks] = useState<Record<string, string>>({});
   const [avatarImageUri, setAvatarImageUri] = useState<string | undefined>();
   const [coverImageUri, setCoverImageUri] = useState<string | undefined>();
-
-  const [hasChanges, setHasChanges] = useState(false); // 변경 여부 감지
+  const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- 데이터 로딩 ---
-  // 화면에 들어올 때 스토어의 user 데이터로 상태를 초기화합니다.
   useFocusEffect(
     useCallback(() => {
       if (user) {
@@ -52,34 +97,33 @@ export default function ProfileEdit() {
         setBio(user.bio || "");
         setIntroduction(user.introduction || "");
         setLocation(user.location || "");
-        setAvatarImageUri(user.avatarImageUri);
-        setCoverImageUri(user.coverImageUri);
+        // FIX: Convert `null` from the user object to `undefined` for local state.
+        setAvatarImageUri(user.avatarImageUri || undefined);
+        setCoverImageUri(user.coverImageUri || undefined);
+
+        const existingLinks = user.links?.reduce((acc, link) => {
+          if (link.platform) {
+            // a null check for safety
+            acc[link.platform] = link.url;
+          }
+          return acc;
+        }, {} as Record<string, string>);
+        setLinks(existingLinks || {});
       }
-      // 화면에 들어올 때는 변경사항이 없는 상태로 시작
       setHasChanges(false);
     }, [user])
   );
 
-  // --- 핸들러 함수 ---
-  // 입력 필드 값이 변경될 때, 상태와 함께 '변경 여부'도 업데이트합니다.
   const createChangeHandler =
-    <T,>(setter: React.Dispatch<React.SetStateAction<T>>) =>
-    (value: T) => {
+    (setter: React.Dispatch<React.SetStateAction<string>>) =>
+    (value: string) => {
       setter(value);
       setHasChanges(true);
     };
 
-  const handleDisplayNameChange = createChangeHandler(setDisplayName);
-  const handleBioChange = createChangeHandler(setBio);
-  const handleIntroductionChange = createChangeHandler(setIntroduction);
-  const handleLocationChange = createChangeHandler(setLocation);
-
-  const handleCoverImageChange = async () => {
-    const newUri = await pickAndSaveImage();
-    if (newUri) {
-      setCoverImageUri(newUri);
-      setHasChanges(true);
-    }
+  const handleLinkChange = (platform: string, url: string) => {
+    setLinks((prev) => ({ ...prev, [platform]: url }));
+    setHasChanges(true);
   };
 
   const handleAvatarImageChange = async () => {
@@ -90,14 +134,41 @@ export default function ProfileEdit() {
     }
   };
 
+  const handleCoverImageChange = async () => {
+    const newUri = await pickAndSaveImage();
+    if (newUri) {
+      setCoverImageUri(newUri);
+      setHasChanges(true);
+    }
+  };
   const handleSave = async () => {
     if (!user) return;
     if (!displayName.trim()) {
       Alert.alert("이름 필요", "이름은 필수 항목입니다.");
       return;
     }
-
     setIsSaving(true);
+
+    // FIX: The object created in this .map() now perfectly matches the UserLink shape.
+    const updatedLinks = Object.entries(links)
+      .map(([platform, url]) => {
+        if (url && url.trim()) {
+          const existingLink = user.links?.find((l) => l.platform === platform);
+          return {
+            // Use existing ID or generate a new one for new links
+            id: existingLink?.id || uuidv4(),
+            platform: platform as UserLink["platform"],
+            url: url.trim(),
+            // Preserve existing title or default to null
+            title: existingLink?.title ?? null,
+            // Add the required userId
+            userId: user.id,
+          };
+        }
+        return null;
+      })
+      // This filter now works correctly because the object shape matches UserLink
+      .filter((l): l is UserLink => l !== null);
 
     const updatedUser: User = {
       ...user,
@@ -105,9 +176,10 @@ export default function ProfileEdit() {
       bio: bio.trim(),
       introduction: introduction.trim(),
       location: location.trim(),
-      avatarImageUri,
-      coverImageUri,
-      // 링크(links) 수정 기능은 추후 이 곳에 추가
+      avatarImageUri: avatarImageUri ?? null,
+      coverImageUri: coverImageUri ?? null,
+      // This assignment is now valid because updatedLinks is of type UserLink[]
+      links: updatedLinks,
     };
 
     const result = await updateUser(updatedUser);
@@ -121,7 +193,6 @@ export default function ProfileEdit() {
     }
   };
 
-  // User 데이터 로딩 전 UI
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
@@ -132,7 +203,6 @@ export default function ProfileEdit() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* --- 커스텀 헤더 --- */}
       <View style={styles.customHeader}>
         <TouchableOpacity
           style={styles.headerButton}
@@ -152,7 +222,7 @@ export default function ProfileEdit() {
               (!hasChanges || isSaving) && styles.headerSaveButtonDisabled,
             ]}
           >
-            {isSaving ? "저장 중..." : "저장"}
+            {isSaving ? "저장중..." : "저장"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -161,11 +231,7 @@ export default function ProfileEdit() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          style={styles.scrollView}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* 커버 이미지 */}
+        <ScrollView keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={handleCoverImageChange}
@@ -174,59 +240,73 @@ export default function ProfileEdit() {
               source={coverImageUri ? { uri: coverImageUri } : undefined}
               style={styles.coverImage}
             >
-              <Feather name="camera" size={24} color="rgba(255,255,255,0.8)" />
+              {!coverImageUri && (
+                <Feather name="image" size={32} color="rgba(0,0,0,0.3)" />
+              )}
+              <View style={styles.coverEditIcon}>
+                <Feather name="camera" size={16} color="#343a40" />
+              </View>
             </ImageBackground>
           </TouchableOpacity>
 
-          {/* 아바타 및 이름 */}
-          <View style={styles.profileSection}>
-            <TouchableOpacity onPress={handleAvatarImageChange}>
-              <View style={styles.avatar}>
-                {avatarImageUri ? (
-                  <Image
-                    source={{ uri: avatarImageUri }}
-                    style={styles.avatarImage}
-                  />
-                ) : (
+          <View style={styles.profileHeader}>
+            <TouchableOpacity
+              style={styles.avatarContainer}
+              onPress={handleAvatarImageChange}
+            >
+              {avatarImageUri ? (
+                <Image
+                  source={{ uri: avatarImageUri }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
                   <Feather name="user" size={40} color="#adb5bd" />
-                )}
-              </View>
+                </View>
+              )}
             </TouchableOpacity>
-            <TextInput
-              style={styles.inputDisplayName}
-              value={displayName}
-              onChangeText={handleDisplayNameChange}
-              placeholder="이름"
-            />
           </View>
 
-          {/* 나머지 입력 필드 */}
-          <View style={styles.formSection}>
-            <Text style={styles.label}>한 줄 소개 (Bio)</Text>
-            <TextInput
-              style={styles.input}
+          <View style={styles.formContainer}>
+            <FormRow
+              label="이름"
+              value={displayName}
+              onChangeText={createChangeHandler(setDisplayName)}
+              placeholder="이름을 입력하세요"
+              autoCapitalize="words"
+            />
+            <FormRow
+              label="소개"
               value={bio}
-              onChangeText={handleBioChange}
+              onChangeText={createChangeHandler(setBio)}
               placeholder="자신을 한 문장으로 표현해보세요"
             />
-
-            <Text style={styles.label}>지역</Text>
-            <TextInput
-              style={styles.input}
+            {/* ✅ [추가] 자기소개 필드 */}
+            <FormRow
+              label="자기소개"
+              value={introduction}
+              onChangeText={createChangeHandler(setIntroduction)}
+              placeholder="자신에 대해 더 자세히 알려주세요"
+            />
+            {/* ✅ [추가] 지역 필드 */}
+            <FormRow
+              label="지역"
               value={location}
-              onChangeText={handleLocationChange}
+              onChangeText={createChangeHandler(setLocation)}
               placeholder="활동 지역 (예: Seoul, Korea)"
             />
 
-            <Text style={styles.label}>자기소개</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={introduction}
-              onChangeText={handleIntroductionChange}
-              placeholder="자신에 대해 더 자세히 알려주세요"
-              multiline
-            />
-            {/* TODO: 링크 수정 UI 추가 */}
+            {/* 링크 입력 필드 */}
+            {LINK_PLATFORMS.map((platform) => (
+              <FormRow
+                key={platform}
+                label={platform.charAt(0).toUpperCase() + platform.slice(1)}
+                value={links[platform] || ""}
+                onChangeText={(url) => handleLinkChange(platform, url)}
+                placeholder={`${platform} URL`}
+                keyboardType="url"
+              />
+            ))}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -236,7 +316,10 @@ export default function ProfileEdit() {
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#ffffff" },
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+  },
   customHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -244,68 +327,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#e9ecef",
+    borderBottomColor: "#f1f3f5",
   },
   headerButton: { padding: 4 },
   headerTitle: { fontSize: 17, fontWeight: "600" },
   headerSaveButton: { fontSize: 16, fontWeight: "bold", color: "#007AFF" },
   headerSaveButtonDisabled: { color: "#adb5bd" },
-  scrollView: { flex: 1 },
   coverImage: {
-    width: "100%",
     height: 220,
     backgroundColor: "#e9ecef",
     justifyContent: "center",
     alignItems: "center",
   },
-  profileSection: {
-    paddingHorizontal: 16,
-    marginTop: -40,
+  coverEditIcon: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    padding: 8,
+    borderRadius: 20,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#f1f3f5",
+  profileHeader: {
+    paddingHorizontal: 16,
+    marginTop: -45,
+  },
+  avatarContainer: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
-    borderColor: "#ffffff",
+    borderColor: "#40c057",
+    backgroundColor: "#e9ecef",
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 45,
+  },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 45,
+    backgroundColor: "#f1f3f5",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
   },
-  avatarImage: { width: "100%", height: "100%" },
-  inputDisplayName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#212529",
-    marginTop: 12,
+  formContainer: {
+    paddingLeft: 16,
+    marginTop: 24,
+  },
+  formRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 50,
     borderBottomWidth: 1,
-    borderColor: "#dee2e6",
-    paddingBottom: 8,
+    borderBottomColor: "#f1f3f5",
+    paddingRight: 16,
   },
-  formSection: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
+  // ✅ [추가] 멀티라인 행을 위한 스타일
+  formRowMultiline: {
+    alignItems: "flex-start",
   },
   label: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#495057",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#f8f9fa",
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    width: 90,
     fontSize: 16,
-    marginBottom: 20,
     color: "#212529",
   },
-  textArea: {
-    minHeight: 120,
-    textAlignVertical: "top",
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: "#212529",
+  },
+  // ✅ [추가] 멀티라인 입력을 위한 스타일
+  inputMultiline: {
+    textAlignVertical: "top", // 안드로이드에서 텍스트를 상단에 정렬
   },
 });

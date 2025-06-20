@@ -1,3 +1,5 @@
+// components/problem/SelectWeeklyProblemModal.tsx
+
 import { useAppStore } from "@/store/store";
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
@@ -15,7 +17,6 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import SelectableProblemItem from "./SelectableProblemItem";
 
-// 컴포넌트가 받을 Props 정의
 interface SelectWeeklyProblemModalProps {
   isVisible: boolean;
   onClose: () => void;
@@ -33,19 +34,19 @@ export default function SelectWeeklyProblemModal({
     null
   );
 
-  const { problems, selectedPersonaId } = useAppStore(
+  const { problems, selectedObjectiveId } = useAppStore(
     useShallow((state) => ({
       problems: state.problems,
-      selectedPersonaId: state.selectedPersonaId,
+      selectedObjectiveId: state.selectedObjectiveId,
     }))
   );
 
   const selectableProblems = useMemo(() => {
-    if (!selectedPersonaId) return [];
+    if (!selectedObjectiveId) return [];
     return problems.filter(
-      (p) => p.personaId === selectedPersonaId && p.status === "active"
+      (p) => p.objectiveId === selectedObjectiveId && p.status === "active"
     );
-  }, [selectedPersonaId, problems]);
+  }, [selectedObjectiveId, problems]);
 
   const handleConfirm = () => {
     if (selectedProblemId) {
@@ -55,7 +56,7 @@ export default function SelectWeeklyProblemModal({
   };
 
   const handleClose = () => {
-    setSelectedProblemId(null); // 선택 상태 초기화
+    setSelectedProblemId(null);
     onClose();
   };
 
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f9fa",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: SCREEN_HEIGHT * 0.7, // 화면 높이의 70%
+    maxHeight: SCREEN_HEIGHT * 0.7,
     paddingBottom: 32,
   },
   header: {
@@ -179,7 +180,8 @@ const styles = StyleSheet.create({
     borderColor: "#e9ecef",
   },
   button: {
-    backgroundColor: "#1971c2",
+    // FIX: Changed the background color to your app's main color.
+    backgroundColor: "#2b8a3e",
     padding: 16,
     borderRadius: 8,
     alignItems: "center",

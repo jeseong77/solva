@@ -1,30 +1,19 @@
 // src/store/slices/starReportSlice.ts
 
-import { getDatabase } from "@/lib/db";
+import { db } from "@/lib/db";
+import { starReports } from "@/lib/db/schema";
 import { StarReport } from "@/types";
 import type {
   AppState,
   StarReportSlice as StarReportSliceInterface,
 } from "@/types/storeTypes";
+import { eq } from "drizzle-orm";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-/**
- * 데이터베이스에서 가져온 데이터를 StarReport 타입으로 변환합니다.
- * @param dbItem - 데이터베이스의 row 아이템
- * @returns StarReport 타입 객체
- */
-const parseStarReportFromDB = (dbItem: any): StarReport => ({
-  id: dbItem.id,
-  problemId: dbItem.problemId,
-  situation: dbItem.situation,
-  task: dbItem.task,
-  action: dbItem.action,
-  result: dbItem.result,
-  learnings: dbItem.learnings === null ? undefined : dbItem.learnings,
-  createdAt: new Date(dbItem.createdAt),
-});
+// The parseStarReportFromDB function is NO LONGER NEEDED.
+// Drizzle and our inferred types handle this automatically.
 
 export const createStarReportSlice: StateCreator<
   AppState,
@@ -41,17 +30,20 @@ export const createStarReportSlice: StateCreator<
   fetchStarReports: async (problemId?: string) => {
     set({ isLoadingStarReports: true });
     try {
-      const db = await getDatabase();
-      let query = "SELECT * FROM StarReports";
-      const params: string[] = [];
-      if (problemId) {
-        query += " WHERE problemId = ?";
-        params.push(problemId);
-      }
-      const dbResults = await db.getAllAsync<any>(query, params);
-      const fetchedReports = dbResults.map(parseStarReportFromDB);
+      let fetchedReports: StarReport[];
 
-      // 기존 상태와 병합
+      if (problemId) {
+        // Drizzle query to fetch by problemId
+        fetchedReports = await db
+          .select()
+          .from(starReports)
+          .where(eq(starReports.problemId, problemId));
+      } else {
+        // Drizzle query to fetch all reports
+        fetchedReports = await db.select().from(starReports);
+      }
+
+      // Client-side logic for merging state without duplicates is preserved.
       const existingIds = new Set(fetchedReports.map((r) => r.id));
       const untouchedReports = get().starReports.filter(
         (r) => !existingIds.has(r.id)
@@ -75,41 +67,28 @@ export const createStarReportSlice: StateCreator<
    * 새로운 StarReport를 추가하고, 부모 Problem의 starReportId를 업데이트합니다.
    */
   addStarReport: async (reportData) => {
-    const newStarReport: StarReport = {
-      id: uuidv4(),
-      createdAt: new Date(),
-      ...reportData,
-    };
-
-    // 한 Problem에 하나의 StarReport만 존재하도록 보장
-    const existingReport = get().getStarReportByProblemId(
-      newStarReport.problemId
-    );
+    // CRITICAL: This application logic to ensure a 1-to-1 relationship is preserved.
+    const existingReport = get().getStarReportByProblemId(reportData.problemId);
     if (existingReport) {
       console.warn(
-        `[StarReportSlice] StarReport already exists for problem ${newStarReport.problemId}. Aborting.`
+        `[StarReportSlice] StarReport already exists for problem ${reportData.problemId}. Aborting.`
       );
       return null;
     }
 
-    try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO StarReports (id, problemId, situation, task, action, result, learnings, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-        [
-          newStarReport.id,
-          newStarReport.problemId,
-          newStarReport.situation,
-          newStarReport.task,
-          newStarReport.action,
-          newStarReport.result,
-          newStarReport.learnings ?? null,
-          newStarReport.createdAt.toISOString(),
-        ]
-      );
+    const newStarReport: StarReport = {
+      id: uuidv4(),
+      createdAt: new Date(),
+      ...reportData,
+      // Ensure optional learnings is null, not undefined, for the database
+      learnings: reportData.learnings ?? null,
+    };
 
-      // 부모 Problem의 starReportId 필드 업데이트
+    try {
+      // Drizzle's insert query is type-safe.
+      await db.insert(starReports).values(newStarReport);
+
+      // CRITICAL: The logic to update the parent Problem is preserved exactly.
       const parentProblem = get().getProblemById(newStarReport.problemId);
       if (parentProblem) {
         const updatedProblem = {
@@ -139,19 +118,17 @@ export const createStarReportSlice: StateCreator<
    */
   updateStarReport: async (reportToUpdate) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `UPDATE StarReports SET situation = ?, task = ?, action = ?, result = ?, learnings = ?
-         WHERE id = ?;`,
-        [
-          reportToUpdate.situation,
-          reportToUpdate.task,
-          reportToUpdate.action,
-          reportToUpdate.result,
-          reportToUpdate.learnings ?? null,
-          reportToUpdate.id,
-        ]
-      );
+      // Drizzle's update query.
+      await db
+        .update(starReports)
+        .set({
+          situation: reportToUpdate.situation,
+          task: reportToUpdate.task,
+          action: reportToUpdate.action,
+          result: reportToUpdate.result,
+          learnings: reportToUpdate.learnings,
+        })
+        .where(eq(starReports.id, reportToUpdate.id));
 
       set((state) => ({
         starReports: state.starReports.map((sr) =>
@@ -175,10 +152,10 @@ export const createStarReportSlice: StateCreator<
     if (!reportToDelete) return false;
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(`DELETE FROM StarReports WHERE id = ?;`, [reportId]);
+      // Drizzle's delete query.
+      await db.delete(starReports).where(eq(starReports.id, reportId));
 
-      // 부모 Problem의 starReportId 필드를 null로 업데이트
+      // CRITICAL: The logic to update the parent Problem is preserved exactly.
       const parentProblem = get().getProblemById(reportToDelete.problemId);
       if (parentProblem) {
         const updatedProblem = { ...parentProblem, starReportId: null };
@@ -201,6 +178,7 @@ export const createStarReportSlice: StateCreator<
    * ID로 StarReport를 동기적으로 조회합니다.
    */
   getStarReportById: (id: string) => {
+    // No changes needed.
     return get().starReports.find((sr) => sr.id === id);
   },
 
@@ -208,6 +186,7 @@ export const createStarReportSlice: StateCreator<
    * Problem ID로 StarReport를 동기적으로 조회합니다.
    */
   getStarReportByProblemId: (problemId: string) => {
+    // No changes needed.
     return get().starReports.find((sr) => sr.problemId === problemId);
   },
 });

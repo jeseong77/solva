@@ -1,49 +1,47 @@
-import ProfileCard from "@/components/user/ProfileCard";
+// app/(tabs)/profile.tsx
+
 import StarReportList from "@/components/report/StarReportList";
+import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
+import ProfileCard from "@/components/user/ProfileCard";
 import { useAppStore } from "@/store/store";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const bottom = useBottomTabOverflow();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // ✅ [변경] Persona -> Objective 관련 상태와 액션으로 변경
   const {
     user,
-    personas,
+    objectives, // personas -> objectives
     problems,
     threadItems,
     starReports,
     fetchStarReports,
     fetchProblems,
-    fetchPersonas,
+    fetchObjectives, // fetchPersonas -> fetchObjectives
     fetchThreads,
   } = useAppStore(
     useShallow((state) => ({
       user: state.user,
-      personas: state.personas,
+      objectives: state.objectives, // state.personas -> state.objectives
       problems: state.problems,
       threadItems: state.threadItems,
       starReports: state.starReports,
       fetchStarReports: state.fetchStarReports,
       fetchProblems: state.fetchProblems,
-      fetchPersonas: state.fetchPersonas,
+      fetchObjectives: state.fetchObjectives, // state.fetchPersonas -> state.fetchObjectives
       fetchThreads: state.fetchThreads,
     }))
   );
 
   const loadProfileData = useCallback(async () => {
-    await Promise.all([fetchPersonas(), fetchProblems(), fetchStarReports()]);
+    // ✅ [변경] fetchPersonas -> fetchObjectives
+    await Promise.all([fetchObjectives(), fetchProblems(), fetchStarReports()]);
     const currentProblems = useAppStore.getState().problems;
     if (currentProblems.length > 0) {
       const threadFetchPromises = currentProblems.map((p) =>
@@ -51,7 +49,7 @@ export default function ProfileScreen() {
       );
       await Promise.all(threadFetchPromises);
     }
-  }, [fetchPersonas, fetchProblems, fetchStarReports, fetchThreads]);
+  }, [fetchObjectives, fetchProblems, fetchStarReports, fetchThreads]);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -72,28 +70,38 @@ export default function ProfileScreen() {
 
   const profileStats = useMemo(() => {
     if (!user) return null;
-    const userPersonas = personas.filter((p) => p.userId === user.id);
-    const userProblemIds = new Set(userPersonas.flatMap((p) => p.problemIds));
+
+    // Dynamically derive userProblemIds
+    const userProblemIds = new Set(
+      problems
+        .filter((p) => objectives.some((o) => o.id === p.objectiveId))
+        .map((p) => p.id)
+    );
+
     const userProblems = problems.filter((p) => userProblemIds.has(p.id));
     const problemsSolved = userProblems.filter(
       (p) => p.status === "resolved"
     ).length;
+
     const totalSeconds = threadItems
-      .filter((t) => userProblemIds.has(t.problemId)) // 현재 유저의 문제에 속한 스레드만 필터링
+      .filter((t) => userProblemIds.has(t.problemId))
       .reduce((sum, item) => {
-        // 'Action' 또는 'Session' 타입에만 timeSpent가 존재
         if (item.type === "Action" || item.type === "Session") {
           return sum + (item.timeSpent || 0);
         }
         return sum;
       }, 0);
-    const totalHours = totalSeconds / 3600; // 초 단위를 시간으로
-    const activePersonas = userPersonas.length;
-    const insightsGained = threadItems.filter(
-      (t) => t.type === "Insight"
+
+    const totalHours = totalSeconds / 3600;
+    const activeObjectives = objectives.filter(
+      (o) => o.userId === user.id
     ).length;
-    return { problemsSolved, totalHours, activePersonas, insightsGained };
-  }, [user, personas, problems, threadItems]);
+    const insightsGained = threadItems.filter(
+      (t) => userProblemIds.has(t.problemId) && t.type === "Insight"
+    ).length;
+
+    return { problemsSolved, totalHours, activeObjectives, insightsGained };
+  }, [user, objectives, problems, threadItems]);
 
   const validAndSortedReports = useMemo(() => {
     const problemIdSet = new Set(problems.map((p) => p.id));

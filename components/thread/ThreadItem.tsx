@@ -1,7 +1,9 @@
+// components/thread/ThreadItem.tsx
+
 import { useAppStore } from "@/store/store";
 import {
   ActionThreadItem,
-  Persona,
+  Objective,
   Problem,
   SessionThreadItem,
   TaskThreadItem,
@@ -47,7 +49,7 @@ const formatSeconds = (totalSeconds: number): string => {
 
 interface ThreadItemProps {
   thread: ThreadItemData;
-  persona: Persona;
+  objective: Objective;
   problem: Problem;
   onReply: (threadId: string) => void;
   onStartSession: (threadId: string) => void;
@@ -59,7 +61,7 @@ interface ThreadItemProps {
 
 export default function ThreadItem({
   thread,
-  persona,
+  objective,
   problem,
   onReply,
   onStartSession,
@@ -80,7 +82,8 @@ export default function ThreadItem({
   const isCompletable = thread.type === "Task" || thread.type === "Action";
   let isCompleted = false;
   if (thread.type === "Task") {
-    isCompleted = (thread as TaskThreadItem).isCompleted;
+    // FIX: Safely convert boolean | null to a strict boolean.
+    isCompleted = !!(thread as TaskThreadItem).isCompleted;
   } else if (thread.type === "Action") {
     isCompleted = (thread as ActionThreadItem).status === "completed";
   }
@@ -91,14 +94,16 @@ export default function ThreadItem({
     }
     const sessions = thread.childThreadIds
       .map((id) => getThreadItemById(id))
-      .filter((item): item is SessionThreadItem => item?.type === "Session");
+      .filter(
+        (item): item is SessionThreadItem => !!item && item.type === "Session"
+      );
     const totalTime = sessions.reduce((sum, s) => sum + (s.timeSpent || 0), 0);
     return { sessions, totalTime };
   }, [thread.childThreadIds, getThreadItemById]);
 
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
-  }).format(new Date(thread.createdAt));
+  }).format(new Date(thread.createdAt as Date)); // Added type assertion for safety
 
   const tagStyle =
     thread.type !== "Session"
@@ -150,13 +155,11 @@ export default function ThreadItem({
           </Text>
         </View>
 
-        {/* ✅ [수정] 푸터의 모든 텍스트 제거 및 아이콘 변경 */}
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => onReply(thread.id)}
           >
-            {/* 'Reply' 아이콘을 'corner-down-right'로 변경 */}
             <Feather name="corner-down-right" size={18} color="#495057" />
           </TouchableOpacity>
           <TouchableOpacity
@@ -214,7 +217,8 @@ export default function ThreadItem({
                       {session.content || "기록 없음"}
                     </Text>
                     <Text style={styles.sessionTime}>
-                      {formatSeconds(session.timeSpent)}
+                      {/* FIX: Provide a fallback of 0 in case timeSpent is null. */}
+                      {formatSeconds(session.timeSpent ?? 0)}
                     </Text>
                   </View>
                 ))}
@@ -253,7 +257,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 13,
     color: "#868e96",
-    flexShrink: 1
+    flexShrink: 1,
   },
   menuTrigger: {
     padding: 4,
@@ -270,12 +274,12 @@ const styles = StyleSheet.create({
   },
   typeTagText: {
     fontSize: 12,
-    fontWeight: "bold"
+    fontWeight: "bold",
   },
   contentText: {
     fontSize: 15,
     lineHeight: 22,
-    color: "#343a40"
+    color: "#343a40",
   },
   completedText: {
     textDecorationLine: "line-through",
@@ -303,12 +307,12 @@ const styles = StyleSheet.create({
   summaryText: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#495057"
+    color: "#495057",
   },
   sessionList: {
     borderTopWidth: 1,
     borderColor: "#e9ecef",
-    padding: 12
+    padding: 12,
   },
   sessionItem: {
     flexDirection: "row",
@@ -318,7 +322,7 @@ const styles = StyleSheet.create({
   sessionContent: {
     fontSize: 14,
     color: "#495057",
-    flex: 1
+    flex: 1,
   },
   sessionTime: {
     fontSize: 14,

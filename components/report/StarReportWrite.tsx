@@ -6,7 +6,7 @@ import {
   ThreadItemType,
 } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react"; // ✅ useEffect 추가
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   SafeAreaView,
@@ -16,11 +16,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view"; // ✅ [추가]
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useShallow } from "zustand/react/shallow";
 import StarReportPreviewModal from "./StarReportPreviewModal";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  interpolateColor,
+} from "react-native-reanimated"; // ✅ Reanimated 훅 추가
 
-// 초(seconds)를 HH:MM:SS 형식으로 변환하는 헬퍼 함수
+// --- Helper Functions and Constants ---
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) return "00:00";
   const hours = Math.floor(totalSeconds / 3600);
@@ -34,21 +40,66 @@ const formatSeconds = (totalSeconds: number): string => {
   return parts.join(":");
 };
 
-// ✅ [추가] 타입별 칩 스타일 정보
 const typeStyles: {
-  [key in Exclude<ThreadItemType, "Session">]: {
+  [key in Exclude<ThreadItemType, "Session" | "General">]: {
     color: string;
-    backgroundColor: string;
     name: string;
   };
 } = {
-  General: { color: "#1c7ed6", backgroundColor: "#d0ebff", name: "일반" },
-  Bottleneck: { color: "#f76707", backgroundColor: "#fff4e6", name: "병목" },
-  Task: { color: "#2b8a3e", backgroundColor: "#e6fcf5", name: "할 일" },
-  Action: { color: "#d9480f", backgroundColor: "#fff0f6", name: "액션" },
-  Insight: { color: "#845ef7", backgroundColor: "#f3f0ff", name: "인사이트" },
+  Insight: { color: "#2b8a3e", name: "인사이트" },
+  Bottleneck: { color: "#2b8a3e", name: "병목" },
+  Task: { color: "#2b8a3e", name: "할 일" },
+  Action: { color: "#2b8a3e", name: "액션" },
 };
 
+// ✅ [추가] 애니메이션이 적용된 입력창 그룹 컴포넌트
+interface StarInputGroupProps {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+}
+const StarInputGroup: React.FC<StarInputGroupProps> = ({ label, value, onChangeText, placeholder }) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
+  }, [isFocused]);
+
+  const animatedContainerStyle = useAnimatedStyle(() => {
+    const borderColor = interpolateColor(
+      progress.value,
+      [0, 1],
+      ["#e9ecef", "#2b8a3e"]
+    );
+    return {
+      borderColor,
+    };
+  });
+
+  return (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <Animated.View
+        style={[styles.textInputContainer, animatedContainerStyle]}
+      >
+        <TextInput
+          style={styles.textInput}
+          placeholder={placeholder}
+          placeholderTextColor="#adb5bd"
+          multiline
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+      </Animated.View>
+    </View>
+  );
+};
+
+// --- Main Component ---
 interface StarReportWriteProps {
   isVisible: boolean;
   onClose: () => void;
@@ -60,15 +111,12 @@ export default function StarReportWrite({
   problemId,
 }: StarReportWriteProps) {
   const [isPreviewVisible, setPreviewVisible] = useState(false);
-
-  // ✅ [추가] STAR 필드 입력을 위한 상태
   const [situation, setSituation] = useState("");
   const [task, setTask] = useState("");
   const [action, setAction] = useState("");
   const [result, setResult] = useState("");
   const [learnings, setLearnings] = useState("");
 
-  // ✅ [추가] 스토어에서 데이터 및 액션 가져오기
   const {
     getProblemById,
     getStarReportByProblemId,
@@ -83,23 +131,20 @@ export default function StarReportWrite({
     }))
   );
 
-  // ✅ [추가] prop으로 받은 problemId를 기반으로 데이터 조회
   const problem = getProblemById(problemId);
   const starReport = getStarReportByProblemId(problemId);
   const problemThreads = threadItems.filter((t) => t.problemId === problemId);
 
-  // ✅ [추가] 모달이 열리거나, starReport 데이터가 로드되면 입력 필드 상태를 초기화/업데이트
   useEffect(() => {
-    if (starReport) {
-      setSituation(starReport.situation);
-      setTask(starReport.task);
-      setAction(starReport.action);
-      setResult(starReport.result);
+    if (isVisible && starReport) {
+      setSituation(starReport.situation || "");
+      setTask(starReport.task || "");
+      setAction(starReport.action || "");
+      setResult(starReport.result || "");
       setLearnings(starReport.learnings || "");
     }
-  }, [starReport]);
+  }, [isVisible, starReport]);
 
-  // ✅ [추가] 저장 핸들러
   const handleSave = () => {
     if (!starReport) return;
     const updatedReport: StarReport = {
@@ -124,12 +169,10 @@ export default function StarReportWrite({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>
-        {/* 고정 헤더 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
             <Feather name="x" size={24} color="#343a40" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>STAR 리포트 작성</Text>
           <View style={styles.headerRightContainer}>
             <TouchableOpacity onPress={() => setPreviewVisible(true)}>
               <Text style={styles.headerButton}>미리보기</Text>
@@ -145,17 +188,9 @@ export default function StarReportWrite({
         <KeyboardAwareScrollView
           style={styles.scrollView}
           keyboardShouldPersistTaps="handled"
-          extraScrollHeight={20} // 키보드와 입력창 사이의 추가 여백 (선택 사항)
         >
-          {/* 참고 정보 섹션 */}
           <View style={styles.referenceSection}>
-            {/* ✅ [수정] 제목과 아이콘을 포함하는 컨테이너 View로 변경 */}
-            <View style={styles.problemTitleContainer}>
-              <Text style={styles.problemTitle}>{problem.title}</Text>
-              <TouchableOpacity>
-                <Feather name="chevron-right" size={28} color="#adb5bd" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.problemTitle}>{problem.title}</Text>
             <Text style={styles.sectionTitle}>문제 해결 과정 요약</Text>
             {problemThreads
               .filter((t) => !t.parentId)
@@ -169,57 +204,44 @@ export default function StarReportWrite({
               ))}
           </View>
 
-          {/* STAR 입력 섹션 */}
           <View style={styles.inputSection}>
             <Text style={styles.sectionTitle}>STAR 회고</Text>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Situation (상황)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="문제가 발생한 배경이나 맥락은 어땠나요?"
-                multiline
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Task (과제)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="해결해야 할 구체적인 과제는 무엇이었나요?"
-                multiline
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Action (행동)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="과제를 해결하기 위해 어떤 행동을 했나요?"
-                multiline
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Result (결과)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="행동의 결과로 어떤 변화가 있었나요?"
-                multiline
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Learnings (배운 점)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="이번 경험을 통해 무엇을 배웠나요?"
-                multiline
-              />
-            </View>
+            <StarInputGroup
+              label="Situation (상황)"
+              placeholder="문제가 발생한 배경이나 맥락은 어땠나요?"
+              value={situation}
+              onChangeText={setSituation}
+            />
+            <StarInputGroup
+              label="Task (과제)"
+              placeholder="해결해야 할 구체적인 과제는 무엇이었나요?"
+              value={task}
+              onChangeText={setTask}
+            />
+            <StarInputGroup
+              label="Action (행동)"
+              placeholder="과제를 해결하기 위해 어떤 행동을 했나요?"
+              value={action}
+              onChangeText={setAction}
+            />
+            <StarInputGroup
+              label="Result (결과)"
+              placeholder="행동의 결과로 어떤 변화가 있었나요?"
+              value={result}
+              onChangeText={setResult}
+            />
+            <StarInputGroup
+              label="Learnings (배운 점)"
+              placeholder="이번 경험을 통해 무엇을 배웠나요?"
+              value={learnings}
+              onChangeText={setLearnings}
+            />
           </View>
         </KeyboardAwareScrollView>
 
-        {/* 4. JSX 최하단에 미리보기 모달 렌더링 코드 추가 */}
         <StarReportPreviewModal
           isVisible={isPreviewVisible}
           onClose={() => setPreviewVisible(false)}
-          // ✅ [추가] 현재 작성 중인 내용을 reportData prop으로 전달
           reportData={{ situation, task, action, result, learnings }}
         />
       </SafeAreaView>
@@ -228,88 +250,68 @@ export default function StarReportWrite({
 }
 const ReferenceThreadItem = ({
   thread,
-  allThreads, // ✅ 1. prop을 받도록 수정
+  allThreads,
   level,
 }: {
   thread: ThreadItem;
-  allThreads: ThreadItem[]; // ✅ 1. allThreads의 타입을 명시
+  allThreads: ThreadItem[];
   level: number;
 }) => {
-  // ✅ 2. dummyThreads 대신 prop으로 받은 allThreads 사용
   const allChildren = allThreads.filter((t) => t.parentId === thread.id);
   const sessionChildren = allChildren.filter(
     (t): t is SessionThreadItem => t.type === "Session"
   );
   const nonSessionChildren = allChildren.filter((t) => t.type !== "Session");
 
-  // --- 세션 정보 계산 ---
+  // FIX: Define the missing sessionCount variable here.
   const sessionCount = sessionChildren.length;
+
   const totalSessionTime = sessionChildren.reduce(
-    (sum, s) => sum + s.timeSpent,
+    (sum, s) => sum + (s.timeSpent ?? 0),
     0
   );
 
-  // --- 아이콘 및 완료 상태 결정 로직 (기존과 유사) ---
-  const isCompletable =
-    thread.type === "Task" ||
-    thread.type === "Action" ||
-    thread.type === "Bottleneck";
-
   let isCompleted = false;
-  if (thread.type === "Task") isCompleted = thread.isCompleted;
-  else if (thread.type === "Action")
+  if (thread.type === "Task") {
+    isCompleted = !!thread.isCompleted;
+  } else if (thread.type === "Action") {
     isCompleted = thread.status === "completed";
-  else if (thread.type === "Bottleneck") isCompleted = thread.isResolved;
-
-  let iconName: React.ComponentProps<typeof Feather>["name"] =
-    "corner-down-right";
-  if (isCompletable) iconName = isCompleted ? "check-circle" : "circle";
+  } else if (thread.type === "Bottleneck") {
+    isCompleted = !!thread.isResolved;
+  }
 
   const tagStyle =
-    thread.type !== "General"
-      ? typeStyles[
-          thread.type as Exclude<ThreadItemType, "Session" | "General">
-        ]
+    thread.type !== "General" && thread.type !== "Session"
+      ? typeStyles[thread.type as keyof typeof typeStyles]
       : null;
 
-  // Session 타입 자체는 이제 렌더링하지 않음
   if (thread.type === "Session") return null;
 
   return (
-    <View style={{ marginLeft: level * 20 }}>
+    <View style={{ marginLeft: level * 20, marginBottom: 10 }}>
       <View style={styles.threadItemContainer}>
-        <View style={styles.threadItemLeft}>
-          <Feather
-            name={iconName}
-            size={16}
-            color={isCompleted ? "#2b8a3e" : "#adb5bd"}
-            style={{ marginRight: 8 }}
-          />
-          {tagStyle && (
-            <View
-              style={[
-                styles.typeTag,
-                { backgroundColor: tagStyle.backgroundColor },
-              ]}
-            >
-              <Text style={[styles.typeTagText, { color: tagStyle.color }]}>
-                {tagStyle.name}
-              </Text>
-            </View>
-          )}
+        <Feather
+          name={isCompleted ? "check-square" : "square"}
+          size={16}
+          color={isCompleted ? "#2b8a3e" : "#adb5bd"}
+          style={{ marginRight: 8, marginTop: 2 }}
+        />
+        <View style={{ flex: 1 }}>
           <Text
             style={[
               styles.threadItemText,
               isCompleted && styles.threadItemTextCompleted,
             ]}
-            numberOfLines={1}
           >
             {thread.content}
           </Text>
+          {tagStyle && (
+            <Text style={[styles.typeTagText, { color: tagStyle.color }]}>
+              #{tagStyle.name}
+            </Text>
+          )}
         </View>
       </View>
-
-      {/* 세션 요약 정보 표시 */}
       {sessionCount > 0 && (
         <View style={styles.sessionSummaryContainer}>
           <Feather name="clock" size={14} color="#868e96" />
@@ -318,8 +320,6 @@ const ReferenceThreadItem = ({
           </Text>
         </View>
       )}
-
-      {/* Session이 아닌 자식 스레드만 재귀적으로 렌더링 */}
       {nonSessionChildren.map((child) => (
         <ReferenceThreadItem
           key={child.id}
@@ -341,88 +341,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: "#e9ecef",
+    borderColor: "#f1f3f5",
   },
-  headerTitle: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "bold",
-    zIndex: -1,
-  },
-  headerRightContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  headerButton: { fontSize: 16, color: "#1971c2" },
-  headerButtonSave: { fontWeight: "bold", marginLeft: 16 },
-  scrollView: { flex: 1, marginBottom: 20 },
+  headerRightContainer: { flexDirection: "row", alignItems: "center" },
+  headerButton: { fontSize: 16, color: "#2b8a3e" },
+  headerButtonSave: { fontWeight: "bold", marginLeft: 12 },
+  scrollView: { flex: 1 },
+
   referenceSection: {
     padding: 20,
+    paddingBottom: 24,
     backgroundColor: "#f8f9fa",
-    borderBottomWidth: 1,
-    borderColor: "#e9ecef",
   },
-  // ✅ [추가] 제목과 아이콘을 감싸는 컨테이너 스타일
-  problemTitleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  // ✅ [수정] 제목 스타일
   problemTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
-    flex: 1, // 아이콘을 제외한 남은 공간을 모두 차지
-    marginRight: 8, // 아이콘과의 간격
+    marginBottom: 20,
+    color: "#212529",
   },
-  sectionTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 16 },
-  threadItemContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between", // 왼쪽과 오른쪽 내용을 양 끝으로
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  threadItemLeft: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    flex: 1, // 텍스트가 길어지면 공간을 차지하도록
-    marginRight: 8,
-  },
-  threadItemText: {
-    fontSize: 15,
-    color: "#868e96",
-    flex: 1, // 텍스트가 아이콘 옆 남은 공간을 모두 차지
-  },
-  threadItemTextCompleted: {
-    textDecorationLine: "line-through",
-    color: "#2b8a3e",
-  },
-  typeTag: {
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  typeTagText: {
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  // ✅ [추가] 세션 시간 텍스트 스타일
-  sessionTimeText: {
+  sectionTitle: {
     fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 16,
     color: "#868e96",
-    fontWeight: "500",
-    fontVariant: ["tabular-nums"],
+    textTransform: "uppercase",
   },
+  threadItemContainer: { flexDirection: "row" },
+  threadItemText: { fontSize: 15, color: "#495057", lineHeight: 22 },
+  threadItemTextCompleted: {
+    color: "#adb5bd",
+    textDecorationLine: "line-through",
+  },
+  typeTagText: { fontSize: 13, fontWeight: "500", marginTop: 4 },
   sessionSummaryContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginLeft: 24, // 아이콘 너비만큼 들여쓰기
-    marginBottom: 12,
+    marginLeft: 24,
+    marginTop: 4,
+    marginBottom: 8,
   },
   sessionSummaryText: {
     marginLeft: 6,
@@ -430,20 +386,30 @@ const styles = StyleSheet.create({
     color: "#868e96",
     fontStyle: "italic",
   },
-  inputSection: { padding: 20 },
-  inputGroup: { marginBottom: 24 },
+
+  // Input Section
+  inputSection: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  inputGroup: { marginBottom: 32 },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#343a40",
-    marginBottom: 8,
+    color: "#212529",
+    marginBottom: 12,
   },
+  // ✅ [추가] TextInput을 감싸는 애니메이션 컨테이너 스타일
+  textInputContainer: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+  },
+  // ✅ [수정] TextInput 자체는 테두리와 배경이 없음
   textInput: {
-    backgroundColor: "#f1f3f5",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    minHeight: 120,
+    padding: 16,
+    paddingTop: 16,
+    fontSize: 16,
+    minHeight: 140,
     textAlignVertical: "top",
+    color: "#212529",
+    lineHeight: 24,
   },
 });

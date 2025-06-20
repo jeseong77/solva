@@ -1,5 +1,8 @@
-import { Persona, Problem } from "@/types";
+// components/problem/ResolvedProblemList.tsx
+
+import { Objective, Problem, ProblemStatus } from "@/types";
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   FlatList,
@@ -9,22 +12,15 @@ import {
   View,
 } from "react-native";
 
-// 컴포넌트가 받을 Props 정의
-interface ResolvedProblemListProps {
-  problems: Problem[];
-  persona: Persona;
-  onPressProblem: (problemId: string) => void;
-}
-
-// 아이템 렌더링을 위한 간단한 Dumb Component
+// --- ResolvedProblemItem (Child Component) ---
 const ResolvedProblemItem = ({
   problem,
   onPress,
-  isLast,
+  onPressReport,
 }: {
   problem: Problem;
   onPress: (problemId: string) => void;
-  isLast: boolean;
+  onPressReport: (reportId: string) => void;
 }) => {
   const statusInfo = {
     resolved: {
@@ -40,10 +36,11 @@ const ResolvedProblemItem = ({
       backgroundColor: "#f1f3f5",
     },
   };
+
   if (problem.status !== "resolved" && problem.status !== "archived") {
     return null;
   }
-  const currentStatus = statusInfo[problem.status] || statusInfo.archived;
+  const currentStatus = statusInfo[problem.status];
   const date =
     problem.status === "resolved" ? problem.resolvedAt : problem.archivedAt;
 
@@ -56,110 +53,126 @@ const ResolvedProblemItem = ({
     : "";
 
   return (
-    <TouchableOpacity
-      style={[styles.itemContainer, isLast && styles.lastItemContainer]}
-      onPress={() => onPress(problem.id)}
-    >
-      {/* ✅ [수정] 아이콘을 '상태 칩' View로 감싸고 텍스트 추가 */}
-      <View
-        style={[
-          styles.statusChip,
-          { backgroundColor: currentStatus.backgroundColor },
-        ]}
+    <View style={styles.itemContainer}>
+      <TouchableOpacity
+        style={styles.mainContent}
+        onPress={() => onPress(problem.id)}
+        activeOpacity={0.7}
       >
-        <Feather
-          name={currentStatus.icon}
-          size={14}
-          color={currentStatus.color}
-        />
-        <Text style={[styles.statusChipText, { color: currentStatus.color }]}>
-          {currentStatus.name}
+        <View
+          style={[
+            styles.statusChip,
+            { backgroundColor: currentStatus.backgroundColor },
+          ]}
+        >
+          <Feather
+            name={currentStatus.icon}
+            size={14}
+            color={currentStatus.color}
+          />
+          <Text style={[styles.statusChipText, { color: currentStatus.color }]}>
+            {currentStatus.name}
+          </Text>
+        </View>
+        <Text style={styles.itemTitle} numberOfLines={1}>
+          {problem.title}
         </Text>
-      </View>
-      <Text style={styles.itemTitle} numberOfLines={1}>
-        {problem.title}
-      </Text>
-      <Text style={styles.itemDate}>{formattedDate}</Text>
-    </TouchableOpacity>
+        <Text style={styles.itemDate}>{formattedDate}</Text>
+      </TouchableOpacity>
+
+      {problem.status === "resolved" && problem.starReportId && (
+        <>
+          {/* ADD: New short, indented separator view */}
+          <View style={styles.internalSeparator} />
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => onPressReport(problem.starReportId as string)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Feather name="star" size={16} color="#495057" />
+              <Text style={styles.reportButtonText}>리포트</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#adb5bd" />
+          </TouchableOpacity>
+        </>
+      )}
+    </View>
   );
 };
 
+// --- ResolvedProblemList (Parent Component) ---
 export default function ResolvedProblemList({
   problems,
-  persona,
   onPressProblem,
-}: ResolvedProblemListProps) {
+}: {
+  problems: Problem[];
+  objective: Objective;
+  onPressProblem: (problemId: string) => void;
+}) {
+  const router = useRouter();
+
+  const handlePressReport = (reportId: string) => {
+    router.push(`/report/${reportId}`);
+  };
+
+  const Separator = () => <View style={styles.separator} />;
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
-        <Text style={styles.titleText}>
-          페르소나 - <Text style={styles.personaTitle}>{persona.title}</Text>의
-          해결된 문제들:
-        </Text>
+        <Text style={styles.titleText}>해결된 문제들</Text>
       </View>
-      <FlatList
-        data={problems}
-        // ✅ renderItem에서 index를 함께 받아 마지막 항목인지 확인
-        renderItem={({ item, index }) => (
-          <ResolvedProblemItem
-            problem={item}
-            onPress={onPressProblem}
-            isLast={index === problems.length - 1} // ✅ isLast prop 전달
-          />
-        )}
-        keyExtractor={(item) => item.id}
-        scrollEnabled={false}
-      />
+      <View style={styles.listContainer}>
+        <FlatList
+          data={problems}
+          renderItem={({ item }) => (
+            <ResolvedProblemItem
+              problem={item}
+              onPress={onPressProblem}
+              onPressReport={handlePressReport}
+            />
+          )}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          ItemSeparatorComponent={Separator}
+        />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#f8f9fa",
+  container: { paddingTop: 16, paddingBottom: 24, marginHorizontal: 16 },
+  listContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
     borderWidth: 1,
-    marginHorizontal: 16,
-    borderRadius: 8,
     borderColor: "#e9ecef",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    overflow: "hidden",
   },
-  titleContainer: {
-    padding: 16,
+  titleContainer: { paddingBottom: 12 },
+  titleText: { fontSize: 18, fontWeight: "bold", color: "#212529" },
+
+  // FIX: This separator between items is now full-width (no margin).
+  separator: {
+    height: 1,
+    backgroundColor: "#f1f3f5",
   },
-  titleText: {
-    fontSize: 17,
-    fontWeight: "500",
-    color: "#495057",
-  },
-  personaTitle: {
-    fontWeight: "700",
-    color: "#212529",
-  },
-  // ResolvedProblemItem 스타일
+
+  // --- ResolvedProblemItem styles ---
   itemContainer: {
+    // FIX: Set background to white to match the report button area
+    backgroundColor: "#ffffff",
+  },
+  mainContent: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 18,
     paddingHorizontal: 16,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderColor: "#f1f3f5",
   },
-  itemTitle: {
-    flex: 1,
-    fontSize: 15,
-    color: "#495057",
-    marginLeft: 12,
-  },
-  itemDate: {
-    fontSize: 13,
-    color: "#adb5bd",
-    fontVariant: ["tabular-nums"],
-  },
-  // ✅ [추가] 상태 칩 관련 스타일
+  itemTitle: { flex: 1, fontSize: 15, color: "#495057", marginLeft: 12 },
+  itemDate: { fontSize: 13, color: "#adb5bd", fontVariant: ["tabular-nums"] },
   statusChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -167,13 +180,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 6,
   },
-  statusChipText: {
-    marginLeft: 5,
-    fontSize: 12,
-    fontWeight: "bold",
+  statusChipText: { marginLeft: 5, fontSize: 12, fontWeight: "bold" },
+
+  // ADD: New style for the short separator WITHIN an item
+  internalSeparator: {
+    height: 1,
+    backgroundColor: "#f1f3f5",
+    marginHorizontal: 78, // This creates the shorter, indented look
   },
-  lastItemContainer: {
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
+
+  reportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    // FIX: Set background to white and remove border
+    backgroundColor: "#ffffff",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  reportButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#495057",
+    marginLeft: 10,
   },
 });
