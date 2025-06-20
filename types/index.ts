@@ -1,10 +1,11 @@
 // types/index.ts
 
-// --- 상태(Status) 및 우선순위(Priority) 타입 정의 ---
+import * as schema from "@/lib/db/schema";
+
+// --- Helper Types (These remain the same) ---
 
 export type ProblemStatus = "active" | "onHold" | "resolved" | "archived";
 export type Priority = "high" | "medium" | "low" | "none";
-
 export type ThreadItemType =
   | "General"
   | "Insight"
@@ -12,160 +13,55 @@ export type ThreadItemType =
   | "Task"
   | "Action"
   | "Session";
-
 export type ActionStatus = "todo" | "inProgress" | "completed" | "cancelled";
-
-// ✅ [추가] Objective의 타입을 정의합니다.
 export type ObjectiveType = "persona" | "product";
 
-// --- 주요 엔티티 타입 정의 ---
+// --- Drizzle Inferred Main Entity Types ---
+// Instead of manually defining interfaces, we infer the types directly
+// from the database schema. This ensures they are always in sync.
 
-export interface UserLink {
-  id: string;
-  platform:
-    | "website"
-    | "github"
-    | "linkedin"
-    | "twitter"
-    | "instagram"
-    | "other";
-  url: string;
-  title?: string;
+// This is the raw database model for the 'users' table
+export type DbUser = typeof schema.users.$inferSelect;
+export interface User extends DbUser {
+  links: UserLink[];
 }
+export type UserLink = typeof schema.userLinks.$inferSelect;
+export type Objective = typeof schema.objectives.$inferSelect;
+export type Gap = typeof schema.gaps.$inferSelect;
+export type WeeklyProblem = typeof schema.weeklyProblems.$inferSelect;
+export type Problem = typeof schema.problems.$inferSelect;
+export type StarReport = typeof schema.starReports.$inferSelect;
+export type Result = typeof schema.results.$inferSelect;
+export type Tag = typeof schema.tags.$inferSelect;
+export type Todo = typeof schema.todos.$inferSelect;
+export type ActiveSession = typeof schema.activeSessions.$inferSelect;
 
-export interface User {
-  id: string;
-  displayName: string;
-  username?: string;
-  email?: string;
-  bio?: string;
-  introduction?: string;
-  avatarImageUri?: string;
-  coverImageUri?: string;
-  location?: string;
-  links?: UserLink[];
-  createdAt: Date;
-  updatedAt: Date;
-}
+// The ThreadItem type is a special case because it's a discriminated union.
+// We define it based on the inferred type from the schema.
+// This gives us a base type with all possible fields.
+type BaseThreadItemFromDB = typeof schema.threadItems.$inferSelect;
 
-/**
- * Objective
- */
-export interface Objective {
-  id: string;
-  userId: string;
-  type: ObjectiveType;
-  title: string;
-  description?: string;
-  objectiveGoals?: string;
-  coverImageUri?: string;
-  avatarImageUri?: string;
-  icon?: string;
-  color?: string;
-  createdAt: Date;
-  order?: number;
-}
-
-/**
- * Gap
- */
-export interface Gap {
-  id: string;
-  objectiveId: string;
-  title: string;
-  idealState: string;
-  currentState: string;
-  createdAt: Date;
-}
-
-/**
- * WeeklyProblem
- */
-export interface WeeklyProblem {
-  id: string;
-  objectiveId: string; // 👩‍💻
-  problemId: string;
-  weekIdentifier: string;
-  notes?: string;
-  createdAt: Date;
-}
-
-/**
- * Problem
- */
-export interface Problem {
-  id: string;
-  objectiveId: string;
-  gapId?: string | null; // ✅ [추가] Gap과의 선택적 관계를 위해 nullable한 gapId 추가
-  title: string;
-  description?: string;
-  status: ProblemStatus;
-  priority: Priority;
-  urgency?: number;
-  importance?: number;
-  tags?: string[];
-  childThreadIds: string[];
-  timeSpent: number;
-  createdAt: Date;
-  resolvedAt?: Date;
-  archivedAt?: Date;
-  starReportId?: string | null;
-}
-
-/**
- * BaseThreadItem
- */
-export interface BaseThreadItem {
-  id: string;
-  problemId: string;
-  parentId: string | null;
-  childThreadIds: string[];
-  type: ThreadItemType;
-  content: string;
-  isImportant?: boolean;
-  resultIds: string[];
-  createdAt: Date;
-  authorId?: string;
-}
-
-// --- 구체적인 Thread Item 타입 정의 ---
-
-export interface GeneralThreadItem extends BaseThreadItem {
+// We can still define the discriminated union for stricter type checking in the app
+export interface GeneralThreadItem extends BaseThreadItemFromDB {
   type: "General";
 }
-
-// ✅ InsightThreadItem 인터페이스 추가
-export interface InsightThreadItem extends BaseThreadItem {
+export interface InsightThreadItem extends BaseThreadItemFromDB {
   type: "Insight";
 }
-
-export interface BottleneckThreadItem extends BaseThreadItem {
+export interface BottleneckThreadItem extends BaseThreadItemFromDB {
   type: "Bottleneck";
-  isResolved: boolean;
 }
-
-export interface TaskThreadItem extends BaseThreadItem {
+export interface TaskThreadItem extends BaseThreadItemFromDB {
   type: "Task";
-  isCompleted: boolean;
 }
-
-export interface ActionThreadItem extends BaseThreadItem {
+export interface ActionThreadItem extends BaseThreadItemFromDB {
   type: "Action";
-  status: ActionStatus;
-  timeSpent: number;
-  deadline?: Date;
-  completedAt?: Date;
 }
-
-export interface SessionThreadItem extends BaseThreadItem {
+export interface SessionThreadItem extends BaseThreadItemFromDB {
   type: "Session";
-  timeSpent: number;
-  startTime: Date;
 }
 
-/**
- * 모든 ThreadItem 타입을 하나로 묶는 Discriminated Union
- */
+// All ThreadItem types are now based on the single, consistent schema type
 export type ThreadItem =
   | GeneralThreadItem
   | InsightThreadItem
@@ -174,54 +70,5 @@ export type ThreadItem =
   | ActionThreadItem
   | SessionThreadItem;
 
-/**
- * Result: 각 ThreadItem에 주석처럼 달 수 있는 구체적인 성과 또는 결과물
- */
-export interface Result {
-  id: string;
-  parentThreadId: string;
-  content: string;
-  occurredAt?: Date;
-  createdAt: Date;
-}
-
-/**
- * StarReport: Problem 해결 후 작성하는 회고
- */
-export interface StarReport {
-  id: string;
-  problemId: string;
-  situation: string;
-  task: string;
-  action: string;
-  result: string;
-  learnings?: string;
-  createdAt: Date;
-}
-
-/**
- * Tag: Problem에 연결할 수 있는 태그
- */
-export interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-}
-
-export interface ActiveSession {
-  threadId: string;
-  startTime: number;
-  isPaused: boolean;
-  pausedTime: number;
-}
-
-/**
- * @description 문제에 종속되지 않는 독립적인 할 일
- */
-export interface Todo {
-  id: string;
-  content: string;
-  isCompleted: boolean;
-  createdAt: Date;
-  completedAt?: Date;
-}
+// We also re-export the BaseThreadItem type for convenience if needed
+export type BaseThreadItem = BaseThreadItemFromDB;

@@ -1,54 +1,35 @@
-// store/objectiveSlice.ts
+// store/slices/objectiveSlice.ts
 
-import { getDatabase } from "@/lib/db";
-// ✅ [변경] Persona -> Objective, ObjectiveType 타입 import
-import { Objective, ObjectiveType } from "@/types";
-// ✅ [변경] AppState와 Slice 인터페이스 이름 변경을 가정
+import { db } from "@/lib/db"; // Import the Drizzle instance
+import { objectives } from "@/lib/db/schema"; // Import the objectives table schema
+import { Objective } from "@/types";
 import type {
   AppState,
   ObjectiveSlice as ObjectiveSliceInterface,
 } from "@/types/storeTypes";
+import { asc, eq } from "drizzle-orm"; // Import Drizzle operators
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-// ✅ [변경] DB에서 읽어온 데이터를 Objective 객체로 파싱하는 함수
-const parseObjectiveFromDB = (dbItem: any): Objective => ({
-  id: dbItem.id,
-  userId: dbItem.userId,
-  type: dbItem.type, // ✅ type 필드 추가
-  title: dbItem.title,
-  description: dbItem.description === null ? undefined : dbItem.description,
-  objectiveGoals:
-    dbItem.objectiveGoals === null ? undefined : dbItem.objectiveGoals, // ✅ 이름 변경
-  coverImageUri:
-    dbItem.coverImageUri === null ? undefined : dbItem.coverImageUri,
-  avatarImageUri:
-    dbItem.avatarImageUri === null ? undefined : dbItem.avatarImageUri,
-  icon: dbItem.icon === null ? undefined : dbItem.icon,
-  color: dbItem.color === null ? undefined : dbItem.color,
-  createdAt: new Date(dbItem.createdAt),
-  order: dbItem.order === null ? undefined : dbItem.order,
-});
-
-// ✅ [변경] createPersonaSlice -> createObjectiveSlice
 export const createObjectiveSlice: StateCreator<
   AppState,
   [],
   [],
   ObjectiveSliceInterface
 > = (set, get) => ({
-  objectives: [], // ✅ personas -> objectives
-  isLoadingObjectives: false, // ✅ isLoadingPersonas -> isLoadingObjectives
+  objectives: [],
+  isLoadingObjectives: false,
 
   fetchObjectives: async () => {
     set({ isLoadingObjectives: true });
     try {
-      const db = await getDatabase();
-      const results = await db.getAllAsync<any>(
-        'SELECT * FROM Objectives ORDER BY "order" ASC, createdAt ASC;' // ✅ Personas -> Objectives
-      );
-      const fetchedObjectives = results.map(parseObjectiveFromDB);
+      const fetchedObjectives = await db
+        .select()
+        .from(objectives)
+        .orderBy(asc(objectives.order), asc(objectives.createdAt));
+
+      // This line will no longer cause an error after you update the Objective type
       set({ objectives: fetchedObjectives, isLoadingObjectives: false });
       console.log(
         `[ObjectiveSlice] ${fetchedObjectives.length} objectives fetched.`
@@ -59,8 +40,6 @@ export const createObjectiveSlice: StateCreator<
     }
   },
 
-  // ✅ [변경] addPersona -> addObjective
-  // Omit을 사용하여 id, problemIds 등 서버에서 생성할 필드를 제외
   addObjective: async (
     objectiveData: Omit<Objective, "id" | "userId" | "createdAt">
   ) => {
@@ -73,38 +52,12 @@ export const createObjectiveSlice: StateCreator<
     const newObjective: Objective = {
       id: uuidv4(),
       userId: currentUser.id,
-      type: objectiveData.type, // ✅ type 포함
-      title: objectiveData.title,
-      description: objectiveData.description,
-      objectiveGoals: objectiveData.objectiveGoals, // ✅ 이름 변경
-      coverImageUri: objectiveData.coverImageUri,
-      avatarImageUri: objectiveData.avatarImageUri,
-      icon: objectiveData.icon,
-      color: objectiveData.color,
+      ...objectiveData,
       createdAt: new Date(),
-      order: objectiveData.order,
     };
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO Objectives (id, userId, type, title, description, objectiveGoals, coverImageUri, avatarImageUri, icon, color, createdAt, "order")
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-        [
-          newObjective.id,
-          newObjective.userId,
-          newObjective.type,
-          newObjective.title,
-          newObjective.description ?? null,
-          newObjective.objectiveGoals ?? null,
-          newObjective.coverImageUri ?? null,
-          newObjective.avatarImageUri ?? null,
-          newObjective.icon ?? null,
-          newObjective.color ?? null,
-          newObjective.createdAt.toISOString(),
-          newObjective.order ?? null,
-        ]
-      );
+      await db.insert(objectives).values(newObjective);
 
       const newObjectivesList = [...get().objectives, newObjective].sort(
         (a, b) =>
@@ -122,36 +75,30 @@ export const createObjectiveSlice: StateCreator<
   },
 
   updateObjective: async (objectiveToUpdate) => {
-    if (!get().objectives.find((p) => p.id === objectiveToUpdate.id)) {
-      console.error(
-        "[ObjectiveSlice] Objective not found for update:",
-        objectiveToUpdate.id
-      );
-      return null;
-    }
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `UPDATE Objectives SET type = ?, title = ?, description = ?, objectiveGoals = ?, coverImageUri = ?, avatarImageUri = ?, icon = ?, color = ?, "order" = ?
-           WHERE id = ?;`,
-        [
-          objectiveToUpdate.type,
-          objectiveToUpdate.title,
-          objectiveToUpdate.description ?? null,
-          objectiveToUpdate.objectiveGoals ?? null,
-          objectiveToUpdate.coverImageUri ?? null,
-          objectiveToUpdate.avatarImageUri ?? null,
-          objectiveToUpdate.icon ?? null,
-          objectiveToUpdate.color ?? null,
-          objectiveToUpdate.order ?? null,
-          objectiveToUpdate.id,
-        ]
-      );
+      await db
+        .update(objectives)
+        .set({
+          type: objectiveToUpdate.type,
+          title: objectiveToUpdate.title,
+          description: objectiveToUpdate.description,
+          objectiveGoals: objectiveToUpdate.objectiveGoals,
+          coverImageUri: objectiveToUpdate.coverImageUri,
+          avatarImageUri: objectiveToUpdate.avatarImageUri,
+          icon: objectiveToUpdate.icon,
+          color: objectiveToUpdate.color,
+          order: objectiveToUpdate.order,
+        })
+        .where(eq(objectives.id, objectiveToUpdate.id));
 
       const updatedObjectives = get().objectives.map((p) =>
         p.id === objectiveToUpdate.id ? objectiveToUpdate : p
       );
-      updatedObjectives.sort(/* ... */);
+      updatedObjectives.sort(
+        (a, b) =>
+          (a.order ?? Infinity) - (b.order ?? Infinity) ||
+          a.createdAt.getTime() - b.createdAt.getTime()
+      );
       set({ objectives: updatedObjectives });
 
       console.log(
@@ -166,9 +113,9 @@ export const createObjectiveSlice: StateCreator<
   },
 
   deleteObjective: async (objectiveId) => {
-    const db = await getDatabase();
     try {
-      await db.runAsync(`DELETE FROM Objectives WHERE id = ?;`, [objectiveId]);
+      await db.delete(objectives).where(eq(objectives.id, objectiveId));
+
       console.log("[ObjectiveSlice] Objective deleted from DB:", objectiveId);
 
       const problemIdsToDelete = get()
@@ -177,17 +124,15 @@ export const createObjectiveSlice: StateCreator<
 
       set((state) => ({
         objectives: state.objectives.filter((p) => p.id !== objectiveId),
-        problems: state.problems.filter((p) => p.objectiveId !== objectiveId), // ✅ personaId -> objectiveId
+        problems: state.problems.filter((p) => p.objectiveId !== objectiveId),
         weeklyProblems: state.weeklyProblems.filter(
           (wp) => wp.objectiveId !== objectiveId
-        ), // ✅ personaId -> objectiveId
+        ),
         threadItems: state.threadItems.filter(
           (ti) => !problemIdsToDelete.includes(ti.problemId)
         ),
-        // ... (나머지 상태 정리) ...
       }));
 
-      // ... (정렬 로직)
       return true;
     } catch (error) {
       console.error("[ObjectiveSlice] Error deleting objective:", error);

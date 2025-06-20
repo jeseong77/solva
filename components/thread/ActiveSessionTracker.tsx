@@ -6,7 +6,6 @@ import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-// 밀리초를 MM:SS 형식의 문자열로 변환하는 헬퍼 함수
 const formatTime = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -36,9 +35,12 @@ export default function ActiveSessionTracker({
 
   useEffect(() => {
     if (activeSession) {
+      // FIX: Use .getTime() for all date arithmetic
       const initialTotalElapsed =
-        activeSession.pausedTime +
-        (activeSession.isPaused ? 0 : Date.now() - activeSession.startTime);
+        activeSession.pausedTime.getTime() +
+        (activeSession.isPaused
+          ? 0
+          : new Date().getTime() - activeSession.startTime.getTime());
       setDisplayTime(formatTime(initialTotalElapsed));
     }
 
@@ -47,9 +49,15 @@ export default function ActiveSessionTracker({
     }
 
     const interval = setInterval(() => {
-      const elapsedSinceResume = Date.now() - activeSession.startTime;
-      const totalElapsed = activeSession.pausedTime + elapsedSinceResume;
-      setDisplayTime(formatTime(totalElapsed));
+      if (activeSession) {
+        // Added check for safety inside interval
+        // FIX: Use .getTime() for all date arithmetic
+        const elapsedSinceResume =
+          new Date().getTime() - activeSession.startTime.getTime();
+        const totalElapsed =
+          activeSession.pausedTime.getTime() + elapsedSinceResume;
+        setDisplayTime(formatTime(totalElapsed));
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -58,16 +66,17 @@ export default function ActiveSessionTracker({
   if (!activeSession) return null;
 
   const handleStop = () => {
+    // FIX: Use .getTime() for all date arithmetic
     const finalElapsedTime = activeSession.isPaused
-      ? activeSession.pausedTime
-      : activeSession.pausedTime + (Date.now() - activeSession.startTime);
+      ? activeSession.pausedTime.getTime()
+      : activeSession.pausedTime.getTime() +
+        (new Date().getTime() - activeSession.startTime.getTime());
     onStop(finalElapsedTime);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.timerWrapper}>
-        {/* ✅ [수정] 아이콘 색상을 흰색으로 변경 */}
         <Feather name="clock" size={16} color="#FFFFFF" />
         <Text style={styles.timerText}>{displayTime}</Text>
       </View>
@@ -79,12 +88,10 @@ export default function ActiveSessionTracker({
           <Feather
             name={activeSession.isPaused ? "play" : "pause"}
             size={20}
-            // ✅ [수정] 아이콘 색상을 녹색 계열로 변경
             color="#2f9e44"
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={handleStop}>
-          {/* ✅ [수정] 아이콘 색상을 녹색 계열로 변경 */}
           <Feather name="square" size={20} color="#fa5252" />
         </TouchableOpacity>
       </View>

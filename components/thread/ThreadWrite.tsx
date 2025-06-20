@@ -107,9 +107,10 @@ export default function ThreadWrite({
 
       switch (selectedType) {
         case "General":
+        case "Insight": // Insight also just uses base properties
           updatedThread = {
             ...baseProperties,
-            type: "General",
+            type: selectedType,
           };
           break;
         case "Bottleneck":
@@ -143,6 +144,12 @@ export default function ThreadWrite({
               originalThread.type === "Action" ? originalThread.status : "todo",
             timeSpent:
               originalThread.type === "Action" ? originalThread.timeSpent : 0,
+            deadline:
+              originalThread.type === "Action" ? originalThread.deadline : null,
+            completedAt:
+              originalThread.type === "Action"
+                ? originalThread.completedAt
+                : null,
           };
           break;
         default:
@@ -153,12 +160,22 @@ export default function ThreadWrite({
 
       await updateThreadItem(updatedThread);
     } else {
-      // --- 생성 모드 (기존과 동일) ---
+      // --- 생성 모드 ---
+      // FIX: Add all missing required properties with default values.
       await addThreadItem({
         problemId,
         parentId: parentThreadId || null,
         type: selectedType,
         content: content.trim(),
+        isImportant: false,
+        authorId: null,
+        isResolved: null,
+        isCompleted: null,
+        status: null,
+        timeSpent: null,
+        deadline: null,
+        completedAt: null,
+        startTime: null,
       });
     }
 

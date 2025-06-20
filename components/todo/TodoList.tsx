@@ -1,10 +1,7 @@
+// components/todo/TodoList.tsx
+
 import { useAppStore } from "@/store/store";
-import {
-  ActionThreadItem,
-  TaskThreadItem,
-  ThreadItem, // ✅ ThreadItem 유니온 타입 import
-  Todo,
-} from "@/types";
+import { ActionThreadItem, TaskThreadItem, ThreadItem, Todo } from "@/types";
 import { Feather } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
@@ -47,6 +44,7 @@ export default function TodoList() {
       ...todo,
       type: "standalone",
     }));
+
     const problemTasks: UnifiedTodo[] = threadItems
       .filter(
         (item): item is TaskThreadItem | ActionThreadItem =>
@@ -57,17 +55,19 @@ export default function TodoList() {
         return {
           id: item.id,
           content: item.content,
+          // FIX: Safely convert boolean | null to a strict boolean.
           isCompleted:
             item.type === "Task"
-              ? item.isCompleted
+              ? !!item.isCompleted
               : item.status === "completed",
-          createdAt: item.createdAt,
+          createdAt: item.createdAt as Date,
           type: "thread",
           sourceProblem: problem
             ? { id: problem.id, title: problem.title }
             : undefined,
         };
       });
+
     const unifiedList = [...standaloneTodos, ...problemTasks];
     const active = unifiedList
       .filter((todo) => !todo.isCompleted)
@@ -78,9 +78,7 @@ export default function TodoList() {
     return { activeTodos: active, completedTodos: completed };
   }, [todos, threadItems, problems]);
 
-  // ✅ [수정] 타입 에러를 해결한 핸들러 함수
   const handleToggleComplete = (id: string, currentStatus: boolean) => {
-    // 모든 아이템을 한 배열에 넣어 탐색
     const allItems: (Todo | ThreadItem)[] = [...todos, ...threadItems];
     const itemToUpdate = allItems.find((item) => item.id === id);
 
@@ -89,9 +87,7 @@ export default function TodoList() {
       return;
     }
 
-    // 'type' 속성의 존재 여부로 ThreadItem과 Todo를 구분하는 타입 가드
     if ("type" in itemToUpdate && "problemId" in itemToUpdate) {
-      // 'type' 속성이 있으면 ThreadItem으로 간주
       const thread = itemToUpdate as ThreadItem;
       if (thread.type === "Task") {
         updateThreadItem({ ...thread, isCompleted: !currentStatus });
@@ -99,25 +95,24 @@ export default function TodoList() {
         updateThreadItem({
           ...thread,
           status: !currentStatus ? "completed" : "todo",
-          completedAt: !currentStatus ? new Date() : undefined,
+          // FIX: Use null instead of undefined for the date.
+          completedAt: !currentStatus ? new Date() : null,
         });
       }
     } else {
-      // 'type' 속성이 없으면 독립적인 Todo로 간주
       const todo = itemToUpdate as Todo;
       updateTodo({
         ...todo,
         isCompleted: !currentStatus,
-        completedAt: !currentStatus ? new Date() : undefined,
+        // FIX: Use null instead of undefined for the date.
+        completedAt: !currentStatus ? new Date() : null,
       });
     }
   };
 
   const listData = useMemo<ListItem[]>(() => {
     const data: ListItem[] = [];
-
     data.push({ type: "HEADER", title: "나의 할 일", id: "header-active" });
-
     if (activeTodos.length === 0) {
       data.push({ type: "EMPTY_STATE", id: "empty-active" });
     } else {
@@ -125,7 +120,6 @@ export default function TodoList() {
         data.push({ type: "TODO_ITEM", data: todo });
       });
     }
-
     if (completedTodos.length > 0) {
       data.push({
         type: "HEADER",
@@ -136,7 +130,6 @@ export default function TodoList() {
         data.push({ type: "TODO_ITEM", data: todo });
       });
     }
-
     return data;
   }, [activeTodos, completedTodos]);
 

@@ -96,11 +96,12 @@ export default function GapList({
   problems,
   setProblems,
 }: GapListProps) {
-  const { addGap, updateGap, addProblem } = useAppStore(
+  const { addGap, updateGap, addProblem, deleteGap } = useAppStore(
     useShallow((state) => ({
       addGap: state.addGap,
       updateGap: state.updateGap,
       addProblem: state.addProblem,
+      deleteGap: state.deleteGap
     }))
   );
 
@@ -141,6 +142,39 @@ export default function GapList({
   const handleCloseGapModal = () => {
     setGapModalVisible(false);
     setEditingGap(null);
+  };
+
+  const handleLongPressGap = (gap: Partial<Gap> & { tempId?: string }) => {
+    Alert.alert(
+      "Gap 관리", // Alert Title: "Manage Gap"
+      `'${gap.title}'에 대한 작업을 선택하세요.`, // Alert Message: "Select an action for '[gap title]'"
+      [
+        {
+          text: "수정하기", // "Edit" button
+          onPress: () => handleOpenEditGapModal(gap), // Re-uses the existing function to open the modal
+        },
+        {
+          text: "삭제하기", // "Delete" button
+          onPress: () => {
+            // Logic to delete the gap
+            if (gap.id) {
+              // If the gap has a real ID, it's saved in the database.
+              // Use the store function to delete it everywhere.
+              deleteGap(gap.id);
+            } else if (gap.tempId) {
+              // If it only has a tempId, it's a new, unsaved gap.
+              // Just remove it from the local component state.
+              setGaps((prev) => prev.filter((g) => g.tempId !== gap.tempId));
+            }
+          },
+          style: "destructive", // This gives the button a red color on iOS for emphasis.
+        },
+        {
+          text: "취소", // "Cancel" button
+          style: "cancel",
+        },
+      ]
+    );
   };
 
   const handleSaveGap = () => {
@@ -231,7 +265,7 @@ export default function GapList({
             key={id}
             gap={gap}
             linkedProblems={linkedProblems}
-            onEdit={() => handleOpenEditGapModal(gap)}
+            onEdit={() => handleLongPressGap(gap)}
             onAddProblem={() => handleOpenProblemModal(id)}
           />
         );

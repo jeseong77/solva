@@ -242,10 +242,13 @@ export default function HomeScreen() {
     if (existingWeeklyProblem) {
       deleteWeeklyProblem(existingWeeklyProblem.id);
     }
+
+    // FIX: Add the required 'notes' property with a value of null.
     addWeeklyProblem({
       objectiveId: selectedObjectiveId,
       problemId,
       weekIdentifier,
+      notes: null,
     });
   };
 

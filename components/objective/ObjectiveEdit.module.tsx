@@ -9,12 +9,12 @@ import { Alert } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 import { LocalGap, LocalProblem } from "./GapItem";
 
+
 export const useObjectiveEdit = () => {
   const router = useRouter();
   const { objectiveId } = useLocalSearchParams<{ objectiveId?: string }>();
   const isEditMode = !!objectiveId;
 
-  // ✅ [수정] get 함수를 더 이상 여기서 가져오지 않습니다.
   const {
     getObjectiveById,
     addObjective,
@@ -43,7 +43,7 @@ export const useObjectiveEdit = () => {
     }))
   );
 
-  // --- 상태 관리 ---
+  // --- State Management ---
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<ObjectiveType>("persona");
@@ -55,20 +55,17 @@ export const useObjectiveEdit = () => {
   const [localData, setLocalData] = useState<LocalGap[]>([]);
   const [initialData, setInitialData] = useState<LocalGap[]>([]);
 
-  // Gap 모달 상태
+  // ... (Modal state remains the same)
   const [isGapModalVisible, setGapModalVisible] = useState(false);
   const [editingGapId, setEditingGapId] = useState<string | null>(null);
   const [gapTitle, setGapTitle] = useState("");
   const [idealState, setIdealState] = useState("");
   const [currentState, setCurrentState] = useState("");
-
-  // Problem 모달 상태
   const [isProblemModalVisible, setProblemModalVisible] = useState(false);
   const [problemTitle, setProblemTitle] = useState("");
   const [problemDescription, setProblemDescription] = useState("");
   const [currentGapTempId, setCurrentGapTempId] = useState<string | null>(null);
 
-  // --- 데이터 로딩 (수정 모드 로직 추가) ---
   useFocusEffect(
     useCallback(() => {
       if (isEditMode && objectiveId) {
@@ -77,15 +74,14 @@ export const useObjectiveEdit = () => {
           setTitle(objectiveData.title);
           setDescription(objectiveData.description || "");
           setType(objectiveData.type);
-          setCoverImageUri(objectiveData.coverImageUri);
-          setAvatarImageUri(objectiveData.avatarImageUri);
+          // FIX: Convert `null` from the data model to `undefined` for the local state.
+          setCoverImageUri(objectiveData.coverImageUri || undefined);
+          setAvatarImageUri(objectiveData.avatarImageUri || undefined);
 
           const loadAndStructureData = async () => {
             await fetchGaps(objectiveId);
             await fetchProblems(objectiveId);
 
-            // ✅ [수정] get() 대신 useAppStore.getState()를 사용합니다.
-            // ✅ [수정] g, p 파라미터에 명시적으로 타입을 지정해줍니다.
             const storeState = useAppStore.getState();
             const relevantGaps = storeState.gaps.filter(
               (g: Gap) => g.objectiveId === objectiveId
@@ -125,9 +121,6 @@ export const useObjectiveEdit = () => {
     }, [objectiveId, isEditMode])
   );
 
-  // --- 핸들러들 ---
-  // (이하 핸들러 함수들은 변경 사항이 없으므로 생략하고, 이전 답변과 동일하게 유지)
-
   const handleCoverImageChange = async () => {
     const newImageUri = await pickAndSaveImage();
     if (newImageUri) setCoverImageUri(newImageUri);
@@ -136,7 +129,6 @@ export const useObjectiveEdit = () => {
     const newImageUri = await pickAndSaveImage();
     if (newImageUri) setAvatarImageUri(newImageUri);
   };
-
   const handleOpenAddGapModal = () => {
     setEditingGapId(null);
     setGapTitle("");
@@ -144,7 +136,6 @@ export const useObjectiveEdit = () => {
     setCurrentState("");
     setGapModalVisible(true);
   };
-
   const handleOpenEditGapModal = (gapTempId: string) => {
     const gapToEdit = localData.find((g) => g.tempId === gapTempId);
     if (gapToEdit) {
@@ -155,14 +146,12 @@ export const useObjectiveEdit = () => {
       setGapModalVisible(true);
     }
   };
-
   const handleSaveGap = () => {
     if (!gapTitle.trim()) {
       Alert.alert("입력 필요", "Gap 이름을 입력해주세요.");
       return;
     }
     const gapData = { title: gapTitle, idealState, currentState };
-
     if (editingGapId) {
       setLocalData((prev) =>
         prev.map((g) => (g.tempId === editingGapId ? { ...g, ...gapData } : g))
@@ -179,14 +168,12 @@ export const useObjectiveEdit = () => {
     }
     setGapModalVisible(false);
   };
-
   const handleOpenProblemModal = (gapTempId: string) => {
     setCurrentGapTempId(gapTempId);
     setProblemTitle("");
     setProblemDescription("");
     setProblemModalVisible(true);
   };
-
   const handleSaveProblem = () => {
     if (!problemTitle.trim() || !currentGapTempId) return;
     const newProblem: LocalProblem = {
@@ -211,31 +198,35 @@ export const useObjectiveEdit = () => {
       return;
     }
     setIsSaving(true);
+
+    // This object holds the data from the component's local state
     const commonData = {
       type,
       title,
       description,
-      coverImageUri,
-      avatarImageUri,
+      coverImageUri, // This is `string | undefined`
+      avatarImageUri, // This is `string | undefined`
     };
 
     if (isEditMode && objectiveId) {
+      // FIX: Convert `undefined` from state back to `null` for the `updateObjective` function.
       await updateObjective({
         ...getObjectiveById(objectiveId)!,
         ...commonData,
+        coverImageUri: commonData.coverImageUri ?? null,
+        avatarImageUri: commonData.avatarImageUri ?? null,
       });
 
+      // ... (rest of the update logic remains the same)
       const initialGapIds = new Set(initialData.map((g) => g.id));
       const currentGapIds = new Set(
         localData.map((g) => g.id).filter((id) => id && !id.startsWith("temp_"))
       );
-
       for (const initialGap of initialData) {
         if (initialGap.id && !currentGapIds.has(initialGap.id)) {
           await deleteGap(initialGap.id);
         }
       }
-
       for (const localGap of localData) {
         if (localGap.tempId.startsWith("temp_")) {
           const savedGap = await addGap({
@@ -263,7 +254,6 @@ export const useObjectiveEdit = () => {
             ) {
               await updateGap(localGap as Gap);
             }
-
             const initialProblemIds = new Set(
               initialGap.problems.map((p) => p.id)
             );
@@ -272,7 +262,6 @@ export const useObjectiveEdit = () => {
                 .map((p) => p.id)
                 .filter((id) => id && !id.startsWith("temp_"))
             );
-
             for (const initialProblem of initialGap.problems) {
               if (
                 initialProblem.id &&
@@ -288,15 +277,23 @@ export const useObjectiveEdit = () => {
                   gapId: localGap.id,
                   title: localProblem.title || "",
                 });
-              } else {
-                // TODO: Problem 내용 변경 감지 및 updateProblem 호출 로직
               }
             }
           }
         }
       }
     } else {
-      const objectiveResult = await addObjective(commonData);
+      // FIX: Add missing properties required by `addObjective`.
+      // Also convert `undefined` from state to `null` for the image URIs.
+      const objectiveResult = await addObjective({
+        ...commonData,
+        coverImageUri: commonData.coverImageUri ?? null,
+        avatarImageUri: commonData.avatarImageUri ?? null,
+        objectiveGoals: null,
+        icon: null,
+        color: null,
+        order: null,
+      });
       if (objectiveResult) {
         for (const localGap of localData) {
           const savedGap = await addGap({
@@ -311,7 +308,8 @@ export const useObjectiveEdit = () => {
                 objectiveId: objectiveResult.id,
                 gapId: savedGap.id,
                 title: localProblem.title || "",
-                description: localProblem.description,
+                // FIX: Convert potential `null` or `undefined` to just `undefined`.
+                description: localProblem.description || undefined,
               });
             }
           }
@@ -323,6 +321,7 @@ export const useObjectiveEdit = () => {
     Alert.alert("성공", `"${commonData.title}" 목표가 저장되었습니다.`);
     if (router.canGoBack()) router.back();
   };
+
 
   return {
     isLoading,

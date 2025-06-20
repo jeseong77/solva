@@ -12,12 +12,10 @@ export const createUIStateSlice: StateCreator<
   [],
   UIStateSliceInterface
 > = (set, get) => ({
-  // ✅ [변경] selectedPersonaId -> selectedObjectiveId
   selectedObjectiveId: null,
   isLoading: false,
   activeSession: null,
 
-  // ✅ [변경] setSelectedPersonaId -> setSelectedObjectiveId
   setSelectedObjectiveId: (objectiveId) => {
     console.log("[UIStateSlice] Selected Objective ID set to:", objectiveId);
     set({ selectedObjectiveId: objectiveId });
@@ -35,9 +33,11 @@ export const createUIStateSlice: StateCreator<
     set({
       activeSession: {
         threadId,
-        startTime: Date.now(),
+        // FIX: Use new Date() instead of the number from Date.now()
+        startTime: new Date(),
         isPaused: false,
-        pausedTime: 0,
+        // FIX: Use a "zero" Date object for the initial paused time
+        pausedTime: new Date(0),
       },
     });
   },
@@ -46,12 +46,15 @@ export const createUIStateSlice: StateCreator<
     const session = get().activeSession;
     if (!session || session.isPaused) return;
 
-    const elapsed = Date.now() - session.startTime;
+    // FIX: Get numeric values from dates to do arithmetic
+    const elapsed = new Date().getTime() - session.startTime.getTime();
+
     set({
       activeSession: {
         ...session,
         isPaused: true,
-        pausedTime: session.pausedTime + elapsed,
+        // FIX: Get numeric values, add them, and create a new Date object
+        pausedTime: new Date(session.pausedTime.getTime() + elapsed),
       },
     });
   },
@@ -64,7 +67,8 @@ export const createUIStateSlice: StateCreator<
       activeSession: {
         ...session,
         isPaused: false,
-        startTime: Date.now(),
+        // FIX: Use new Date() to reset the start time for the new active period
+        startTime: new Date(),
       },
     });
   },

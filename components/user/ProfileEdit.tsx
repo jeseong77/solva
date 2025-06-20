@@ -1,4 +1,4 @@
-// components/profile/ProfileEdit.tsx (가정된 파일 경로)
+// components/profile/ProfileEdit.tsx
 
 import { pickAndSaveImage } from "@/lib/imageUtils";
 import { useAppStore } from "@/store/store";
@@ -21,9 +21,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { v4 as uuidv4 } from "uuid";
 import { useShallow } from "zustand/react/shallow";
 
-// 재사용 가능한 입력 필드 행 컴포넌트
+// FormRow and LINK_PLATFORMS components remain the same...
 const FormRow = ({
   label,
   value,
@@ -41,7 +42,7 @@ const FormRow = ({
   multiline?: boolean;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   keyboardType?: "default" | "url" | "email-address";
-  numberOfLines?: number; // ✅ multiline을 위해 추가
+  numberOfLines?: number;
 }) => (
   <View style={[styles.formRow, multiline && styles.formRowMultiline]}>
     <Text style={styles.label}>{label}</Text>
@@ -79,31 +80,32 @@ export default function ProfileEdit() {
     }))
   );
 
-  // --- UI 및 데이터 상태 관리 ---
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
-  const [introduction, setIntroduction] = useState(""); // ✅ 자기소개 상태 추가
-  const [location, setLocation] = useState(""); // ✅ 지역 상태 추가
+  const [introduction, setIntroduction] = useState("");
+  const [location, setLocation] = useState("");
   const [links, setLinks] = useState<Record<string, string>>({});
   const [avatarImageUri, setAvatarImageUri] = useState<string | undefined>();
   const [coverImageUri, setCoverImageUri] = useState<string | undefined>();
-
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // --- 데이터 로딩 ---
   useFocusEffect(
     useCallback(() => {
       if (user) {
         setDisplayName(user.displayName);
         setBio(user.bio || "");
-        setIntroduction(user.introduction || ""); // ✅ 자기소개 로딩 추가
-        setLocation(user.location || ""); // ✅ 지역 로딩 추가
-        setAvatarImageUri(user.avatarImageUri);
-        setCoverImageUri(user.coverImageUri);
+        setIntroduction(user.introduction || "");
+        setLocation(user.location || "");
+        // FIX: Convert `null` from the user object to `undefined` for local state.
+        setAvatarImageUri(user.avatarImageUri || undefined);
+        setCoverImageUri(user.coverImageUri || undefined);
 
         const existingLinks = user.links?.reduce((acc, link) => {
-          acc[link.platform] = link.url;
+          if (link.platform) {
+            // a null check for safety
+            acc[link.platform] = link.url;
+          }
           return acc;
         }, {} as Record<string, string>);
         setLinks(existingLinks || {});
@@ -112,7 +114,6 @@ export default function ProfileEdit() {
     }, [user])
   );
 
-  // --- 핸들러 함수 ---
   const createChangeHandler =
     (setter: React.Dispatch<React.SetStateAction<string>>) =>
     (value: string) => {
@@ -140,7 +141,6 @@ export default function ProfileEdit() {
       setHasChanges(true);
     }
   };
-
   const handleSave = async () => {
     if (!user) return;
     if (!displayName.trim()) {
@@ -149,28 +149,36 @@ export default function ProfileEdit() {
     }
     setIsSaving(true);
 
+    // FIX: The object created in this .map() now perfectly matches the UserLink shape.
     const updatedLinks = Object.entries(links)
       .map(([platform, url]) => {
         if (url && url.trim()) {
           const existingLink = user.links?.find((l) => l.platform === platform);
           return {
-            id: existingLink?.id || platform,
+            // Use existing ID or generate a new one for new links
+            id: existingLink?.id || uuidv4(),
             platform: platform as UserLink["platform"],
             url: url.trim(),
+            // Preserve existing title or default to null
+            title: existingLink?.title ?? null,
+            // Add the required userId
+            userId: user.id,
           };
         }
         return null;
       })
+      // This filter now works correctly because the object shape matches UserLink
       .filter((l): l is UserLink => l !== null);
 
     const updatedUser: User = {
       ...user,
       displayName: displayName.trim(),
       bio: bio.trim(),
-      introduction: introduction.trim(), // ✅ 저장 데이터에 자기소개 포함
-      location: location.trim(), // ✅ 저장 데이터에 지역 포함
-      avatarImageUri,
-      coverImageUri,
+      introduction: introduction.trim(),
+      location: location.trim(),
+      avatarImageUri: avatarImageUri ?? null,
+      coverImageUri: coverImageUri ?? null,
+      // This assignment is now valid because updatedLinks is of type UserLink[]
       links: updatedLinks,
     };
 

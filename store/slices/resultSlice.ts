@@ -1,27 +1,19 @@
 // src/store/slices/resultSlice.ts
 
-import { getDatabase } from "@/lib/db";
+import { db } from "@/lib/db";
+import { results } from "@/lib/db/schema";
 import { Result } from "@/types";
 import type {
   AppState,
   ResultSlice as ResultSliceInterface,
 } from "@/types/storeTypes";
+import { asc, eq } from "drizzle-orm";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-/**
- * 데이터베이스에서 가져온 데이터를 Result 타입으로 변환합니다.
- * @param dbItem - 데이터베이스의 row 아이템
- * @returns Result 타입 객체
- */
-const parseResultFromDB = (dbItem: any): Result => ({
-  id: dbItem.id,
-  parentThreadId: dbItem.parentThreadId,
-  content: dbItem.content,
-  occurredAt: dbItem.occurredAt ? new Date(dbItem.occurredAt) : undefined,
-  createdAt: new Date(dbItem.createdAt),
-});
+// The parseResultFromDB function is NO LONGER NEEDED.
+// Drizzle ORM handles this automatically.
 
 export const createResultSlice: StateCreator<
   AppState,
@@ -38,14 +30,13 @@ export const createResultSlice: StateCreator<
   fetchResults: async (parentThreadId: string) => {
     set({ isLoadingResults: true });
     try {
-      const db = await getDatabase();
-      const dbResults = await db.getAllAsync<any>(
-        "SELECT * FROM Results WHERE parentThreadId = ? ORDER BY createdAt ASC;",
-        [parentThreadId]
-      );
-      const fetchedResults = dbResults.map(parseResultFromDB);
+      const fetchedResults = await db
+        .select()
+        .from(results)
+        .where(eq(results.parentThreadId, parentThreadId))
+        .orderBy(asc(results.createdAt));
 
-      // 기존 상태와 병합
+      // Client-side logic for merging state without duplicates is preserved.
       const existingIds = new Set(fetchedResults.map((r) => r.id));
       const untouchedResults = get().results.filter(
         (r) => !existingIds.has(r.id)
@@ -73,28 +64,20 @@ export const createResultSlice: StateCreator<
       id: uuidv4(),
       createdAt: new Date(),
       ...resultData,
+      // Ensure optional date is null, not undefined, for the database
+      occurredAt: resultData.occurredAt ?? null,
     };
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO Results (id, parentThreadId, content, occurredAt, createdAt)
-         VALUES (?, ?, ?, ?, ?);`,
-        [
-          newResult.id,
-          newResult.parentThreadId,
-          newResult.content,
-          newResult.occurredAt?.toISOString() ?? null,
-          newResult.createdAt.toISOString(),
-        ]
-      );
+      // Drizzle's insert query is type-safe.
+      await db.insert(results).values(newResult);
 
-      // 부모 ThreadItem의 resultIds 배열에 새 ID 추가
+      // CRITICAL: The logic to update the parent ThreadItem is preserved exactly.
       const parentThread = get().getThreadItemById(newResult.parentThreadId);
       if (parentThread) {
         const updatedParent = {
           ...parentThread,
-          resultIds: [...parentThread.resultIds, newResult.id],
+          resultIds: [...(parentThread.resultIds || []), newResult.id],
         };
         await get().updateThreadItem(updatedParent);
       }
@@ -116,15 +99,15 @@ export const createResultSlice: StateCreator<
    */
   updateResult: async (resultToUpdate) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `UPDATE Results SET content = ?, occurredAt = ? WHERE id = ?;`,
-        [
-          resultToUpdate.content,
-          resultToUpdate.occurredAt?.toISOString() ?? null,
-          resultToUpdate.id,
-        ]
-      );
+      // Drizzle's update query
+      await db
+        .update(results)
+        .set({
+          content: resultToUpdate.content,
+          // Ensure optional date is null, not undefined
+          occurredAt: resultToUpdate.occurredAt ?? null,
+        })
+        .where(eq(results.id, resultToUpdate.id));
 
       set((state) => ({
         results: state.results.map((r) =>
@@ -148,14 +131,14 @@ export const createResultSlice: StateCreator<
     if (!resultToDelete) return false;
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(`DELETE FROM Results WHERE id = ?;`, [resultId]);
+      // Drizzle's delete query
+      await db.delete(results).where(eq(results.id, resultId));
 
-      // 부모 ThreadItem의 resultIds 배열에서 ID 제거
+      // CRITICAL: The logic to update the parent ThreadItem is preserved exactly.
       const parentThread = get().getThreadItemById(
         resultToDelete.parentThreadId
       );
-      if (parentThread) {
+      if (parentThread && parentThread.resultIds) {
         const updatedParent = {
           ...parentThread,
           resultIds: parentThread.resultIds.filter((id) => id !== resultId),
@@ -179,6 +162,7 @@ export const createResultSlice: StateCreator<
    * ID로 Result를 동기적으로 조회합니다.
    */
   getResultById: (id: string) => {
+    // No changes needed.
     return get().results.find((r) => r.id === id);
   },
 });

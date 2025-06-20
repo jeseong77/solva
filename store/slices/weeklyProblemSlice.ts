@@ -1,26 +1,18 @@
 // src/store/slices/weeklyProblemSlice.ts
 
-import { getDatabase } from "@/lib/db";
+import { db } from "@/lib/db";
+import { weeklyProblems } from "@/lib/db/schema";
 import { WeeklyProblem } from "@/types";
 import type {
   AppState,
   WeeklyProblemSlice as WeeklyProblemSliceInterface,
 } from "@/types/storeTypes";
+import { and, desc, eq, SQL } from "drizzle-orm";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-/**
- * 데이터베이스에서 가져온 데이터를 WeeklyProblem 타입으로 변환합니다.
- */
-const parseWeeklyProblemFromDB = (dbItem: any): WeeklyProblem => ({
-  id: dbItem.id,
-  objectiveId: dbItem.objectiveId,
-  problemId: dbItem.problemId,
-  weekIdentifier: dbItem.weekIdentifier,
-  notes: dbItem.notes === null ? undefined : dbItem.notes,
-  createdAt: new Date(dbItem.createdAt),
-});
+// The parseWeeklyProblemFromDB function is NO LONGER NEEDED.
 
 export const createWeeklyProblemSlice: StateCreator<
   AppState,
@@ -38,28 +30,24 @@ export const createWeeklyProblemSlice: StateCreator<
   fetchWeeklyProblems: async (options) => {
     set({ isLoadingWeeklyProblems: true });
     try {
-      const db = await getDatabase();
-      let query = "SELECT * FROM WeeklyProblems";
-      const params: string[] = [];
-      const conditions: string[] = [];
-
+      // Drizzle handles dynamic WHERE clauses cleanly.
+      const conditions: (SQL | undefined)[] = [];
       if (options.objectiveId) {
-        conditions.push("objectiveId = ?");
-        params.push(options.objectiveId);
+        conditions.push(eq(weeklyProblems.objectiveId, options.objectiveId));
       }
       if (options.weekIdentifier) {
-        conditions.push("weekIdentifier = ?");
-        params.push(options.weekIdentifier);
+        conditions.push(
+          eq(weeklyProblems.weekIdentifier, options.weekIdentifier)
+        );
       }
 
-      if (conditions.length > 0) {
-        query += ` WHERE ${conditions.join(" AND ")}`;
-      }
-      query += " ORDER BY createdAt DESC;";
+      const fetchedProblems = await db
+        .select()
+        .from(weeklyProblems)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(weeklyProblems.createdAt));
 
-      const results = await db.getAllAsync<any>(query, params);
-      const fetchedProblems = results.map(parseWeeklyProblemFromDB);
-
+      // Client-side logic for merging state without duplicates is preserved.
       const existingIds = new Set(fetchedProblems.map((p) => p.id));
       const filteredOldProblems = get().weeklyProblems.filter(
         (p) => !existingIds.has(p.id)
@@ -90,22 +78,13 @@ export const createWeeklyProblemSlice: StateCreator<
       id: uuidv4(),
       createdAt: new Date(),
       ...weeklyProblemData,
+      // Ensure optional notes is null, not undefined, for the database
+      notes: weeklyProblemData.notes ?? null,
     };
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO WeeklyProblems (id, objectiveId, problemId, weekIdentifier, notes, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?);`,
-        [
-          newWeeklyProblem.id,
-          newWeeklyProblem.objectiveId,
-          newWeeklyProblem.problemId,
-          newWeeklyProblem.weekIdentifier,
-          newWeeklyProblem.notes ?? null,
-          newWeeklyProblem.createdAt.toISOString(),
-        ]
-      );
+      // Drizzle's type-safe insert
+      await db.insert(weeklyProblems).values(newWeeklyProblem);
 
       set((state) => ({
         weeklyProblems: [...state.weeklyProblems, newWeeklyProblem],
@@ -127,11 +106,13 @@ export const createWeeklyProblemSlice: StateCreator<
    */
   updateWeeklyProblem: async (weeklyProblemToUpdate) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(`UPDATE WeeklyProblems SET notes = ? WHERE id = ?;`, [
-        weeklyProblemToUpdate.notes ?? null,
-        weeklyProblemToUpdate.id,
-      ]);
+      // Drizzle's type-safe update
+      await db
+        .update(weeklyProblems)
+        .set({
+          notes: weeklyProblemToUpdate.notes,
+        })
+        .where(eq(weeklyProblems.id, weeklyProblemToUpdate.id));
 
       set((state) => ({
         weeklyProblems: state.weeklyProblems.map((wp) =>
@@ -158,10 +139,10 @@ export const createWeeklyProblemSlice: StateCreator<
    */
   deleteWeeklyProblem: async (weeklyProblemId) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(`DELETE FROM WeeklyProblems WHERE id = ?;`, [
-        weeklyProblemId,
-      ]);
+      // Drizzle's type-safe delete
+      await db
+        .delete(weeklyProblems)
+        .where(eq(weeklyProblems.id, weeklyProblemId));
 
       set((state) => ({
         weeklyProblems: state.weeklyProblems.filter(
@@ -175,19 +156,19 @@ export const createWeeklyProblemSlice: StateCreator<
       );
       return true;
     } catch (error) {
-      // ✅ 이 부분에 { } 중괄호가 추가되었습니다.
       console.error(
         "[WeeklyProblemSlice] Error deleting weekly problem:",
         error
       );
       return false;
-    } // ✅ 이 부분에 { } 중괄호가 추가되었습니다.
+    }
   },
 
   /**
    * ID로 특정 주간 문제를 동기적으로 조회합니다.
    */
   getWeeklyProblemById: (id: string) => {
+    // No changes needed
     return get().weeklyProblems.find((wp) => wp.id === id);
   },
 });

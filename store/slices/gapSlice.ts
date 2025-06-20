@@ -1,21 +1,17 @@
-// store/gapSlice.ts
+// store/slices/gapSlice.ts
 
-import { getDatabase } from "@/lib/db";
+import { db } from "@/lib/db"; // Import the new Drizzle instance
+import { gaps } from "@/lib/db/schema"; // Import the table schema
 import { Gap } from "@/types";
 import type { AppState, GapSlice } from "@/types/storeTypes";
+import { eq, desc } from "drizzle-orm"; // Import Drizzle operators
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-// DB에서 읽어온 데이터를 Gap 객체로 파싱하는 헬퍼 함수
-const parseGapFromDB = (dbItem: any): Gap => ({
-  id: dbItem.id,
-  objectiveId: dbItem.objectiveId,
-  title: dbItem.title,
-  idealState: dbItem.idealState,
-  currentState: dbItem.currentState,
-  createdAt: new Date(dbItem.createdAt),
-});
+// The parseGapFromDB function is NO LONGER NEEDED.
+// Drizzle ORM handles mapping database results to typed objects automatically.
+
 export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
   set,
   get
@@ -26,14 +22,15 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
   fetchGaps: async (objectiveId: string) => {
     set({ isLoadingGaps: true });
     try {
-      const db = await getDatabase();
-      const results = await db.getAllAsync<any>(
-        "SELECT * FROM Gaps WHERE objectiveId = ? ORDER BY createdAt ASC;",
-        [objectiveId]
-      );
-      const fetchedGaps = results.map(parseGapFromDB);
+      // Drizzle query replaces raw SQL
+      const fetchedGaps = await db
+        .select()
+        .from(gaps)
+        .where(eq(gaps.objectiveId, objectiveId))
+        .orderBy(desc(gaps.createdAt));
 
-      // 기존 Gaps 배열에서 해당 objectiveId에 속한 것들만 제외하고, 새로 불러온 데이터로 교체
+      // No more manual parsing! fetchedGaps is already of type Gap[]
+
       set((state) => ({
         gaps: [
           ...state.gaps.filter((g) => g.objectiveId !== objectiveId),
@@ -64,19 +61,8 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
     };
 
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `INSERT INTO Gaps (id, objectiveId, title, idealState, currentState, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?);`,
-        [
-          newGap.id,
-          newGap.objectiveId,
-          newGap.title,
-          newGap.idealState,
-          newGap.currentState,
-          newGap.createdAt.toISOString(),
-        ]
-      );
+      // Drizzle's insert query is type-safe and concise
+      await db.insert(gaps).values(newGap);
 
       set((state) => ({ gaps: [...state.gaps, newGap] }));
       console.log("[GapSlice] Gap added:", newGap.title);
@@ -89,17 +75,15 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
 
   updateGap: async (gapToUpdate) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(
-        `UPDATE Gaps SET title = ?, idealState = ?, currentState = ?
-           WHERE id = ?;`,
-        [
-          gapToUpdate.title,
-          gapToUpdate.idealState,
-          gapToUpdate.currentState,
-          gapToUpdate.id,
-        ]
-      );
+      // Drizzle's update query
+      await db
+        .update(gaps)
+        .set({
+          title: gapToUpdate.title,
+          idealState: gapToUpdate.idealState,
+          currentState: gapToUpdate.currentState,
+        })
+        .where(eq(gaps.id, gapToUpdate.id));
 
       set((state) => ({
         gaps: state.gaps.map((g) =>
@@ -116,13 +100,14 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
 
   deleteGap: async (gapId) => {
     try {
-      const db = await getDatabase();
-      await db.runAsync(`DELETE FROM Gaps WHERE id = ?;`, [gapId]);
+      // Drizzle's delete query
+      await db.delete(gaps).where(eq(gaps.id, gapId));
 
+      // This state logic remains the same
       set((state) => ({
         gaps: state.gaps.filter((g) => g.id !== gapId),
         problems: state.problems.map((p) =>
-          p.gapId === gapId ? { ...p, gapId: undefined } : p
+          p.gapId === gapId ? { ...p, gapId: null } : p
         ),
       }));
 
@@ -135,6 +120,7 @@ export const createGapSlice: StateCreator<AppState, [], [], GapSlice> = (
   },
 
   getGapById: (id: string) => {
+    // No changes needed here, as it only interacts with the in-memory state
     return get().gaps.find((g) => g.id === id);
   },
 });

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-// --- Helper Functions and Components (변경 없음) ---
+// --- Helper Functions (No Changes Needed) ---
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) return "00:00";
   const hours = Math.floor(totalSeconds / 3600);
@@ -58,21 +58,26 @@ const ActiveSessionView = ({
 
   useEffect(() => {
     if (session.isPaused) {
-      setDisplayTime(formatTime(session.pausedTime));
+      // FIX: Use .getTime() to pass a number to formatTime
+      setDisplayTime(formatTime(session.pausedTime.getTime()));
       return;
     }
     const interval = setInterval(() => {
-      const elapsedSinceResume = Date.now() - session.startTime;
-      const totalElapsed = session.pausedTime + elapsedSinceResume;
+      // FIX: Use .getTime() for date arithmetic
+      const elapsedSinceResume =
+        new Date().getTime() - session.startTime.getTime();
+      const totalElapsed = session.pausedTime.getTime() + elapsedSinceResume;
       setDisplayTime(formatTime(totalElapsed));
     }, 1000);
     return () => clearInterval(interval);
   }, [session]);
 
   const handleStopSession = () => {
+    // FIX: Use .getTime() for all date arithmetic
     const finalElapsedTime = session.isPaused
-      ? session.pausedTime
-      : session.pausedTime + (Date.now() - session.startTime);
+      ? session.pausedTime.getTime()
+      : session.pausedTime.getTime() +
+        (new Date().getTime() - session.startTime.getTime());
 
     Alert.alert("세션 종료", "이번 세션의 작업 내용을 기록하시겠습니까?", [
       {
@@ -95,17 +100,26 @@ const ActiveSessionView = ({
       },
       {
         text: "취소",
-        style: "cancel", // '취소' 역할을 하는 버튼
+        style: "cancel",
         onPress: () => console.log("세션 종료 취소됨"),
       },
     ]);
 
     const saveSession = async (content: string) => {
+      if (!thread.problemId) return; // Type guard
+      // FIX: Add all missing required properties for the store action.
       await addThreadItem({
         problemId: thread.problemId,
         parentId: thread.id,
         type: "Session",
         content,
+        isImportant: false,
+        authorId: null,
+        isResolved: null,
+        isCompleted: null,
+        status: null,
+        deadline: null,
+        completedAt: null,
         timeSpent: Math.round(finalElapsedTime / 1000),
         startTime: new Date(Date.now() - finalElapsedTime),
       });
@@ -180,8 +194,9 @@ export default function SessionBox() {
                   <Text style={styles.recentContent} numberOfLines={1}>
                     {recentSessionInfo.parentThread?.content}
                   </Text>
+                  {/* FIX: Provide a fallback of 0 in case timeSpent is null. */}
                   <Text style={styles.recentTime}>
-                    ({formatSeconds(recentSessionInfo.session.timeSpent)})
+                    ({formatSeconds(recentSessionInfo.session.timeSpent ?? 0)})
                   </Text>
                 </View>
               </>
@@ -189,7 +204,6 @@ export default function SessionBox() {
               <Text style={styles.idleTitle}>탭하여 세션을 시작하세요.</Text>
             )}
           </View>
-          {/* ✅ [수정] 플레이 버튼 UI 변경 */}
           <View style={[styles.controlButton, styles.playButtonActive]}>
             <Feather name="play" size={20} color="#ffffff" />
           </View>

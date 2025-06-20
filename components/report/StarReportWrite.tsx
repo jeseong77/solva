@@ -248,7 +248,6 @@ export default function StarReportWrite({
     </Modal>
   );
 }
-
 const ReferenceThreadItem = ({
   thread,
   allThreads,
@@ -263,16 +262,23 @@ const ReferenceThreadItem = ({
     (t): t is SessionThreadItem => t.type === "Session"
   );
   const nonSessionChildren = allChildren.filter((t) => t.type !== "Session");
+
+  // FIX: Define the missing sessionCount variable here.
   const sessionCount = sessionChildren.length;
+
   const totalSessionTime = sessionChildren.reduce(
-    (sum, s) => sum + s.timeSpent,
+    (sum, s) => sum + (s.timeSpent ?? 0),
     0
   );
+
   let isCompleted = false;
-  if (thread.type === "Task") isCompleted = thread.isCompleted;
-  else if (thread.type === "Action")
+  if (thread.type === "Task") {
+    isCompleted = !!thread.isCompleted;
+  } else if (thread.type === "Action") {
     isCompleted = thread.status === "completed";
-  else if (thread.type === "Bottleneck") isCompleted = thread.isResolved;
+  } else if (thread.type === "Bottleneck") {
+    isCompleted = !!thread.isResolved;
+  }
 
   const tagStyle =
     thread.type !== "General" && thread.type !== "Session"
