@@ -128,6 +128,7 @@ export const problems = sqliteTable("problems", {
   resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
   archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
   starReportId: text("star_report_id"),
+  imageUrls: text("image_urls", { mode: "json" }).$type<string[]>(),
 });
 
 /**
@@ -195,6 +196,7 @@ export const threadItems = sqliteTable("thread_items", {
 
   // Session-specific
   startTime: integer("start_time", { mode: "timestamp_ms" }),
+  imageUrls: text("image_urls", { mode: "json" }).$type<string[]>(),
 });
 
 /**

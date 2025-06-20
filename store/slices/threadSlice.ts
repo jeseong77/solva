@@ -68,19 +68,26 @@ export const createThreadSlice: StateCreator<
   addThreadItem: async (itemData) => {
     const baseItem: BaseThreadItem = {
       id: uuidv4(),
-      ...itemData,
+      problemId: itemData.problemId,
+      parentId: itemData.parentId,
+      type: itemData.type,
+      content: itemData.content,
+      isImportant: itemData.isImportant ?? false,
+      authorId: itemData.authorId ?? null,
+      imageUrls: itemData.imageUrls ?? null,
       childThreadIds: [],
       resultIds: [],
       createdAt: new Date(),
       isResolved: null,
       isCompleted: null,
       status: null,
-      timeSpent: null,
-      deadline: null,
+      timeSpent: itemData.timeSpent ?? null,
+      deadline: itemData.deadline ?? null,
       completedAt: null,
-      startTime: null,
+      startTime: itemData.startTime ?? null,
     };
 
+    // This switch statement logic for creating the final newThreadItem remains correct.
     let newThreadItem: ThreadItem;
     switch (baseItem.type) {
       case "Bottleneck":
@@ -121,7 +128,6 @@ export const createThreadSlice: StateCreator<
             (t) => t.id === newThreadItem.parentId
           );
           if (parent) {
-            // FIX: Create a new, non-nullable constant inside the if-block.
             const finalUpdatedParent: ThreadItem = {
               ...parent,
               childThreadIds: [
@@ -130,7 +136,6 @@ export const createThreadSlice: StateCreator<
               ],
             };
             parentThreadToUpdate = finalUpdatedParent;
-            // FIX: Use this new constant in the .map() to ensure the correct type.
             nextThreadItems = state.threadItems.map((t) =>
               t.id === finalUpdatedParent.id ? finalUpdatedParent : t
             );
@@ -140,7 +145,6 @@ export const createThreadSlice: StateCreator<
             (p) => p.id === newThreadItem.problemId
           );
           if (parent) {
-            // FIX: Apply the same pattern here for the parent problem.
             const finalUpdatedParent: Problem = {
               ...parent,
               childThreadIds: [
@@ -149,7 +153,6 @@ export const createThreadSlice: StateCreator<
               ],
             };
             parentProblemToUpdate = finalUpdatedParent;
-            // FIX: Use the new non-nullable constant here as well.
             nextProblems = state.problems.map((p) =>
               p.id === finalUpdatedParent.id ? finalUpdatedParent : p
             );
@@ -175,7 +178,6 @@ export const createThreadSlice: StateCreator<
     }
   },
 
-  // ... (the rest of the file remains the same) ...
   updateThreadItem: async (itemToUpdate) => {
     try {
       await db
@@ -192,6 +194,8 @@ export const createThreadSlice: StateCreator<
           deadline: itemToUpdate.deadline,
           completedAt: itemToUpdate.completedAt,
           startTime: itemToUpdate.startTime,
+          // FIX: Add the new imageUrls property to the update set.
+          imageUrls: itemToUpdate.imageUrls,
         })
         .where(eq(threadItems.id, itemToUpdate.id));
       set((state) => ({
@@ -214,10 +218,15 @@ export const createThreadSlice: StateCreator<
   },
 
   deleteThreadItem: async (itemId) => {
+    // Note: To delete the actual image files from the device, you would first
+    // need to fetch the item and its descendants, get all their imageUrls,
+    // and then loop through them calling a file system delete function
+    // before deleting the database records.
     const itemToDelete = get().threadItems.find((item) => item.id === itemId);
     if (!itemToDelete) return false;
     try {
       await db.delete(threadItems).where(eq(threadItems.id, itemId));
+
       const allIdsToDelete = new Set<string>([itemId]);
       const queue = itemToDelete.childThreadIds
         ? [...itemToDelete.childThreadIds]
@@ -226,6 +235,8 @@ export const createThreadSlice: StateCreator<
         const currentId = queue.shift()!;
         if (currentId && !allIdsToDelete.has(currentId)) {
           allIdsToDelete.add(currentId);
+          // Also delete descendants from the database
+          await db.delete(threadItems).where(eq(threadItems.id, currentId));
           const childItem = get().threadItems.find(
             (item) => item.id === currentId
           );
@@ -234,6 +245,7 @@ export const createThreadSlice: StateCreator<
           }
         }
       }
+
       if (itemToDelete.parentId) {
         const parent = get().threadItems.find(
           (item) => item.id === itemToDelete.parentId
@@ -271,6 +283,8 @@ export const createThreadSlice: StateCreator<
       return false;
     }
   },
+
+  // ... (rest of the slice is unchanged)
   getThreadItemById: (id: string) =>
     get().threadItems.find((item) => item.id === id),
   getThreadItemByType: <T extends ThreadItemType>(options: {

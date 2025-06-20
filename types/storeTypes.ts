@@ -1,12 +1,13 @@
 // src/types/storeTypes.ts
 
 import {
+  ActionStatus,
   ActionThreadItem,
   ActiveSession,
   BaseThreadItem,
-  BottleneckThreadItem, // ✅ ObjectiveType 추가
+  BottleneckThreadItem,
   Gap,
-  Objective, // ✅ Gap 추가
+  Objective,
   Priority,
   Problem,
   ProblemStatus,
@@ -38,7 +39,6 @@ export interface UserSlice {
   updateUser: (userToUpdate: User) => Promise<User | null>;
 }
 
-// ✅ [변경] PersonaSlice -> ObjectiveSlice
 export interface ObjectiveSlice {
   objectives: Objective[];
   isLoadingObjectives: boolean;
@@ -51,7 +51,6 @@ export interface ObjectiveSlice {
   getObjectiveById: (id: string) => Objective | undefined;
 }
 
-// ✅ [추가] GapSlice
 export interface GapSlice {
   gaps: Gap[];
   isLoadingGaps: boolean;
@@ -62,6 +61,7 @@ export interface GapSlice {
   getGapById: (id: string) => Gap | undefined;
 }
 
+// This type is correct and already includes the optional imageUrls property. No changes needed here.
 type AddProblemData = Pick<Problem, "title" | "objectiveId"> & {
   gapId?: string | null;
   description?: string;
@@ -70,12 +70,12 @@ type AddProblemData = Pick<Problem, "title" | "objectiveId"> & {
   urgency?: number;
   importance?: number;
   tags?: string[];
+  imageUrls?: string[] | null;
 };
 
 export interface ProblemSlice {
   problems: Problem[];
   isLoadingProblems: boolean;
-  // ✅ [변경] personaId -> objectiveId
   fetchProblems: (objectiveId?: string) => Promise<void>;
   addProblem: (problemData: AddProblemData) => Promise<Problem | null>;
   updateProblem: (problemToUpdate: Problem) => Promise<Problem | null>;
@@ -87,7 +87,6 @@ export interface WeeklyProblemSlice {
   weeklyProblems: WeeklyProblem[];
   isLoadingWeeklyProblems: boolean;
   fetchWeeklyProblems: (options: {
-    // ✅ [변경] personaId -> objectiveId
     objectiveId?: string;
     weekIdentifier?: string;
   }) => Promise<void>;
@@ -105,6 +104,23 @@ export interface RecentSessionInfo {
   session: SessionThreadItem;
   parentThread: ThreadItem | undefined;
 }
+// FIX: Add all possible optional fields for different thread types.
+type AddThreadItemData = {
+  problemId: string;
+  parentId: string | null;
+  type: ThreadItemType;
+  content: string;
+  isImportant?: boolean;
+  authorId?: string | null;
+  imageUrls?: string[] | null;
+  timeSpent?: number | null;
+  startTime?: Date | null;
+  deadline?: Date | null;
+  status?: ActionStatus | null;
+  isCompleted?: boolean | null;
+  isResolved?: boolean | null;
+  completedAt?: Date | null;
+};
 
 export interface ThreadSlice {
   threadItems: ThreadItem[];
@@ -113,21 +129,8 @@ export interface ThreadSlice {
     problemId: string;
     parentId?: string | null;
   }) => Promise<void>;
-  addThreadItem: (
-    itemData: Omit<
-      BaseThreadItem,
-      "id" | "createdAt" | "childThreadIds" | "resultIds"
-    > &
-      Partial<Pick<BottleneckThreadItem, "isResolved">> &
-      Partial<Pick<TaskThreadItem, "isCompleted">> &
-      Partial<
-        Pick<
-          ActionThreadItem,
-          "status" | "timeSpent" | "deadline" | "completedAt"
-        >
-      > &
-      Partial<Pick<SessionThreadItem, "timeSpent" | "startTime">>
-  ) => Promise<ThreadItem | null>;
+  // FIX: Use the new, cleaner AddThreadItemData type for the function signature.
+  addThreadItem: (itemData: AddThreadItemData) => Promise<ThreadItem | null>;
   updateThreadItem: (itemToUpdate: ThreadItem) => Promise<ThreadItem | null>;
   deleteThreadItem: (itemId: string) => Promise<boolean>;
   getThreadItemById: (id: string) => ThreadItem | undefined;
@@ -174,11 +177,9 @@ export interface StarReportSlice {
 }
 
 export interface UIStateSlice {
-  // ✅ [변경] personaId -> objectiveId
   selectedObjectiveId: string | null;
   isLoading: boolean;
   activeSession: ActiveSession | null;
-  // ✅ [변경] personaId -> objectiveId
   setSelectedObjectiveId: (objectiveId: string | null) => void;
   setGlobalLoading: (isLoading: boolean) => void;
   startSession: (threadId: string) => void;
@@ -197,11 +198,10 @@ export interface TodoSlice {
   getTodoById: (id: string) => Todo | undefined;
 }
 
-// --- 모든 Slice 인터페이스를 통합하는 전체 AppState 정의 ---
 export interface AppState
   extends UserSlice,
-    ObjectiveSlice, // ✅ PersonaSlice -> ObjectiveSlice
-    GapSlice, // ✅ GapSlice 추가
+    ObjectiveSlice,
+    GapSlice,
     ProblemSlice,
     WeeklyProblemSlice,
     ThreadSlice,

@@ -7,7 +7,7 @@ import type {
   AppState,
   ProblemSlice as ProblemSliceInterface,
 } from "@/types/storeTypes";
-import { eq } from "drizzle-orm"; // Import Drizzle operators
+import { eq, desc } from "drizzle-orm"; // Import Drizzle operators
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
@@ -18,6 +18,7 @@ const priorityOrder: { [key in Priority]: number } = {
   low: 3,
   none: 4,
 };
+
 const sortProblems = (a: Problem, b: Problem) => {
   if (
     a.priority &&
@@ -47,9 +48,13 @@ export const createProblemSlice: StateCreator<
         fetchedProblems = await db
           .select()
           .from(problems)
-          .where(eq(problems.objectiveId, objectiveId));
+          .where(eq(problems.objectiveId, objectiveId))
+          .orderBy(desc(problems.createdAt)); // Added sorting for consistency
       } else {
-        fetchedProblems = await db.select().from(problems);
+        fetchedProblems = await db
+          .select()
+          .from(problems)
+          .orderBy(desc(problems.createdAt));
       }
 
       const allProblems = [...get().problems, ...fetchedProblems];
@@ -82,7 +87,6 @@ export const createProblemSlice: StateCreator<
     const newProblem: Problem = {
       id: uuidv4(),
       objectiveId: problemData.objectiveId,
-      // FIX: Ensure undefined values become null before being sent to the database.
       gapId: problemData.gapId ?? null,
       title: problemData.title,
       description: problemData.description ?? null,
@@ -97,6 +101,8 @@ export const createProblemSlice: StateCreator<
       resolvedAt: null,
       archivedAt: null,
       starReportId: null,
+      // FIX: Add the new imageUrls property, defaulting to null.
+      imageUrls: problemData.imageUrls ?? null,
     };
 
     try {
@@ -130,6 +136,8 @@ export const createProblemSlice: StateCreator<
           archivedAt: problemToUpdate.archivedAt,
           starReportId: problemToUpdate.starReportId,
           gapId: problemToUpdate.gapId,
+          // FIX: Add the new imageUrls property to the update set.
+          imageUrls: problemToUpdate.imageUrls,
         })
         .where(eq(problems.id, problemToUpdate.id));
 

@@ -52,6 +52,7 @@ export default function ObjectiveEdit() {
     setProblemModalVisible,
     setProblemTitle,
     setProblemDescription,
+    handleLongPressGap,
     handleSave,
     handleCoverImageChange,
     handleAvatarPress,
@@ -203,14 +204,14 @@ export default function ObjectiveEdit() {
 
           <View style={styles.gapSection}>
             <Text style={styles.sectionDescription}>
-              목표의 이상적인 상태와 현실을 정의하여 그 차이를 명확히 하세요. 이
-              차이가 당신이 해결해야 할 '문제'가 됩니다.
+              이상 - 현실 = 목표{"\n"}
+              목표를 달성하기 위해 해결할 문제들을 정의해 보세요!
             </Text>
             {localData.map((gap) => (
               <GapItem
                 key={gap.tempId}
                 gap={gap}
-                onEditGap={handleOpenEditGapModal}
+                onEditGap={handleLongPressGap}
                 onAddProblem={handleOpenProblemModal}
               />
             ))}

@@ -174,6 +174,37 @@ export const useObjectiveEdit = () => {
     setProblemDescription("");
     setProblemModalVisible(true);
   };
+  const handleDeleteGap = (gapTempId: string) => {
+    setLocalData((prev) => prev.filter((g) => g.tempId !== gapTempId));
+  };
+
+  const handleLongPressGap = (gapTempId: string) => {
+    const gap = localData.find((g) => g.tempId === gapTempId);
+    if (!gap) return;
+
+    Alert.alert(
+      "Gap 관리", // Title: "Manage Gap"
+      `'${gap.title}'에 대한 작업을 선택하세요.`, // Message: "Select an action for '[gap title]'"
+      [
+        {
+          text: "수정하기", // "Edit"
+          // On press, call the original function to open the edit modal
+          onPress: () => handleOpenEditGapModal(gapTempId),
+        },
+        {
+          text: "삭제하기", // "Delete"
+          // On press, call the new local delete function
+          onPress: () => handleDeleteGap(gapTempId),
+          style: "destructive",
+        },
+        {
+          text: "취소", // "Cancel"
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
   const handleSaveProblem = () => {
     if (!problemTitle.trim() || !currentGapTempId) return;
     const newProblem: LocalProblem = {
@@ -358,6 +389,7 @@ export const useObjectiveEdit = () => {
     handleAvatarPress,
     handleOpenAddGapModal,
     handleOpenEditGapModal,
+    handleLongPressGap,
     handleSaveGap,
     handleOpenProblemModal,
     handleSaveProblem,
