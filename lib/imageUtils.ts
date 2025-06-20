@@ -86,3 +86,36 @@ export async function pickAndSaveImage(): Promise<string | null> {
   const permanentUri = await saveImagePermanently(tempUri);
   return permanentUri;
 }
+
+export async function pickAndSaveMultipleImages(
+  selectionLimit: number = 20
+): Promise<string[] | null> {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== "granted") {
+    Alert.alert(
+      "권한 필요",
+      "이미지를 사용하려면 사진첩 접근 권한이 필요합니다."
+    );
+    return null;
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsMultipleSelection: true, // The key option
+    quality: 0.8,
+    selectionLimit: selectionLimit, // Limit how many can be picked
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  // Use Promise.all to save all selected images concurrently
+  const savePromises = result.assets.map((asset) =>
+    saveImagePermanently(asset.uri)
+  );
+  const permanentUris = await Promise.all(savePromises);
+
+  // Filter out any potential nulls if an individual save failed
+  return permanentUris.filter((uri): uri is string => uri !== null);
+}

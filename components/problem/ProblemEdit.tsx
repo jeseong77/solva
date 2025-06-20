@@ -1,7 +1,13 @@
+// components/problem/ProblemEdit.tsx
+
+// ADD: Import necessary components for the new feature
+import { FlatList, Image, ActivityIndicator } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+
 import { useAppStore } from "@/store/store";
 import { Priority, Problem } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router"; // ✅ Expo Router 훅 임포트
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -10,6 +16,7 @@ import {
   KeyboardEvent,
   Platform,
   SafeAreaView,
+  ScrollView, // FIX: Import ScrollView
   StyleSheet,
   Text,
   TextInput,
@@ -23,7 +30,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { useShallow } from "zustand/react/shallow";
 
-// ... (priorityColors, FloatingSaveButton 컴포넌트는 변경 없이 그대로 둡니다)
 const priorityColors: { [key in Priority]: string } = {
   high: "#e57373",
   medium: "#ffb74d",
@@ -31,12 +37,14 @@ const priorityColors: { [key in Priority]: string } = {
   none: "#bdbdbd",
 };
 
-interface FloatingSaveButtonProps {
+// FIX: Update the Floating Toolbar to include an image icon button
+interface FloatingToolbarProps {
   onSave: () => void;
+  onPickImage: () => void; // ADD: Prop for image picking
   bottom: number;
 }
-const FloatingSaveButton = React.memo(
-  ({ onSave, bottom }: FloatingSaveButtonProps) => {
+const FloatingToolbar = React.memo(
+  ({ onSave, onPickImage, bottom }: FloatingToolbarProps) => {
     const opacity = useSharedValue(0);
 
     useEffect(() => {
@@ -51,6 +59,16 @@ const FloatingSaveButton = React.memo(
       <Animated.View
         style={[styles.floatingContainer, { bottom }, animatedStyle]}
       >
+        {/* ADD: Wrapper for left-side action icons */}
+        <View style={styles.floatingActionsWrapper}>
+          <TouchableOpacity
+            onPress={onPickImage}
+            style={styles.floatingIconButton}
+          >
+            <Feather name="image" size={24} color="#495057" />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity onPress={onSave} style={styles.floatingSaveButton}>
           <Text style={styles.floatingSaveButtonText}>저장</Text>
         </TouchableOpacity>
@@ -59,12 +77,8 @@ const FloatingSaveButton = React.memo(
   }
 );
 
-// ❌ 더 이상 Props를 받지 않으므로 interface를 제거합니다.
-// interface ProblemEditProps { ... }
-
 export default function ProblemEdit() {
   const router = useRouter();
-  // ✅ URL에서 problemId와 personaId를 가져옵니다.
   const params = useLocalSearchParams();
   const problemId = params.problemId as string | undefined;
   const objectiveId = params.objectiveId as string | undefined;
@@ -74,14 +88,15 @@ export default function ProblemEdit() {
   const [priority, setPriority] = useState<Priority>("none");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
+  // ADD: New state for image URLs and loading indicator
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [isPickingImage, setIsPickingImage] = useState(false);
+
   const titleInputRef = useRef<TextInput>(null);
   const descriptionInputRef = useRef<TextInput>(null);
 
-  const focusDescriptionInput = () => {
-    descriptionInputRef.current?.focus();
-  };
+  const focusDescriptionInput = () => descriptionInputRef.current?.focus();
 
-  // ✅ [변경] getPersonaById -> getObjectiveById
   const { getProblemById, getObjectiveById, addProblem, updateProblem } =
     useAppStore(
       useShallow((state) => ({
@@ -92,11 +107,8 @@ export default function ProblemEdit() {
       }))
     );
 
-  // ✅ problemId의 존재 여부로 수정 모드/생성 모드를 구분합니다.
   const isEditMode = !!problemId;
   const problemToEdit = isEditMode ? getProblemById(problemId) : undefined;
-
-  // ✅ [변경] personaId -> objectiveId
   const finalObjectiveId = isEditMode
     ? problemToEdit?.objectiveId
     : objectiveId;
@@ -104,39 +116,32 @@ export default function ProblemEdit() {
     ? getObjectiveById(finalObjectiveId)
     : undefined;
 
-  // ✅ isVisible 대신 problemId를 기준으로 데이터 로딩 로직을 변경합니다.
   useEffect(() => {
     if (isEditMode && problemToEdit) {
       setTitle(problemToEdit.title);
       setDescription(problemToEdit.description || "");
       setPriority(problemToEdit.priority);
+      // ADD: Initialize imageUrls when editing
+      setImageUrls(problemToEdit.imageUrls || []);
     } else {
       setTitle("");
       setDescription("");
       setPriority("none");
+      // ADD: Reset imageUrls for create mode
+      setImageUrls([]);
     }
   }, [problemId, problemToEdit, isEditMode]);
 
-  // ✅ isVisible 대신 컴포넌트 마운트 시 한 번만 실행되도록 변경합니다.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      titleInputRef.current?.focus();
-    }, 150);
+    const timer = setTimeout(() => titleInputRef.current?.focus(), 150);
     return () => clearTimeout(timer);
   }, []);
 
-  // ✅ 키보드 리스너는 그대로 유지합니다. 페이지에서도 잘 동작합니다.
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-
-    const onKeyboardDidShow = (e: KeyboardEvent) => {
+    const onKeyboardDidShow = (e: KeyboardEvent) =>
       setKeyboardHeight(e.endCoordinates.height);
-    };
-
-    const onKeyboardDidHide = () => {
-      setKeyboardHeight(0);
-    };
-
+    const onKeyboardDidHide = () => setKeyboardHeight(0);
     const showSubscription = Keyboard.addListener(
       "keyboardDidShow",
       onKeyboardDidShow
@@ -145,12 +150,46 @@ export default function ProblemEdit() {
       "keyboardDidHide",
       onKeyboardDidHide
     );
-
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
     };
   }, []);
+
+  // ADD: Handler for picking multiple images
+  const handlePickImages = async () => {
+    const selectionLimit = 20 - imageUrls.length;
+    if (selectionLimit <= 0) {
+      Alert.alert("알림", "이미지는 최대 20개까지 추가할 수 있습니다.");
+      return;
+    }
+    setIsPickingImage(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        selectionLimit,
+      });
+
+      if (!result.canceled) {
+        const newUris = result.assets.map((asset) => asset.uri);
+        // Note: This uses temporary URIs. For permanent storage, you'd use a utility
+        // like the one we discussed to copy them to your app's document directory.
+        setImageUrls((prevUris) => [...prevUris, ...newUris]);
+      }
+    } catch (error) {
+      console.error("Image picking error:", error);
+      Alert.alert("오류", "이미지를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setIsPickingImage(false);
+    }
+  };
+
+  // ADD: Handler for removing a selected image
+  const handleRemoveImage = (uriToRemove: string) => {
+    setImageUrls((prevUris) => prevUris.filter((uri) => uri !== uriToRemove));
+  };
 
   const handleChangePriority = () => {
     Alert.alert(
@@ -172,24 +211,25 @@ export default function ProblemEdit() {
       return;
     }
 
+    // FIX: Add `imageUrls` to the data being saved
     if (isEditMode && problemToEdit) {
       const updatedProblem: Problem = {
         ...problemToEdit,
         title: title.trim(),
         description: description.trim(),
         priority,
+        imageUrls,
       };
       await updateProblem(updatedProblem);
     } else if (finalObjectiveId) {
-      // ✅ finalPersonaId -> finalObjectiveId
       await addProblem({
-        objectiveId: finalObjectiveId, // ✅ personaId -> objectiveId
+        objectiveId: finalObjectiveId,
         title: title.trim(),
         description: description.trim(),
         priority,
+        imageUrls,
       });
     }
-    // ✅ onClose() 대신 router.back()으로 이전 화면으로 돌아갑니다.
     router.back();
   }, [
     title,
@@ -201,24 +241,20 @@ export default function ProblemEdit() {
     updateProblem,
     addProblem,
     router,
+    imageUrls,
   ]);
 
-  // ❌ <Modal>을 제거하고, <KeyboardAvoidingView>가 최상위 컴포넌트가 됩니다.
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <SafeAreaView style={styles.container}>
-        {/* 헤더 */}
         <View style={styles.header}>
-          {/* ✅ onClose 대신 router.back()으로 변경 */}
           <TouchableOpacity onPress={() => router.back()}>
             <Feather name="x" size={26} color="#343a40" />
           </TouchableOpacity>
-          {/* ✅ 저장 버튼은 플로팅 버튼으로 대체되었으므로 헤더에서 제거합니다. */}
         </View>
-        {/* 서브헤더 */}
         <View style={styles.subHeader}>
           <View style={styles.personaInfo}>
             <TouchableOpacity onPress={handleChangePriority}>
@@ -234,8 +270,12 @@ export default function ProblemEdit() {
             </Text>
           </View>
         </View>
-        {/* 콘텐츠 영역 */}
-        <View style={styles.contentContainer}>
+
+        {/* FIX: Use ScrollView to handle all content including the new image list */}
+        <ScrollView
+          style={styles.contentScrollView}
+          keyboardShouldPersistTaps="handled"
+        >
           <TextInput
             ref={titleInputRef}
             style={styles.titleInput}
@@ -255,18 +295,43 @@ export default function ProblemEdit() {
             onChangeText={setDescription}
             multiline
           />
-        </View>
+
+          {imageUrls.length > 0 && (
+            <FlatList
+              horizontal
+              data={imageUrls}
+              keyExtractor={(item) => item}
+              showsHorizontalScrollIndicator={false}
+              style={styles.imageList}
+              contentContainerStyle={{ paddingHorizontal: 20 }}
+              renderItem={({ item }) => (
+                <View style={styles.imageContainer}>
+                  <Image source={{ uri: item }} style={styles.image} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => handleRemoveImage(item)}
+                  >
+                    <Feather name="x" size={14} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          )}
+          {isPickingImage && <ActivityIndicator style={{ marginTop: 20 }} />}
+        </ScrollView>
       </SafeAreaView>
 
-      {/* ✅ 플로팅 저장 버튼은 모달이 아니어도 잘 동작하므로 그대로 둡니다. */}
       {Platform.OS === "ios" && keyboardHeight > 0 && (
-        <FloatingSaveButton onSave={handleSave} bottom={keyboardHeight} />
+        <FloatingToolbar
+          onSave={handleSave}
+          onPickImage={handlePickImages}
+          bottom={keyboardHeight}
+        />
       )}
     </KeyboardAvoidingView>
   );
 }
 
-// ✅ 스타일 이름 명확화 및 기존 스타일 유지
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#ffffff" },
   header: {
@@ -286,21 +351,24 @@ const styles = StyleSheet.create({
   personaInfo: { flexDirection: "row", alignItems: "center" },
   indicator: { width: 16, height: 16, borderRadius: 12, marginRight: 12 },
   metaText: { fontSize: 14, color: "#495057" },
-  contentContainer: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
+  // FIX: Change contentContainer to a ScrollView style
+  contentScrollView: { flex: 1 },
   titleInput: {
     fontSize: 24,
     fontWeight: "bold",
     paddingTop: 16,
     color: "#212529",
     lineHeight: 32,
+    paddingHorizontal: 20,
   },
   bodyInput: {
-    flex: 1,
     marginTop: 10,
     fontSize: 17,
     lineHeight: 25,
     color: "#343a40",
     textAlignVertical: "top",
+    paddingHorizontal: 20,
+    minHeight: 100,
   },
   floatingContainer: {
     position: "absolute",
@@ -309,10 +377,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderTopWidth: 1,
     borderColor: "#e9ecef",
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
+  // ADD: New styles for the toolbar layout
+  floatingActionsWrapper: { flexDirection: "row", alignItems: "center" },
+  floatingIconButton: { padding: 8 },
   floatingSaveButton: {
     backgroundColor: "#212529",
     paddingVertical: 10,
@@ -323,5 +396,25 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 18,
     fontWeight: "bold",
+  },
+  // ADD: New styles for the image list
+  imageList: { marginTop: 16, paddingBottom: 16, maxHeight: 120 },
+  imageContainer: { marginRight: 10, position: "relative" },
+  image: {
+    width: 90,
+    height: 120, // Creates a 4x3 aspect ratio
+    borderRadius: 8,
+    backgroundColor: "#f1f3f5",
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

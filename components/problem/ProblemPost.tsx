@@ -1,27 +1,39 @@
+// components/problem/ProblemPost.tsx
+
+// ADD: Import React Native components for the image list and viewer state
+import {
+  FlatList,
+  Image,
+  Modal,
+  SafeAreaView as ModalSafeArea, // Use alias to avoid name conflict
+} from "react-native";
+import React, { useMemo, useState } from "react"; // Import useState
+
+// ADD: Import the new image viewer library
+import ImageView from "react-native-image-viewing";
+
+// ... (keep all other imports: useAppStore, Problem, Feather, etc.)
 import { useAppStore } from "@/store/store";
 import {
-  ActionThreadItem,
   Objective,
   Priority,
   Problem,
   ProblemStatus,
   SessionThreadItem,
   TaskThreadItem,
+  ActionThreadItem,
 } from "@/types";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router"; // ✅ [추가] 페이지 이동을 위한 useRouter 임포트
-import React, { useMemo } from "react";
+import { useRouter } from "expo-router";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// Priority에 따른 색상 맵
+// ... (keep helper functions like priorityColors, formatSeconds, statusInfo)
 const priorityColors: { [key in Priority]: string } = {
   high: "#e57373",
   medium: "#ffb74d",
   low: "#81c784",
   none: "#bdbdbd",
 };
-
-// 초(seconds)를 HH:MM:SS 또는 MM:SS 형식으로 변환하는 헬퍼 함수
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
     return "00:00";
@@ -38,8 +50,6 @@ const formatSeconds = (totalSeconds: number): string => {
   }
   return parts.join(":");
 };
-
-// 상태별 이름 및 색상 정보
 const statusInfo: {
   [key in ProblemStatus]: {
     name: string;
@@ -53,7 +63,6 @@ const statusInfo: {
   archived: { name: "Archived", color: "#495057", backgroundColor: "#e9ecef" },
 };
 
-// 컴포넌트가 받을 Props 정의
 interface ProblemPostProps {
   problem: Problem;
   objective: Objective;
@@ -65,12 +74,17 @@ export default function ProblemPost({
   objective,
   onStatusBadgePress,
 }: ProblemPostProps) {
-  const router = useRouter(); // ✅ [추가] 라우터 훅 초기화
+  const router = useRouter();
   const threadItems = useAppStore((state) => state.threadItems);
   const currentStatus = problem.status || "active";
   const currentStatusInfo = statusInfo[currentStatus];
 
+  // ADD: State to manage the image viewer modal
+  const [isImageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   const stats = useMemo(() => {
+    // ... (stats calculation logic remains the same)
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
@@ -80,7 +94,9 @@ export default function ProblemPost({
     const taskItems = allThreadsInProblem.filter(
       (item): item is TaskThreadItem => item.type === "Task"
     );
-    const completedTasks = taskItems.filter((item) => item.isCompleted).length;
+    const completedTasks = taskItems.filter(
+      (item) => !!item.isCompleted
+    ).length;
     const actionItems = allThreadsInProblem.filter(
       (item): item is ActionThreadItem => item.type === "Action"
     );
@@ -94,7 +110,6 @@ export default function ProblemPost({
       (sum, item) => sum + (item.timeSpent || 0),
       0
     );
-
     return {
       totalThreads,
       tasks: { completed: completedTasks, total: taskItems.length },
@@ -110,106 +125,156 @@ export default function ProblemPost({
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date(problem.createdAt));
+  }).format(new Date(problem.createdAt as Date));
 
-  // ✅ [추가] STAR 리포트 페이지로 이동하는 핸들러
+  // ADD: Handlers to open and close the image viewer
+  const openImageViewer = (index: number) => {
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+  };
+
+  // ADD: Prepare image data for the viewer library
+  const imagesForViewer = useMemo(() => {
+    return (problem.imageUrls || []).map((url) => ({ uri: url }));
+  }, [problem.imageUrls]);
+
   const handleNavigateToStarReport = () => {
     if (problem.starReportId) {
       router.push(`/report/${problem.starReportId}`);
     } else {
-      // starReportId가 없는 경우에 대한 예외 처리 (예: 경고)
       console.warn("This resolved problem does not have a Star Report ID.");
       Alert.alert("오류", "연결된 리포트를 찾을 수 없습니다.");
     }
   };
 
   return (
-    <View style={styles.postContainer}>
-      {/* --- 헤더 --- */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View
-            style={[styles.indicator, { backgroundColor: indicatorColor }]}
-          />
-          <View style={styles.metaContainer}>
-            <Text style={styles.metaText}>
-              {objective.type}/
-              <Text style={styles.objectiveTitle}>{objective.title}</Text>
-            </Text>
-            <Text style={styles.metaText}>{formattedDate}</Text>
+    <>
+      <View style={styles.postContainer}>
+        {/* --- Header --- */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View
+              style={[styles.indicator, { backgroundColor: indicatorColor }]}
+            />
+            <View style={styles.metaContainer}>
+              <Text style={styles.metaText}>
+                {objective.type}/
+                <Text style={styles.objectiveTitle}>{objective.title}</Text>
+              </Text>
+              <Text style={styles.metaText}>{formattedDate}</Text>
+            </View>
           </View>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.statusBadge,
-            { backgroundColor: currentStatusInfo.backgroundColor },
-          ]}
-          onPress={onStatusBadgePress}
-        >
-          <Text
-            style={[styles.statusBadgeText, { color: currentStatusInfo.color }]}
+          <TouchableOpacity
+            style={[
+              styles.statusBadge,
+              { backgroundColor: currentStatusInfo.backgroundColor },
+            ]}
+            onPress={onStatusBadgePress}
           >
-            {currentStatusInfo.name}
-          </Text>
-          <Feather
-            name="chevron-down"
-            size={16}
-            color={currentStatusInfo.color}
-            style={{ marginLeft: 4 }}
-          />
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.statusBadgeText,
+                { color: currentStatusInfo.color },
+              ]}
+            >
+              {currentStatusInfo.name}
+            </Text>
+            <Feather
+              name="chevron-down"
+              size={16}
+              color={currentStatusInfo.color}
+              style={{ marginLeft: 4 }}
+            />
+          </TouchableOpacity>
+        </View>
 
-      {/* --- 본문 --- */}
-      <View style={styles.body}>
-        <Text style={styles.problemTitle}>{problem.title}</Text>
-        {problem.description && (
-          <Text style={styles.problemDescription}>{problem.description}</Text>
+        {/* --- Body --- */}
+        <View style={styles.body}>
+          <Text style={styles.problemTitle}>{problem.title}</Text>
+          {problem.description && (
+            <Text style={styles.problemDescription}>{problem.description}</Text>
+          )}
+
+          {/* ADD: Horizontal image list renderer */}
+          {problem.imageUrls && problem.imageUrls.length > 0 && (
+            <FlatList
+              horizontal
+              data={problem.imageUrls}
+              keyExtractor={(item) => item}
+              showsHorizontalScrollIndicator={false}
+              style={styles.imageList}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity
+                  onPress={() => openImageViewer(index)}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: item }} style={styles.imageThumbnail} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+
+        {/* --- Footer Stats --- */}
+        <View style={styles.statsContainer}>
+          <Feather name="git-branch" size={14} color="#6c757d" />
+          <Text style={styles.statsText}>{stats.totalThreads}</Text>
+          <Text style={styles.separator}>·</Text>
+          <Feather name="check-square" size={14} color="#6c757d" />
+          <Text style={styles.statsText}>
+            {stats.tasks.completed} / {stats.tasks.total}
+          </Text>
+          <Text style={styles.separator}>·</Text>
+          <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
+          <Text style={styles.statsText}>
+            {stats.actions.completed} / {stats.actions.total}
+          </Text>
+          <Text style={styles.separator}>·</Text>
+          <Feather name="clock" size={14} color="#6c757d" />
+          <Text style={styles.statsText}>
+            {formatSeconds(stats.totalSessionTime)}
+          </Text>
+        </View>
+
+        {problem.status === "resolved" && problem.starReportId && (
+          <TouchableOpacity
+            style={styles.reportButtonContainer}
+            onPress={handleNavigateToStarReport}
+            activeOpacity={0.7}
+          >
+            <Feather name="star" size={16} color={"#ffffff"} />
+            <Text style={styles.reportButtonText}>리포트 확인하기</Text>
+            <Feather name="chevron-right" size={18} color={"#ffffff"} />
+          </TouchableOpacity>
         )}
       </View>
 
-      {/* --- 푸터 통계 --- */}
-      <View style={styles.statsContainer}>
-        <Feather name="git-branch" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>{stats.totalThreads}</Text>
-        <Text style={styles.separator}>·</Text>
-        <Feather name="check-square" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>
-          {stats.tasks.completed} / {stats.tasks.total}
-        </Text>
-        <Text style={styles.separator}>·</Text>
-        <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>
-          {stats.actions.completed} / {stats.actions.total}
-        </Text>
-        <Text style={styles.separator}>·</Text>
-        <Feather name="clock" size={14} color="#6c757d" />
-        <Text style={styles.statsText}>
-          {formatSeconds(stats.totalSessionTime)}
-        </Text>
-      </View>
-
-      {/* ✅ [추가] Resolved 상태일 때만 보이는 리포트 확인 버튼 */}
-      {problem.status === "resolved" && problem.starReportId && (
-        <TouchableOpacity
-          style={styles.reportButtonContainer}
-          onPress={handleNavigateToStarReport}
-          activeOpacity={0.7}
-        >
-          <Feather name="star" size={16} color={"#ffffff"} />
-          <Text style={styles.reportButtonText}>리포트 확인하기</Text>
-          <Feather name="chevron-right" size={18} color={"#ffffff"} />
-        </TouchableOpacity>
-      )}
-    </View>
+      {/* ADD: The full-screen image viewer modal component */}
+      <ImageView
+        images={imagesForViewer}
+        imageIndex={currentImageIndex}
+        visible={isImageViewerVisible}
+        onRequestClose={closeImageViewer}
+        HeaderComponent={({ imageIndex }) => (
+          // This adds the 'X' close button to the top right
+          <ModalSafeArea style={styles.imageViewerHeader}>
+            <TouchableOpacity onPress={closeImageViewer}>
+              <Feather name="x" size={30} color="#ffffff" />
+            </TouchableOpacity>
+          </ModalSafeArea>
+        )}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  postContainer: {
-    padding: 16,
-    backgroundColor: "#ffffff",
-  },
+  // ... (all previous styles remain the same)
+  postContainer: { padding: 16, backgroundColor: "#ffffff" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -222,35 +287,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  indicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 16,
-  },
-  metaContainer: {
-    marginLeft: 10,
-  },
-  metaText: {
-    fontSize: 13,
-    color: "#868e96",
-  },
-  objectiveTitle: {
-    fontWeight: "bold",
-  },
-  body: {
-    marginBottom: 20,
-  },
+  indicator: { width: 16, height: 16, borderRadius: 16 },
+  metaContainer: { marginLeft: 10 },
+  metaText: { fontSize: 13, color: "#868e96" },
+  objectiveTitle: { fontWeight: "bold" },
+  body: { marginBottom: 20 },
   problemTitle: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#212529",
     marginBottom: 12,
   },
-  problemDescription: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#495057",
-  },
+  problemDescription: { fontSize: 16, lineHeight: 24, color: "#495057" },
   statsContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -264,10 +312,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontVariant: ["tabular-nums"],
   },
-  separator: {
-    color: "#ced4da",
-    marginHorizontal: 8,
-  },
+  separator: { color: "#ced4da", marginHorizontal: 8 },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -275,30 +320,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 12,
   },
-  statusBadgeText: {
-    fontSize: 13,
-    fontWeight: "bold",
-  },
-  // ✅ [수정] 리포트 확인 버튼 관련 스타일
+  statusBadgeText: { fontSize: 13, fontWeight: "bold" },
   reportButtonContainer: {
-    // 레이아웃
     flexDirection: "row",
     alignItems: "center",
     marginTop: 16,
-    // 좌우, 하단 여백을 음수 마진으로 처리해 부모의 padding을 무시하고 꽉 채움
     marginHorizontal: -16,
     marginBottom: -16,
-    // 디자인
-    backgroundColor: "#2b8a3e", // 요청하신 녹색 배경
+    backgroundColor: "#2b8a3e",
     paddingVertical: 18,
     paddingHorizontal: 20,
-    // borderTopWidth는 배경색으로 구분되므로 제거
   },
   reportButtonText: {
     flex: 1,
     marginLeft: 10,
-    fontSize: 16, // 가독성을 위해 폰트 크기 살짝 키움
-    fontWeight: "bold", // 굵게 하여 강조
-    color: "#ffffff", // ✅ 녹색 배경과 대비가 가장 선명한 흰색으로 변경
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#ffffff",
+  },
+
+  // ADD: New styles for the image list and viewer
+  imageList: {
+    marginTop: 8,
+  },
+  imageThumbnail: {
+    width: 90,
+    height: 120, // 3x4 aspect ratio
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: "#f1f3f5",
+  },
+  imageViewerHeader: {
+    width: "100%",
+    position: "absolute",
+    top: 0,
+    right: 0,
+    padding: 16,
+    zIndex: 1,
+    alignItems: "flex-end",
   },
 });
