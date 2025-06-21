@@ -12,17 +12,17 @@ import {
   View,
 } from "react-native";
 
-interface AddTodoModalProps {
+interface EditTodoModalProps {
   isVisible: boolean;
   onClose: () => void;
   onSave: (content: string) => void;
 }
 
-export default function AddTodoModal({
+export default function EditTodoModal({
   isVisible,
   onClose,
   onSave,
-}: AddTodoModalProps) {
+}: EditTodoModalProps) {
   const [content, setContent] = useState("");
 
   // 모달이 닫힐 때 내용 초기화

@@ -3,8 +3,6 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-// 컴포넌트가 받을 Props 정의
-// Todo 또는 ThreadItem(Task/Action)의 정보를 조합하여 받습니다.
 interface TodoListItemProps {
   id: string;
   content: string;
@@ -18,7 +16,6 @@ interface TodoListItemProps {
     currentStatus: boolean,
     isStandalone: boolean
   ) => void;
-  // 상세 보기 등 추가 액션을 위해 남겨둡니다.
   onPressItem?: () => void;
 }
 
@@ -30,24 +27,26 @@ export default function TodoListItem({
   onToggleComplete,
   onPressItem,
 }: TodoListItemProps) {
-  // 독립적인 Todo인지, 문제에 속한 Task/Action인지 구분
   const isStandaloneTodo = !sourceProblem;
 
+  // ✅ [변경] 루트 View를 TouchableOpacity로 변경하여 전체를 클릭 가능하게 만듭니다.
   return (
-    <View style={styles.container}>
-      {/* 완료 토글 체크박스 */}
-      <TouchableOpacity
-        style={styles.checkboxContainer}
-        onPress={() => onToggleComplete(id, isCompleted, isStandaloneTodo)}
-      >
+    <TouchableOpacity
+      style={styles.container}
+      // ✅ [이동] 클릭 이벤트를 루트 TouchableOpacity로 옮깁니다.
+      onPress={() => onToggleComplete(id, isCompleted, isStandaloneTodo)}
+      activeOpacity={0.6} // 클릭 시 시각적 피드백을 위한 옵션
+    >
+      {/* ✅ [변경] 기존 TouchableOpacity를 View로 변경하여 레이아웃만 유지합니다. */}
+      <View style={styles.checkboxContainer}>
         <Feather
           name={isCompleted ? "check-square" : "square"}
           size={22}
           color={isCompleted ? "#adb5bd" : "#343a40"}
         />
-      </TouchableOpacity>
+      </View>
 
-      {/* 할 일 내용 및 출처 정보 */}
+      {/* 할 일 내용 및 출처 정보 (이 부분은 변경 없음) */}
       <View style={styles.contentWrapper}>
         <Text
           style={[styles.contentText, isCompleted && styles.completedText]}
@@ -55,7 +54,6 @@ export default function TodoListItem({
         >
           {content}
         </Text>
-        {/* 문제에 속한 Task/Action일 경우 출처 표시 */}
         {sourceProblem && (
           <View style={styles.sourceContainer}>
             <Feather name="git-branch" size={12} color="#868e96" />
@@ -65,7 +63,7 @@ export default function TodoListItem({
           </View>
         )}
       </View>
-    </View>
+    </TouchableOpacity> // ✅ [변경] TouchableOpacity로 닫습니다.
   );
 }
 

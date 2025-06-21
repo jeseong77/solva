@@ -12,12 +12,10 @@ import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-export const createTodoSlice: StateCreator<
-  AppState,
-  [],
-  [],
-  TodoSliceInterface
-> = (set, get) => ({
+export const createTodoSlice: StateCreator<AppState, [], [], TodoSliceInterface> = (
+  set,
+  get
+) => ({
   todos: [],
   isLoadingTodos: false,
 
@@ -74,26 +72,36 @@ export const createTodoSlice: StateCreator<
   },
 
   /**
-   * 기존 Todo 항목을 업데이트합니다. (주로 완료 상태 변경)
+   * 기존 Todo 항목을 업데이트합니다.
    */
-  updateTodo: async (todoToUpdate) => {
-    try {
-      await db
-        .update(todos)
-        .set({
-          content: todoToUpdate.content,
-          isCompleted: todoToUpdate.isCompleted,
-          completedAt: todoToUpdate.completedAt,
-        })
-        .where(eq(todos.id, todoToUpdate.id));
+  updateTodo: async (updates: Partial<Todo> & { id: string }) => {
+    const { id, ...fieldsToUpdate } = updates;
 
+    // 업데이트할 필드가 없으면 아무것도 하지 않음
+    if (Object.keys(fieldsToUpdate).length === 0) {
+      console.log("[TodoSlice] No fields to update for todo:", id);
+      return get().todos.find((t) => t.id === id) || null;
+    }
+
+    try {
+      // 1. DB 업데이트
+      await db.update(todos).set(fieldsToUpdate).where(eq(todos.id, id));
+
+      // 2. 클라이언트 상태 업데이트
+      let mergedTodo: Todo | null = null;
       set((state) => ({
-        todos: state.todos.map((t) =>
-          t.id === todoToUpdate.id ? todoToUpdate : t
-        ),
+        todos: state.todos.map((originalTodo) => {
+          if (originalTodo.id === id) {
+            // 기존 객체와 업데이트된 필드를 병합
+            mergedTodo = { ...originalTodo, ...updates };
+            return mergedTodo;
+          }
+          return originalTodo;
+        }),
       }));
-      console.log("[TodoSlice] Todo updated:", todoToUpdate.id);
-      return todoToUpdate;
+
+      console.log("[TodoSlice] Todo updated:", id, "with", fieldsToUpdate);
+      return mergedTodo;
     } catch (error) {
       console.error("[TodoSlice] Error updating todo:", error);
       return null;

@@ -6,7 +6,7 @@ import ResolvedProblemList from "@/components/problem/ResolvedProblemList";
 import SelectWeeklyProblemModal from "@/components/problem/SelectWeeklyProblemModal";
 import WeeklyProblemCard from "@/components/problem/WeeklyProblem";
 import SessionBox from "@/components/session/SessionBox";
-import AddTodoModal from "@/components/todo/AddTodoModal";
+import EditTodoModal from "@/components/todo/EditTodoModal";
 import TodoList from "@/components/todo/TodoList";
 import FloatingActionButton from "@/components/ui/FloatingActionButton";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
@@ -350,9 +350,20 @@ export default function HomeScreen() {
     </ScrollView>
   );
 
+  // ✅ [추가] TodoList를 ScrollView로 감싸는 새로운 뷰 컴포넌트
+  const TodoView = () => (
+    <ScrollView
+      style={styles.sceneContainer}
+      contentContainerStyle={{ paddingBottom: bottom }}
+    >
+      <TodoList />
+    </ScrollView>
+  );
+
+  // ✅ [변경] SceneMap에서 TodoList를 새로 만든 TodoView로 교체
   const renderScene = SceneMap({
     solva: SolvaView,
-    todo: TodoList,
+    todo: TodoView, // TodoList -> TodoView
   });
 
   const activeView = routes[index].key as "solva" | "todo";
@@ -397,7 +408,7 @@ export default function HomeScreen() {
         onClose={() => setWeeklySelectModalVisible(false)}
         onConfirm={handleConfirmWeeklyProblem}
       />
-      <AddTodoModal
+      <EditTodoModal
         isVisible={isAddTodoModalVisible}
         onClose={() => setAddTodoModalVisible(false)}
         onSave={handleSaveNewTodo}
@@ -409,7 +420,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#ffffff" },
   sceneContainer: { flex: 1, backgroundColor: "#F2F2F7" },
-  placeholderContainer: { flex: 1, paddingTop: 70, alignItems: "center" },
+  placeholderContainer: { flex: 1, paddingTop: 120, alignItems: "center" },
   placeholderText: { fontSize: 16, color: "#6c757d", textAlign: "center" },
   placeholderImage: { width: 180, height: 180, marginBottom: 24, opacity: 0.8 },
   tabBar: {
