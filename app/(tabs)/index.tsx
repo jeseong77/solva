@@ -12,11 +12,13 @@ import FloatingActionButton from "@/components/ui/FloatingActionButton";
 import { useBottomTabOverflow } from "@/components/ui/TabBarBackground";
 import { useAppStore } from "@/store/store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
+  RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -39,7 +41,6 @@ const getWeekIdentifier = (date: Date): string => {
   );
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 };
-
 export default function HomeScreen() {
   const router = useRouter();
   const layout = useWindowDimensions();
@@ -55,8 +56,9 @@ export default function HomeScreen() {
   ]);
   const [isAddTodoModalVisible, setAddTodoModalVisible] = useState(false);
 
-  // --- 스토어 데이터 및 액션 (Zustand) ---
-  // ✅ [변경] Persona -> Objective 관련 상태와 액션으로 모두 변경
+  // ADD: New state to manage the refreshing indicator
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const {
     objectives,
     fetchObjectives,
@@ -74,6 +76,7 @@ export default function HomeScreen() {
     addTodo,
   } = useAppStore(
     useShallow((state) => ({
+      // ... (this state selection is unchanged)
       objectives: state.objectives,
       fetchObjectives: state.fetchObjectives,
       selectedObjectiveId: state.selectedObjectiveId,
@@ -91,12 +94,19 @@ export default function HomeScreen() {
     }))
   );
 
-  // --- 데이터 로딩 (useEffect / useFocusEffect) ---
+  // --- Data Loading ---
+
   useFocusEffect(
     useCallback(() => {
+      // 이 함수는 HomeScreen이 포커스될 때마다 실행됩니다.
+      console.log("HomeScreen focused, fetching initial data...");
       fetchObjectives();
       fetchTodos();
-    }, [fetchObjectives, fetchTodos])
+
+      // cleanup 함수를 반환할 수도 있습니다.
+      // 화면이 포커스를 잃을 때 실행할 작업이 있다면 여기에 작성합니다.
+      // 예: return () => console.log("HomeScreen unfocused");
+    }, [fetchObjectives, fetchTodos]) // fetch 함수들이 변경되지 않는 한, 콜백은 재생성되지 않습니다.
   );
 
   useEffect(() => {
@@ -117,12 +127,11 @@ export default function HomeScreen() {
     }
   }, [selectedObjectiveId, fetchProblems, fetchWeeklyProblems, fetchThreads]);
 
-  // --- 데이터 가공 (useMemo) ---
+  // --- Data Processing (useMemo hooks are unchanged) ---
   const selectedObjective = useMemo(
     () => objectives.find((p) => p.id === selectedObjectiveId),
     [objectives, selectedObjectiveId]
   );
-
   const activeProblems = useMemo(
     () =>
       selectedObjectiveId
@@ -134,7 +143,6 @@ export default function HomeScreen() {
         : [],
     [problems, selectedObjectiveId]
   );
-
   const resolvedProblems = useMemo(
     () =>
       selectedObjectiveId
@@ -146,7 +154,6 @@ export default function HomeScreen() {
         : [],
     [problems, selectedObjectiveId]
   );
-
   const currentWeeklyProblem = useMemo(() => {
     if (!selectedObjectiveId) return undefined;
     const weekIdentifier = getWeekIdentifier(new Date());
@@ -156,11 +163,35 @@ export default function HomeScreen() {
         wp.weekIdentifier === weekIdentifier
     );
   }, [weeklyProblems, selectedObjectiveId]);
-
   const problemForWeekly = useMemo(() => {
     if (!currentWeeklyProblem) return undefined;
     return problems.find((p) => p.id === currentWeeklyProblem.problemId);
   }, [problems, currentWeeklyProblem]);
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    console.log("Refreshing data...");
+    try {
+      await Promise.all([fetchObjectives(), fetchTodos()]);
+      // 선택된 목표가 있다면 관련 데이터도 새로고침
+      if (selectedObjectiveId) {
+        await fetchProblems(selectedObjectiveId);
+        await fetchWeeklyProblems({ objectiveId: selectedObjectiveId });
+        // 스레드까지 새로고침 할 필요가 있다면 추가
+      }
+    } catch (error) {
+      console.error("Failed to refresh data:", error);
+      Alert.alert("오류", "데이터를 새로고침하는 데 실패했습니다.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [
+    selectedObjectiveId,
+    fetchObjectives,
+    fetchTodos,
+    fetchProblems,
+    fetchWeeklyProblems,
+  ]);
 
   // --- 핸들러 함수 (Handlers) ---
   const handleSelectObjective = (objectiveId: string) => {
@@ -274,7 +305,12 @@ export default function HomeScreen() {
       style={styles.sceneContainer}
       contentContainerStyle={{ paddingBottom: bottom }}
       showsVerticalScrollIndicator={false}
+      // ADD: Add the RefreshControl component to the ScrollView
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+      }
     >
+      {/* ... (The content inside the ScrollView is unchanged) ... */}
       {selectedObjective ? (
         <>
           <SessionBox />
@@ -295,7 +331,6 @@ export default function HomeScreen() {
           />
           {resolvedProblems.length > 0 && (
             <ResolvedProblemList
-              objective={selectedObjective}
               problems={resolvedProblems}
               onPressProblem={handleNavigateToProblemDetail}
             />
@@ -373,7 +408,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#ffffff" },
-  sceneContainer: { flex: 1, backgroundColor: "#f8f9fa" },
+  sceneContainer: { flex: 1, backgroundColor: "#F2F2F7" },
   placeholderContainer: { flex: 1, paddingTop: 70, alignItems: "center" },
   placeholderText: { fontSize: 16, color: "#6c757d", textAlign: "center" },
   placeholderImage: { width: 180, height: 180, marginBottom: 24, opacity: 0.8 },

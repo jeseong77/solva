@@ -12,8 +12,6 @@ import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
 
-// The parseTodoFromDB function is NO LONGER NEEDED.
-
 export const createTodoSlice: StateCreator<
   AppState,
   [],
@@ -34,7 +32,16 @@ export const createTodoSlice: StateCreator<
         .from(todos)
         .orderBy(desc(todos.createdAt));
 
-      set({ todos: fetchedTodos, isLoadingTodos: false });
+      // --- FIX: Implement the "Smart Merge" logic ---
+      const todoMap = new Map(get().todos.map((t) => [t.id, t]));
+      fetchedTodos.forEach((t) => todoMap.set(t.id, t));
+
+      const newTodoList = Array.from(todoMap.values()).sort(
+        (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)
+      );
+      // --- End of Fix ---
+
+      set({ todos: newTodoList, isLoadingTodos: false });
       console.log(`[TodoSlice] ${fetchedTodos.length} todos fetched.`);
     } catch (error) {
       console.error("[TodoSlice] Error fetching todos:", error);
@@ -55,7 +62,6 @@ export const createTodoSlice: StateCreator<
     };
 
     try {
-      // Drizzle's type-safe insert
       await db.insert(todos).values(newTodo);
 
       set((state) => ({ todos: [newTodo, ...state.todos] }));
@@ -72,7 +78,6 @@ export const createTodoSlice: StateCreator<
    */
   updateTodo: async (todoToUpdate) => {
     try {
-      // Drizzle's type-safe update
       await db
         .update(todos)
         .set({
@@ -100,7 +105,6 @@ export const createTodoSlice: StateCreator<
    */
   deleteTodo: async (todoId) => {
     try {
-      // Drizzle's type-safe delete
       await db.delete(todos).where(eq(todos.id, todoId));
 
       set((state) => ({
@@ -118,7 +122,6 @@ export const createTodoSlice: StateCreator<
    * ID로 Todo를 동기적으로 조회합니다.
    */
   getTodoById: (id: string) => {
-    // No changes needed
     return get().todos.find((t) => t.id === id);
   },
 });

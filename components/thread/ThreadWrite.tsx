@@ -1,3 +1,5 @@
+// components/thread/ThreadWrite.tsx
+
 import { useAppStore } from "@/store/store";
 import { ThreadItem, ThreadItemType } from "@/types";
 import { Feather } from "@expo/vector-icons";
@@ -16,21 +18,24 @@ import {
 } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-const SELECTABLE_TYPES: Exclude<ThreadItemType, "Session">[] = [
+// FIX: Removed 'Action' from the selectable types
+const SELECTABLE_TYPES: Exclude<ThreadItemType, "Session" | "Action">[] = [
   "General",
   "Bottleneck",
   "Task",
-  "Action",
   "Insight",
 ];
 
+// FIX: Removed the style definition for 'Action'
 const typeInfo: {
-  [key in Exclude<ThreadItemType, "Session">]: { color: string; name: string };
+  [key in Exclude<ThreadItemType, "Session" | "Action">]: {
+    color: string;
+    name: string;
+  };
 } = {
   General: { color: "#4dabf7", name: "일반" },
   Bottleneck: { color: "#f76707", name: "병목" },
   Task: { color: "#2b8a3e", name: "할 일" },
-  Action: { color: "#d9480f", name: "액션" },
   Insight: { color: "#845ef7", name: "인사이트" },
 };
 
@@ -50,8 +55,9 @@ export default function ThreadWrite({
   threadToEditId,
 }: ThreadWriteProps) {
   const [content, setContent] = useState("");
+  // The state type now excludes 'Action'
   const [selectedType, setSelectedType] =
-    useState<Exclude<ThreadItemType, "Session">>("General");
+    useState<Exclude<ThreadItemType, "Session" | "Action">>("General");
 
   const { addThreadItem, getThreadItemById, updateThreadItem } = useAppStore(
     useShallow((state) => ({
@@ -71,7 +77,12 @@ export default function ThreadWrite({
     if (isVisible) {
       if (isEditMode) {
         const threadToEdit = getThreadItemById(threadToEditId);
-        if (threadToEdit && threadToEdit.type !== "Session") {
+        // Ensure we don't try to edit an Action or Session here
+        if (
+          threadToEdit &&
+          threadToEdit.type !== "Session" &&
+          threadToEdit.type !== "Action"
+        ) {
           setContent(threadToEdit.content);
           setSelectedType(threadToEdit.type);
         }
@@ -81,6 +92,7 @@ export default function ThreadWrite({
       }
     }
   }, [isVisible, threadToEditId, getThreadItemById, isEditMode]);
+
   const handleSave = async () => {
     if (!content.trim()) {
       Alert.alert("내용을 입력해주세요.");
@@ -88,17 +100,13 @@ export default function ThreadWrite({
     }
 
     if (isEditMode) {
-      // --- 수정 모드 ---
       const originalThread = getThreadItemById(threadToEditId);
       if (!originalThread) {
         Alert.alert("오류", "수정할 스레드를 찾을 수 없습니다.");
         return;
       }
 
-      // `selectedType`에 따라 완전한 새 객체를 생성합니다.
       let updatedThread: ThreadItem;
-
-      // 공통 기본 속성을 정의합니다.
       const baseProperties = {
         ...originalThread,
         content: content.trim(),
@@ -107,17 +115,13 @@ export default function ThreadWrite({
 
       switch (selectedType) {
         case "General":
-        case "Insight": // Insight also just uses base properties
-          updatedThread = {
-            ...baseProperties,
-            type: selectedType,
-          };
+        case "Insight":
+          updatedThread = { ...baseProperties, type: selectedType };
           break;
         case "Bottleneck":
           updatedThread = {
             ...baseProperties,
             type: "Bottleneck",
-            // 타입이 변경되었을 경우를 대비해 기본값을 설정합니다.
             isResolved:
               originalThread.type === "Bottleneck"
                 ? originalThread.isResolved
@@ -128,40 +132,21 @@ export default function ThreadWrite({
           updatedThread = {
             ...baseProperties,
             type: "Task",
-            // 타입이 변경되었을 경우를 대비해 기본값을 설정합니다.
             isCompleted:
               originalThread.type === "Task"
                 ? originalThread.isCompleted
                 : false,
           };
           break;
-        case "Action":
-          updatedThread = {
-            ...baseProperties,
-            type: "Action",
-            // 타입이 변경되었을 경우를 대비해 기본값을 설정합니다.
-            status:
-              originalThread.type === "Action" ? originalThread.status : "todo",
-            timeSpent:
-              originalThread.type === "Action" ? originalThread.timeSpent : 0,
-            deadline:
-              originalThread.type === "Action" ? originalThread.deadline : null,
-            completedAt:
-              originalThread.type === "Action"
-                ? originalThread.completedAt
-                : null,
-          };
-          break;
+        // FIX: The 'Action' case has been completely removed
         default:
-          // Session 타입 등 다른 예외 케이스 처리
           console.error("Unsupported type for editing:", selectedType);
           return;
       }
 
       await updateThreadItem(updatedThread);
     } else {
-      // --- 생성 모드 ---
-      // FIX: Add all missing required properties with default values.
+      // --- Create Mode ---
       await addThreadItem({
         problemId,
         parentId: parentThreadId || null,
@@ -172,7 +157,7 @@ export default function ThreadWrite({
         isResolved: null,
         isCompleted: null,
         status: null,
-        timeSpent: null,
+        timeSpent: 0,
         deadline: null,
         completedAt: null,
         startTime: null,
@@ -254,17 +239,10 @@ export default function ThreadWrite({
   );
 }
 
+// ... (Styles are unchanged)
 const styles = StyleSheet.create({
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
-  keyboardAvoidingView: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)" },
+  keyboardAvoidingView: { position: "absolute", bottom: 0, left: 0, right: 0 },
   container: {
     backgroundColor: "#ffffff",
     borderTopLeftRadius: 16,
@@ -279,12 +257,7 @@ const styles = StyleSheet.create({
     borderColor: "#f1f3f5",
     marginBottom: 8,
   },
-  replyingToText: {
-    fontSize: 13,
-    color: "#868e96",
-    marginLeft: 8,
-    flex: 1,
-  },
+  replyingToText: { fontSize: 13, color: "#868e96", marginLeft: 8, flex: 1 },
   textInput: {
     minHeight: 80,
     maxHeight: 200,
@@ -297,10 +270,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 12,
   },
-  typeSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  typeSelector: { flexDirection: "row", alignItems: "center" },
   typeButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -308,19 +278,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#f1f3f5",
     marginRight: 8,
   },
-  typeButtonText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#495057",
-  },
+  typeButtonText: { fontSize: 13, fontWeight: "500", color: "#495057" },
   postButton: {
     backgroundColor: "#212529",
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 20,
   },
-  postButtonText: {
-    color: "#ffffff",
-    fontWeight: "bold",
-  },
+  postButtonText: { color: "#ffffff", fontWeight: "bold" },
 });

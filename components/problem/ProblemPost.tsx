@@ -1,29 +1,32 @@
 // components/problem/ProblemPost.tsx
 
-// ... (keep all imports)
-import {
-  FlatList,
-  Image,
-  Modal,
-  SafeAreaView as ModalSafeArea,
-} from "react-native";
-import React, { useMemo, useState } from "react";
-import ImageView from "react-native-image-viewing";
+// ... (imports remain mostly the same, but ActionThreadItem can be removed)
 import { useAppStore } from "@/store/store";
 import {
+  InsightThreadItem,
   Objective,
   Priority,
   Problem,
   ProblemStatus,
   SessionThreadItem,
   TaskThreadItem,
-  ActionThreadItem,
 } from "@/types";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Image,
+  SafeAreaView as ModalSafeArea,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import ImageView from "react-native-image-viewing";
 
-// ... (keep all helper functions)
+// ... (helper functions remain the same)
 const priorityColors: { [key in Priority]: string } = {
   high: "#e57373",
   medium: "#ffb74d",
@@ -59,27 +62,26 @@ const statusInfo: {
   archived: { name: "Archived", color: "#495057", backgroundColor: "#e9ecef" },
 };
 
-// FIX: Add the new onPressMenu prop
 interface ProblemPostProps {
   problem: Problem;
   objective: Objective;
   onStatusBadgePress: () => void;
-  onPressMenu: () => void; // <-- ADD THIS
+  onPressMenu: () => void;
 }
 
 export default function ProblemPost({
   problem,
   objective,
   onStatusBadgePress,
-  onPressMenu, // <-- ADD THIS
+  onPressMenu,
 }: ProblemPostProps) {
-  // ... (keep all existing logic and state inside this component)
   const router = useRouter();
   const threadItems = useAppStore((state) => state.threadItems);
   const currentStatus = problem.status || "active";
   const currentStatusInfo = statusInfo[currentStatus];
   const [isImageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   const stats = useMemo(() => {
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
@@ -87,18 +89,23 @@ export default function ProblemPost({
     const totalThreads = allThreadsInProblem.filter(
       (item) => item.type !== "Session"
     ).length;
+
     const taskItems = allThreadsInProblem.filter(
       (item): item is TaskThreadItem => item.type === "Task"
     );
     const completedTasks = taskItems.filter(
       (item) => !!item.isCompleted
     ).length;
-    const actionItems = allThreadsInProblem.filter(
-      (item): item is ActionThreadItem => item.type === "Action"
+
+    // REMOVED: All logic related to 'Action' items
+    // const actionItems = ...
+    // const completedActions = ...
+
+    // ADD: New logic to count 'Insight' items
+    const insightItems = allThreadsInProblem.filter(
+      (item): item is InsightThreadItem => item.type === "Insight"
     );
-    const completedActions = actionItems.filter(
-      (item) => item.status === "completed"
-    ).length;
+
     const sessionItems = allThreadsInProblem.filter(
       (item): item is SessionThreadItem => item.type === "Session"
     );
@@ -106,13 +113,15 @@ export default function ProblemPost({
       (sum, item) => sum + (item.timeSpent || 0),
       0
     );
+
     return {
       totalThreads,
       tasks: { completed: completedTasks, total: taskItems.length },
-      actions: { completed: completedActions, total: actionItems.length },
+      insights: insightItems.length, // <-- New insight count
       totalSessionTime,
     };
   }, [problem.id, threadItems]);
+
   const indicatorColor =
     priorityColors[problem.priority] || priorityColors.none;
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
@@ -142,6 +151,7 @@ export default function ProblemPost({
   return (
     <>
       <View style={styles.postContainer}>
+        {/* ... (Header remains the same) ... */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View
@@ -155,7 +165,6 @@ export default function ProblemPost({
               <Text style={styles.metaText}>{formattedDate}</Text>
             </View>
           </View>
-
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={[
@@ -179,13 +188,13 @@ export default function ProblemPost({
                 style={{ marginLeft: 4 }}
               />
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.menuButton} onPress={onPressMenu}>
               <Feather name="more-vertical" size={22} color="#495057" />
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* ... (Body remains the same) ... */}
         <View style={styles.body}>
           <Text style={styles.problemTitle}>{problem.title}</Text>
           {problem.description && (
@@ -203,16 +212,14 @@ export default function ProblemPost({
                   onPress={() => openImageViewer(index)}
                   activeOpacity={0.8}
                 >
-                  
-                  <Image
-                    source={{ uri: item }}
-                    style={styles.imageThumbnail}
-                  />
+                  <Image source={{ uri: item }} style={styles.imageThumbnail} />
                 </TouchableOpacity>
               )}
             />
           )}
         </View>
+
+        {/* --- Footer Stats --- */}
         <View style={styles.statsContainer}>
           <Feather name="git-branch" size={14} color="#6c757d" />
           <Text style={styles.statsText}>{stats.totalThreads}</Text>
@@ -222,16 +229,19 @@ export default function ProblemPost({
             {stats.tasks.completed} / {stats.tasks.total}
           </Text>
           <Text style={styles.separator}>·</Text>
-          <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-          <Text style={styles.statsText}>
-            {stats.actions.completed} / {stats.actions.total}
-          </Text>
+
+          {/* FIX: Replaced 'Action' stats with 'Insight' stats */}
+          <Feather name="eye" size={14} color="#6c757d" />
+          <Text style={styles.statsText}>{stats.insights}</Text>
+
           <Text style={styles.separator}>·</Text>
           <Feather name="clock" size={14} color="#6c757d" />
           <Text style={styles.statsText}>
             {formatSeconds(stats.totalSessionTime)}
           </Text>
         </View>
+
+        {/* ... (Report button remains the same) ... */}
         {problem.status === "resolved" && problem.starReportId && (
           <TouchableOpacity
             style={styles.reportButtonContainer}
@@ -263,7 +273,6 @@ export default function ProblemPost({
 }
 
 const styles = StyleSheet.create({
-  // ... (existing styles)
   postContainer: { padding: 16, backgroundColor: "#ffffff" },
   header: {
     flexDirection: "row",
@@ -330,8 +339,8 @@ const styles = StyleSheet.create({
   },
   imageList: { marginTop: 8 },
   imageThumbnail: {
-    width: 90,
-    height: 120,
+    width: 180,
+    height: 240,
     borderRadius: 8,
     marginRight: 10,
     backgroundColor: "#f1f3f5",
@@ -345,14 +354,6 @@ const styles = StyleSheet.create({
     zIndex: 1,
     alignItems: "flex-end",
   },
-
-  // ADD: New styles for the right side of the header
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  menuButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
+  headerRight: { flexDirection: "row", alignItems: "center" },
+  menuButton: { marginLeft: 8, padding: 4 },
 });

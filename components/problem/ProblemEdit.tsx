@@ -359,7 +359,6 @@ const styles = StyleSheet.create({
     color: "#343a40",
     textAlignVertical: "top",
     paddingHorizontal: 20,
-    minHeight: 100,
   },
   floatingContainer: {
     position: "absolute",
@@ -393,17 +392,16 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   imageList: {
-    marginTop: 16,
     paddingBottom: 16,
-    maxHeight: 160, // Adjusted height for 3x4 ratio
+    maxHeight: 240, // Adjusted height for 3x4 ratio
   },
   imageContainer: {
     marginRight: 10,
     position: "relative",
   },
   image: {
-    width: 90,
-    height: 120, // Your new 3x4 aspect ratio
+    width: 180,
+    height: 240, // Your new 3x4 aspect ratio
     borderRadius: 8,
     backgroundColor: "#f1f3f5",
   },

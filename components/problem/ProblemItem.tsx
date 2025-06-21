@@ -2,7 +2,8 @@
 
 import { useAppStore } from "@/store/store";
 import {
-  ActionThreadItem,
+  // REMOVED: ActionThreadItem is no longer needed
+  InsightThreadItem, // ADD: Import InsightThreadItem for type guarding
   Objective,
   Priority,
   Problem,
@@ -63,21 +64,27 @@ export default function ProblemItem({
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
     );
+
     const totalThreads = allThreadsInProblem.filter(
       (item) => item.type !== "Session"
     ).length;
+
     const taskItems = allThreadsInProblem.filter(
       (item): item is TaskThreadItem => item.type === "Task"
     );
     const completedTasks = taskItems.filter(
       (item) => !!item.isCompleted
     ).length;
-    const actionItems = allThreadsInProblem.filter(
-      (item): item is ActionThreadItem => item.type === "Action"
+
+    // REMOVED: Logic for counting 'Action' items
+    // const actionItems = ...
+    // const completedActions = ...
+
+    // ADD: New logic to count 'Insight' items
+    const insightItems = allThreadsInProblem.filter(
+      (item): item is InsightThreadItem => item.type === "Insight"
     );
-    const completedActions = actionItems.filter(
-      (item) => item.status === "completed"
-    ).length;
+
     const sessionItems = allThreadsInProblem.filter(
       (item): item is SessionThreadItem => item.type === "Session"
     );
@@ -85,10 +92,14 @@ export default function ProblemItem({
       (sum, item) => sum + (item.timeSpent || 0),
       0
     );
+
     return {
       totalThreads,
-      tasks: { completed: completedTasks, total: taskItems.length },
-      actions: { completed: completedActions, total: actionItems.length },
+      tasks: {
+        completed: completedTasks,
+        total: taskItems.length,
+      },
+      insights: insightItems.length, // <-- New insight count
       totalSessionTime,
     };
   }, [problem.id, threadItems]);
@@ -136,10 +147,11 @@ export default function ProblemItem({
             {stats.tasks.completed} / {stats.tasks.total}
           </Text>
           <Text style={styles.separator}>·</Text>
-          <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-          <Text style={styles.statsText}>
-            {stats.actions.completed} / {stats.actions.total}
-          </Text>
+
+          {/* FIX: Replaced 'Action' stats with 'Insight' stats */}
+          <Feather name="eye" size={14} color="#6c757d" />
+          <Text style={styles.statsText}>{stats.insights}</Text>
+
           <Text style={styles.separator}>·</Text>
           <Feather name="clock" size={14} color="#6c757d" />
           <Text style={styles.statsText}>
@@ -152,8 +164,6 @@ export default function ProblemItem({
 }
 
 const styles = StyleSheet.create({
-  // FIX: Simplified to be a transparent container with padding.
-  // The parent component now provides the background and separators.
   itemContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -168,23 +178,23 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    marginLeft: 16, // Increased margin for better spacing
+    marginLeft: 16,
   },
   metaContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6, // Adjusted spacing
+    marginBottom: 6,
   },
   metaText: {
-    fontSize: 13, // Slightly larger for readability
+    fontSize: 13,
     color: "#868e96",
-    flexShrink: 1, // Allow text to shrink if status tag is long
+    flexShrink: 1,
   },
   statusTag: {
     paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 8,
-    marginLeft: "auto", // Pushes the tag to the far right
+    marginLeft: "auto",
   },
   statusTagText: {
     fontSize: 11,
@@ -194,7 +204,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#212529",
-    marginBottom: 10, // Adjusted spacing
+    marginBottom: 10,
     lineHeight: 22,
   },
   statsContainer: {

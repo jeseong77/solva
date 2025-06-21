@@ -33,7 +33,14 @@ export default function SelectableProblemItem({
       activeOpacity={0.7}
     >
       {/* 우선순위 인디케이터 */}
-      <View style={[styles.indicator, { backgroundColor: indicatorColor }]} />
+      {/* FIX: Added a conditional style for when the item is selected */}
+      <View
+        style={[
+          styles.indicator,
+          { backgroundColor: indicatorColor },
+          isSelected && styles.selectedIndicator,
+        ]}
+      />
 
       {/* 문제 제목 */}
       <Text
@@ -47,26 +54,30 @@ export default function SelectableProblemItem({
 }
 
 const styles = StyleSheet.create({
+  // FIX: Default container is now flat with a transparent background
   container: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#dee2e6",
-    marginBottom: 10,
+    backgroundColor: "transparent",
+    paddingVertical: 12, // Reduced padding slightly for a tighter list feel
+    paddingHorizontal: 16,
+    borderRadius: 10, // Add borderRadius here to be used by the selected state
+    marginBottom: 4, // Reduced margin for a tighter list
   },
+  // FIX: Selected container now has a solid background color
   selectedContainer: {
-    // FIX: Changed border and background color to your main green theme
-    borderColor: "#40c057",
-    backgroundColor: "#e6fcf5", // A light green tint for consistency
+    backgroundColor: "#40c057", // Use your app's main color
   },
   indicator: {
     width: 16,
     height: 16,
-    borderRadius: 11,
-    marginRight: 12,
+    borderRadius: 8, // Make it a perfect circle
+    marginRight: 16, // Increased spacing
+  },
+  // ADD: New style for the indicator when its row is selected
+  selectedIndicator: {
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.8)",
   },
   title: {
     flex: 1,
@@ -74,9 +85,9 @@ const styles = StyleSheet.create({
     color: "#212529",
     fontWeight: "500",
   },
+  // FIX: Selected title is now white for contrast
   selectedTitle: {
-    // FIX: Changed text color to your main green theme
-    color: "#40c057",
-    fontWeight: "bold",
+    color: "#ffffff",
+    fontWeight: "600",
   },
 });

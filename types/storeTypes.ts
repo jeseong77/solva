@@ -180,12 +180,14 @@ export interface UIStateSlice {
   selectedObjectiveId: string | null;
   isLoading: boolean;
   activeSession: ActiveSession | null;
+  solvaScrollPosition: number;
   setSelectedObjectiveId: (objectiveId: string | null) => void;
   setGlobalLoading: (isLoading: boolean) => void;
   startSession: (threadId: string) => void;
   pauseSession: () => void;
   resumeSession: () => void;
   stopSession: () => void;
+  setSolvaScrollPosition: (position: number) => void;
 }
 
 export interface TodoSlice {

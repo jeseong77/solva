@@ -2,21 +2,19 @@
 
 import { useAppStore } from "@/store/store";
 import {
-  ActionThreadItem,
+  InsightThreadItem,
   Objective,
   Problem,
   SessionThreadItem,
   TaskThreadItem,
   WeeklyProblem,
 } from "@/types";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useMemo } from "react";
+import { Feather } from "@expo/vector-icons";
+import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-/**
- * 초(seconds)를 HH:MM:SS 또는 MM:SS 형식으로 변환하는 헬퍼 함수
- */
 const formatSeconds = (totalSeconds: number): string => {
+  // ... (helper function is unchanged)
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
     return "00:00";
   }
@@ -52,16 +50,42 @@ export default function WeeklyProblemCard({
 }: WeeklyProblemProps) {
   const threadItems = useAppStore((state) => state.threadItems);
 
-  const dDay = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dayOfWeek = today.getDay();
-    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-    if (daysUntilSunday === 0) return "D-Day";
-    return `D-${daysUntilSunday}`;
+  // FIX: Replaced D-Day logic with "Time Elapsed" logic
+  const timeElapsedDisplay = useMemo(() => {
+    if (!weeklyProblem?.createdAt) return "";
+
+    const now = new Date();
+    const startTime = new Date(weeklyProblem.createdAt);
+    const diffMs = now.getTime() - startTime.getTime();
+
+    const oneDayInMs = 24 * 60 * 60 * 1000;
+
+    if (diffMs < oneDayInMs) {
+      // Less than a day: show HH:mm
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+        2,
+        "0"
+      )}`;
+    } else {
+      // One day or more: show D+N
+      const days = Math.floor(diffMs / oneDayInMs);
+      return `D+${days}`;
+    }
+  }, [weeklyProblem?.createdAt]);
+
+  // ADD: A state to force re-render the time every minute for the HH:mm format
+  const [, setForceUpdate] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setForceUpdate((v) => v + 1);
+    }, 60 * 1000); // Re-render every minute
+    return () => clearInterval(interval);
   }, []);
 
   const stats = useMemo(() => {
+    // ... (stats logic is unchanged)
     if (!problem) return null;
     const allThreadsInProblem = threadItems.filter(
       (item) => item.problemId === problem.id
@@ -75,12 +99,9 @@ export default function WeeklyProblemCard({
     const completedTasks = taskItems.filter(
       (item) => !!item.isCompleted
     ).length;
-    const actionItems = allThreadsInProblem.filter(
-      (item): item is ActionThreadItem => item.type === "Action"
+    const insightItems = allThreadsInProblem.filter(
+      (item): item is InsightThreadItem => item.type === "Insight"
     );
-    const completedActions = actionItems.filter(
-      (item) => item.status === "completed"
-    ).length;
     const sessionItems = allThreadsInProblem.filter(
       (item): item is SessionThreadItem => item.type === "Session"
     );
@@ -91,7 +112,7 @@ export default function WeeklyProblemCard({
     return {
       totalThreads,
       tasks: { completed: completedTasks, total: taskItems.length },
-      actions: { completed: completedActions, total: actionItems.length },
+      insights: insightItems.length,
       totalSessionTime,
     };
   }, [problem, threadItems]);
@@ -105,12 +126,12 @@ export default function WeeklyProblemCard({
   ) {
     return (
       <View style={styles.container}>
-        <Text style={styles.componentTitle}>이번 주에 해결할 문제:</Text>
+        <Text style={styles.componentTitle}>집중 해결할 문제:</Text>
         <TouchableOpacity style={styles.emptyContainer} onPress={onPressNew}>
-          {/* FIX: 아이콘을 'plus-circle'에서 'target'으로 변경 */}
           <Feather name="target" size={24} color="#adb5bd" />
           <Text style={styles.emptyText}>
-            이번 주에 해결할 문제를 설정해주세요.
+            {/* FIX: Changed wording */}
+            집중해서 해결할 문제를 설정해주세요.
           </Text>
         </TouchableOpacity>
       </View>
@@ -120,7 +141,7 @@ export default function WeeklyProblemCard({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.componentTitle}>이번 주에 집중할 문제</Text>
+        <Text style={styles.componentTitle}>집중 해결할 문제</Text>
         <TouchableOpacity onPress={onChangeWeeklyProblem}>
           <Text style={styles.changeButtonText}>변경</Text>
         </TouchableOpacity>
@@ -136,7 +157,7 @@ export default function WeeklyProblemCard({
             {objective.type}/{objective.title}
           </Text>
           <View style={styles.dDayChip}>
-            <Text style={styles.dDayText}>{dDay}</Text>
+            <Text style={styles.dDayText}>{timeElapsedDisplay}</Text>
           </View>
         </View>
 
@@ -159,10 +180,8 @@ export default function WeeklyProblemCard({
               {stats.tasks.completed} / {stats.tasks.total}
             </Text>
             <Text style={styles.separator}>·</Text>
-            <MaterialCommunityIcons name="run-fast" size={14} color="#6c757d" />
-            <Text style={styles.statsText}>
-              {stats.actions.completed} / {stats.actions.total}
-            </Text>
+            <Feather name="eye" size={14} color="#6c757d" />
+            <Text style={styles.statsText}>{stats.insights}</Text>
             <Text style={styles.separator}>·</Text>
             <Feather name="clock" size={14} color="#6c757d" />
             <Text style={styles.statsText}>
@@ -176,11 +195,7 @@ export default function WeeklyProblemCard({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 12,
-  },
+  container: { paddingTop: 24, paddingHorizontal: 16, paddingBottom: 12 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -188,11 +203,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 4,
   },
-  componentTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#212529",
-  },
+  componentTitle: { fontSize: 18, fontWeight: "bold", color: "#212529" },
   contentContainer: {
     backgroundColor: "#ffffff",
     padding: 16,
@@ -206,10 +217,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8,
   },
-  metaText: {
-    fontSize: 13,
-    color: "#868e96",
-  },
+  metaText: { fontSize: 13, color: "#868e96" },
   dDayChip: {
     backgroundColor: "#495057",
     borderRadius: 12,
@@ -220,21 +228,16 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 12,
     fontWeight: "bold",
+    fontVariant: ["tabular-nums"],
   },
-  contentBody: {
-    marginBottom: 16,
-  },
+  contentBody: { marginBottom: 16 },
   problemTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#343a40",
     marginBottom: 8,
   },
-  problemDescription: {
-    fontSize: 15,
-    color: "#495057",
-    lineHeight: 22,
-  },
+  problemDescription: { fontSize: 15, color: "#495057", lineHeight: 22 },
   statsContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -242,17 +245,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#f1f3f5",
   },
-  statsText: {
-    fontSize: 13,
-    color: "#6c757d",
-    marginLeft: 4,
-  },
-  separator: {
-    color: "#ced4da",
-    marginHorizontal: 8,
-  },
+  statsText: { fontSize: 13, color: "#6c757d", marginLeft: 4 },
+  separator: { color: "#ced4da", marginHorizontal: 8 },
   emptyContainer: {
-    backgroundColor: "transparent",
+    backgroundColor: "#ffffff",
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
@@ -269,9 +265,5 @@ const styles = StyleSheet.create({
     color: "#868e96",
     fontWeight: "500",
   },
-  changeButtonText: {
-    fontSize: 15,
-    color: "#40c057",
-    fontWeight: "600",
-  },
+  changeButtonText: { fontSize: 15, color: "#40c057", fontWeight: "600" },
 });

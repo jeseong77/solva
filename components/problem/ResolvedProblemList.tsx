@@ -2,7 +2,7 @@
 
 import { Objective, Problem, ProblemStatus } from "@/types";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+// REMOVED: useRouter is no longer needed in this component
 import React from "react";
 import {
   FlatList,
@@ -16,11 +16,10 @@ import {
 const ResolvedProblemItem = ({
   problem,
   onPress,
-  onPressReport,
 }: {
   problem: Problem;
   onPress: (problemId: string) => void;
-  onPressReport: (reportId: string) => void;
+  // REMOVED: onPressReport prop is no longer needed
 }) => {
   const statusInfo = {
     resolved: {
@@ -53,51 +52,36 @@ const ResolvedProblemItem = ({
     : "";
 
   return (
-    <View style={styles.itemContainer}>
-      <TouchableOpacity
-        style={styles.mainContent}
-        onPress={() => onPress(problem.id)}
-        activeOpacity={0.7}
-      >
-        <View
-          style={[
-            styles.statusChip,
-            { backgroundColor: currentStatus.backgroundColor },
-          ]}
-        >
-          <Feather
-            name={currentStatus.icon}
-            size={14}
-            color={currentStatus.color}
-          />
-          <Text style={[styles.statusChipText, { color: currentStatus.color }]}>
-            {currentStatus.name}
-          </Text>
-        </View>
+    // FIX: The entire item is now a single touchable area again.
+    <TouchableOpacity
+      style={styles.itemContainer}
+      onPress={() => onPress(problem.id)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.titleDateContainer}>
         <Text style={styles.itemTitle} numberOfLines={1}>
           {problem.title}
         </Text>
         <Text style={styles.itemDate}>{formattedDate}</Text>
-      </TouchableOpacity>
+      </View>
 
-      {problem.status === "resolved" && problem.starReportId && (
-        <>
-          {/* ADD: New short, indented separator view */}
-          <View style={styles.internalSeparator} />
-          <TouchableOpacity
-            style={styles.reportButton}
-            onPress={() => onPressReport(problem.starReportId as string)}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Feather name="star" size={16} color="#495057" />
-              <Text style={styles.reportButtonText}>리포트</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#adb5bd" />
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
+      <View
+        style={[
+          styles.statusChip,
+          { backgroundColor: currentStatus.backgroundColor },
+        ]}
+      >
+        <Feather
+          name={currentStatus.icon}
+          size={14}
+          color={currentStatus.color}
+        />
+        <Text style={[styles.statusChipText, { color: currentStatus.color }]}>
+          {currentStatus.name}
+        </Text>
+      </View>
+    </TouchableOpacity>
+    // REMOVED: The entire JSX block for the report button has been deleted.
   );
 };
 
@@ -107,14 +91,10 @@ export default function ResolvedProblemList({
   onPressProblem,
 }: {
   problems: Problem[];
-  objective: Objective;
+  // REMOVED: The objective prop was unused and has been removed for cleanup
   onPressProblem: (problemId: string) => void;
 }) {
-  const router = useRouter();
-
-  const handlePressReport = (reportId: string) => {
-    router.push(`/report/${reportId}`);
-  };
+  // REMOVED: useRouter and handlePressReport are no longer needed here.
 
   const Separator = () => <View style={styles.separator} />;
 
@@ -130,7 +110,7 @@ export default function ResolvedProblemList({
             <ResolvedProblemItem
               problem={item}
               onPress={onPressProblem}
-              onPressReport={handlePressReport}
+              // REMOVED: The onPressReport prop is no longer passed
             />
           )}
           keyExtractor={(item) => item.id}
@@ -147,61 +127,47 @@ const styles = StyleSheet.create({
   listContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
     overflow: "hidden",
   },
   titleContainer: { paddingBottom: 12 },
   titleText: { fontSize: 18, fontWeight: "bold", color: "#212529" },
-
-  // FIX: This separator between items is now full-width (no margin).
-  separator: {
-    height: 1,
-    backgroundColor: "#f1f3f5",
-  },
+  separator: { height: 1, backgroundColor: "#f1f3f5" },
 
   // --- ResolvedProblemItem styles ---
+  // FIX: Reverted to a simpler, single-line layout
   itemContainer: {
-    // FIX: Set background to white to match the report button area
     backgroundColor: "#ffffff",
-  },
-  mainContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-  },
-  itemTitle: { flex: 1, fontSize: 15, color: "#495057", marginLeft: 12 },
-  itemDate: { fontSize: 13, color: "#adb5bd", fontVariant: ["tabular-nums"] },
-  statusChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  statusChipText: { marginLeft: 5, fontSize: 12, fontWeight: "bold" },
-
-  // ADD: New style for the short separator WITHIN an item
-  internalSeparator: {
-    height: 1,
-    backgroundColor: "#f1f3f5",
-    marginHorizontal: 78, // This creates the shorter, indented look
-  },
-
-  reportButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    // FIX: Set background to white and remove border
-    backgroundColor: "#ffffff",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  reportButtonText: {
-    fontSize: 14,
+  // REMOVED: mainContent style is merged into itemContainer
+  titleDateContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  itemTitle: {
+    fontSize: 16,
+    color: "#212529",
     fontWeight: "500",
-    color: "#495057",
-    marginLeft: 10,
+    marginBottom: 4,
+  },
+  itemDate: {
+    fontSize: 13,
+    color: "#868e96",
+  },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  statusChipText: {
+    marginLeft: 5,
+    fontSize: 11,
+    fontWeight: "bold",
   },
 });

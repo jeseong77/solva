@@ -138,8 +138,6 @@ const styles = StyleSheet.create({
   listContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
     overflow: "hidden",
   },
   titleContainer: {

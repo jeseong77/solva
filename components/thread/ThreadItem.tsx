@@ -2,7 +2,7 @@
 
 import { useAppStore } from "@/store/store";
 import {
-  ActionThreadItem,
+  // REMOVED: ActionThreadItem is no longer needed here
   Objective,
   Problem,
   SessionThreadItem,
@@ -16,8 +16,9 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 import ActiveSessionTracker from "./ActiveSessionTracker";
 
+// FIX: Removed 'Action' from the type definition and the style object
 const typeStyles: {
-  [key in Exclude<ThreadTypeEnum, "Session">]: {
+  [key in Exclude<ThreadTypeEnum, "Session" | "Action">]: {
     color: string;
     backgroundColor: string;
     name: string;
@@ -26,10 +27,10 @@ const typeStyles: {
   General: { color: "#1c7ed6", backgroundColor: "#d0ebff", name: "일반" },
   Bottleneck: { color: "#f76707", backgroundColor: "#fff4e6", name: "병목" },
   Task: { color: "#2b8a3e", backgroundColor: "#e6fcf5", name: "할 일" },
-  Action: { color: "#d9480f", backgroundColor: "#fff0f6", name: "액션" },
   Insight: { color: "#845ef7", backgroundColor: "#f3f0ff", name: "인사이트" },
 };
 
+// ... (formatSeconds helper remains the same)
 const formatSeconds = (totalSeconds: number): string => {
   if (typeof totalSeconds !== "number" || isNaN(totalSeconds)) {
     return "00:00";
@@ -79,16 +80,17 @@ export default function ThreadItem({
 
   const [sessionsVisible, setSessionsVisible] = useState(false);
 
-  const isCompletable = thread.type === "Task" || thread.type === "Action";
+  // FIX: isCompletable is now only true for 'Task' type
+  const isCompletable = thread.type === "Task";
+
+  // FIX: isCompleted logic is simplified to only handle 'Task'
   let isCompleted = false;
   if (thread.type === "Task") {
-    // FIX: Safely convert boolean | null to a strict boolean.
     isCompleted = !!(thread as TaskThreadItem).isCompleted;
-  } else if (thread.type === "Action") {
-    isCompleted = (thread as ActionThreadItem).status === "completed";
   }
 
   const sessionStats = useMemo(() => {
+    // ... (sessionStats logic is unchanged)
     if (!thread.childThreadIds || thread.childThreadIds.length === 0) {
       return { sessions: [], totalTime: 0 };
     }
@@ -103,11 +105,11 @@ export default function ThreadItem({
 
   const formattedDate = new Intl.DateTimeFormat("ko-KR", {
     dateStyle: "medium",
-  }).format(new Date(thread.createdAt as Date)); // Added type assertion for safety
+  }).format(new Date(thread.createdAt as Date));
 
   const tagStyle =
-    thread.type !== "Session"
-      ? typeStyles[thread.type as Exclude<ThreadTypeEnum, "Session">]
+    thread.type !== "Session" && thread.type !== "Action" // Also exclude 'Action' here
+      ? typeStyles[thread.type as Exclude<ThreadTypeEnum, "Session" | "Action">]
       : null;
   const isSessionActiveOnThisThread = activeSession?.threadId === thread.id;
 
@@ -131,7 +133,7 @@ export default function ThreadItem({
                 </Text>
               </View>
             )}
-            <Text style={[styles.metaText, { marginLeft: 8 }]}>
+            <Text style={[styles.metaText, { marginLeft: tagStyle ? 8 : 0 }]}>
               {formattedDate}
             </Text>
           </View>
@@ -200,7 +202,7 @@ export default function ThreadItem({
               onPress={() => setSessionsVisible(!sessionsVisible)}
             >
               <Text style={styles.summaryText}>
-                완료된 세션: {sessionStats.sessions.length}개 · 총 시간:{" "}
+                완료된 세션: {sessionStats.sessions.length}개 · 총 시간:
                 {formatSeconds(sessionStats.totalTime)}
               </Text>
               <Feather
@@ -217,7 +219,6 @@ export default function ThreadItem({
                       {session.content || "기록 없음"}
                     </Text>
                     <Text style={styles.sessionTime}>
-                      {/* FIX: Provide a fallback of 0 in case timeSpent is null. */}
                       {formatSeconds(session.timeSpent ?? 0)}
                     </Text>
                   </View>
@@ -231,6 +232,7 @@ export default function ThreadItem({
   );
 }
 
+// ... (Styles are unchanged)
 const styles = StyleSheet.create({
   contentContainer: {
     paddingVertical: 8,
@@ -250,21 +252,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  metaText: {
-    fontSize: 13,
-    color: "#868e96",
-    flexShrink: 1,
-  },
-  menuTrigger: {
-    padding: 4,
-  },
-  body: {
-    marginBottom: 8,
-  },
+  headerRight: { flexDirection: "row", alignItems: "center" },
+  metaText: { fontSize: 13, color: "#868e96", flexShrink: 1 },
+  menuTrigger: { padding: 4 },
+  body: { marginBottom: 8 },
   typeTag: {
     alignSelf: "flex-start",
     borderRadius: 4,
@@ -272,27 +263,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     marginRight: 8,
   },
-  typeTagText: {
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  contentText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#343a40",
-  },
-  completedText: {
-    textDecorationLine: "line-through",
-    color: "#adb5bd",
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  actionButton: {
-    padding: 6, // 텍스트가 없으므로 터치 영역 확보를 위해 padding 조정
-    marginRight: 12, // 버튼 간 간격 조정
-  },
+  typeTagText: { fontSize: 12, fontWeight: "bold" },
+  contentText: { fontSize: 15, lineHeight: 22, color: "#343a40" },
+  completedText: { textDecorationLine: "line-through", color: "#adb5bd" },
+  footer: { flexDirection: "row", alignItems: "center" },
+  actionButton: { padding: 6, marginRight: 12 },
   completedSessionSection: {
     marginTop: 12,
     backgroundColor: "#f8f9fa",
@@ -304,26 +279,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 12,
   },
-  summaryText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#495057",
-  },
-  sessionList: {
-    borderTopWidth: 1,
-    borderColor: "#e9ecef",
-    padding: 12,
-  },
+  summaryText: { fontSize: 13, fontWeight: "500", color: "#495057" },
+  sessionList: { borderTopWidth: 1, borderColor: "#e9ecef", padding: 12 },
   sessionItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 4,
   },
-  sessionContent: {
-    fontSize: 14,
-    color: "#495057",
-    flex: 1,
-  },
+  sessionContent: { fontSize: 14, color: "#495057", flex: 1 },
   sessionTime: {
     fontSize: 14,
     color: "#868e96",

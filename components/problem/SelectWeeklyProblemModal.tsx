@@ -5,10 +5,10 @@ import { Feather } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
   Dimensions,
-  FlatList,
   Modal,
   Pressable,
   SafeAreaView,
+  ScrollView, // FIX: We will use ScrollView
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -69,7 +69,8 @@ export default function SelectWeeklyProblemModal({
     >
       <Pressable style={styles.backdrop} onPress={handleClose}>
         <Pressable style={styles.sheetContainer} onPress={() => {}}>
-          <SafeAreaView>
+          <SafeAreaView style={styles.safeArea}>
+            {/* Header remains fixed at the top */}
             <View style={styles.header}>
               <TouchableOpacity
                 onPress={handleClose}
@@ -77,32 +78,32 @@ export default function SelectWeeklyProblemModal({
               >
                 <Feather name="x" size={24} color="#343a40" />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>이번 주 문제 선택</Text>
+              <Text style={styles.headerTitle}>집중할 문제 선택</Text>
             </View>
 
-            <FlatList
-              data={selectableProblems}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <SelectableProblemItem
-                  problem={item}
-                  isSelected={item.id === selectedProblemId}
-                  onPress={setSelectedProblemId}
-                />
-              )}
-              ListHeaderComponent={() => (
-                <Text style={styles.listTitle}>
-                  이번 주에 집중할 문제를 선택하세요.
-                </Text>
-              )}
-              ListEmptyComponent={
+            {/* FIX: The content area is now a ScrollView that will only scroll if the content is too tall. */}
+            <ScrollView style={styles.contentScrollView}>
+              <Text style={styles.listTitle}>
+                집중해서 해결할 문제를 선택하세요.
+              </Text>
+
+              {selectableProblems.length > 0 ? (
+                selectableProblems.map((item) => (
+                  <SelectableProblemItem
+                    key={item.id}
+                    problem={item}
+                    isSelected={item.id === selectedProblemId}
+                    onPress={setSelectedProblemId}
+                  />
+                ))
+              ) : (
                 <View style={styles.emptyContainer}>
                   <Text style={styles.emptyText}>선택할 문제가 없습니다.</Text>
                 </View>
-              }
-              contentContainerStyle={styles.listContentContainer}
-            />
+              )}
+            </ScrollView>
 
+            {/* Footer remains fixed at the bottom */}
             <View style={styles.footer}>
               <TouchableOpacity
                 style={[
@@ -129,33 +130,33 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheetContainer: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#ffffff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: SCREEN_HEIGHT * 0.7,
-    paddingBottom: 32,
+    // FIX: Set a flexible max height as a safeguard against overly long lists.
+    maxHeight: SCREEN_HEIGHT * 0.9,
+  },
+  // ADD: A safe area view that allows content to be structured inside
+  safeArea: {
+    // Let the content determine the height
   },
   header: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
-    borderBottomWidth: 1,
-    borderColor: "#e9ecef",
-    backgroundColor: "#ffffff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   closeButton: {
     position: "absolute",
     left: 16,
     padding: 4,
   },
-  listContentContainer: {
+  // FIX: This is now the scrollable content area
+  contentScrollView: {
     paddingHorizontal: 16,
   },
   listTitle: {
@@ -175,15 +176,14 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
+    paddingTop: 16,
+    paddingBottom: 32, // More bottom padding for safe area
     backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderColor: "#e9ecef",
   },
   button: {
-    // FIX: Changed the background color to your app's main color.
-    backgroundColor: "#2b8a3e",
+    backgroundColor: "#40c057",
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
   },
   buttonDisabled: {

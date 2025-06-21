@@ -1,13 +1,13 @@
 // store/slices/objectiveSlice.ts
 
-import { db } from "@/lib/db"; // Import the Drizzle instance
-import { objectives } from "@/lib/db/schema"; // Import the objectives table schema
+import { db } from "@/lib/db";
+import { objectives } from "@/lib/db/schema";
 import { Objective } from "@/types";
 import type {
   AppState,
   ObjectiveSlice as ObjectiveSliceInterface,
 } from "@/types/storeTypes";
-import { asc, eq } from "drizzle-orm"; // Import Drizzle operators
+import { asc, eq } from "drizzle-orm";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 import { StateCreator } from "zustand";
@@ -29,8 +29,20 @@ export const createObjectiveSlice: StateCreator<
         .from(objectives)
         .orderBy(asc(objectives.order), asc(objectives.createdAt));
 
-      // This line will no longer cause an error after you update the Objective type
-      set({ objectives: fetchedObjectives, isLoadingObjectives: false });
+      // --- FIX: Implement the "Smart Merge" logic ---
+      // This pattern prevents re-rendering unchanged items, which preserves scroll position.
+      const objectiveMap = new Map(get().objectives.map((o) => [o.id, o]));
+      fetchedObjectives.forEach((o) => objectiveMap.set(o.id, o));
+
+      const newObjectivesList = Array.from(objectiveMap.values()).sort(
+        (a, b) =>
+          (a.order ?? Infinity) - (b.order ?? Infinity) ||
+          (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0)
+      );
+      // --- End of Fix ---
+
+      set({ objectives: newObjectivesList, isLoadingObjectives: false });
+
       console.log(
         `[ObjectiveSlice] ${fetchedObjectives.length} objectives fetched.`
       );
@@ -62,7 +74,7 @@ export const createObjectiveSlice: StateCreator<
       const newObjectivesList = [...get().objectives, newObjective].sort(
         (a, b) =>
           (a.order ?? Infinity) - (b.order ?? Infinity) ||
-          a.createdAt.getTime() - b.createdAt.getTime()
+          (a.createdAt.getTime() ?? 0) - (b.createdAt.getTime() ?? 0)
       );
       set({ objectives: newObjectivesList });
 
@@ -97,7 +109,7 @@ export const createObjectiveSlice: StateCreator<
       updatedObjectives.sort(
         (a, b) =>
           (a.order ?? Infinity) - (b.order ?? Infinity) ||
-          a.createdAt.getTime() - b.createdAt.getTime()
+          (a.createdAt.getTime() ?? 0) - (b.createdAt.getTime() ?? 0)
       );
       set({ objectives: updatedObjectives });
 

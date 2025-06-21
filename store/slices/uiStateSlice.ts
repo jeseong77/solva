@@ -1,5 +1,6 @@
 // store/slices/uiStateSlice.ts
 
+import { ActiveSession } from "@/types"; // Make sure ActiveSession is imported
 import type {
   AppState,
   UIStateSlice as UIStateSliceInterface,
@@ -15,6 +16,9 @@ export const createUIStateSlice: StateCreator<
   selectedObjectiveId: null,
   isLoading: false,
   activeSession: null,
+
+  // ADD: New state to hold the scroll position of the main screen
+  solvaScrollPosition: 0,
 
   setSelectedObjectiveId: (objectiveId) => {
     console.log("[UIStateSlice] Selected Objective ID set to:", objectiveId);
@@ -33,10 +37,8 @@ export const createUIStateSlice: StateCreator<
     set({
       activeSession: {
         threadId,
-        // FIX: Use new Date() instead of the number from Date.now()
         startTime: new Date(),
         isPaused: false,
-        // FIX: Use a "zero" Date object for the initial paused time
         pausedTime: new Date(0),
       },
     });
@@ -45,15 +47,11 @@ export const createUIStateSlice: StateCreator<
   pauseSession: () => {
     const session = get().activeSession;
     if (!session || session.isPaused) return;
-
-    // FIX: Get numeric values from dates to do arithmetic
     const elapsed = new Date().getTime() - session.startTime.getTime();
-
     set({
       activeSession: {
         ...session,
         isPaused: true,
-        // FIX: Get numeric values, add them, and create a new Date object
         pausedTime: new Date(session.pausedTime.getTime() + elapsed),
       },
     });
@@ -62,16 +60,19 @@ export const createUIStateSlice: StateCreator<
   resumeSession: () => {
     const session = get().activeSession;
     if (!session || !session.isPaused) return;
-
     set({
       activeSession: {
         ...session,
         isPaused: false,
-        // FIX: Use new Date() to reset the start time for the new active period
         startTime: new Date(),
       },
     });
   },
 
   stopSession: () => set({ activeSession: null }),
+
+  // ADD: New action to save the scroll position to the store
+  setSolvaScrollPosition: (position: number) => {
+    set({ solvaScrollPosition: position });
+  },
 });

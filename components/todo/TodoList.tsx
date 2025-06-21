@@ -181,7 +181,7 @@ export default function TodoList() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#F2F2F7",
   },
   mainSectionHeader: {
     fontSize: 22,
