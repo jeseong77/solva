@@ -2,27 +2,25 @@
 
 import { useAppStore } from "@/store/store";
 import { Objective, Problem } from "@/types";
+import { Feather } from "@expo/vector-icons";
 import React from "react";
 import {
   Alert,
-  Dimensions,
   FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity, // FIX: Import TouchableOpacity
+  TouchableOpacity,
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 import ProblemItem from "./ProblemItem";
-import { Feather } from "@expo/vector-icons"; // ADD: Import Feather icons
 
-// FIX: Add a new prop for handling the press on the empty state
 interface ProblemListProps {
   problems: Problem[];
   objective: Objective;
   onPressProblem: (problemId: string) => void;
   onPressEdit?: (problemId: string) => void;
-  onPressEmpty?: () => void; // <-- ADD THIS
+  onPressEmpty?: () => void;
 }
 
 export default function ProblemList({
@@ -30,11 +28,10 @@ export default function ProblemList({
   objective,
   onPressProblem,
   onPressEdit,
-  onPressEmpty, // <-- ADD THIS
+  onPressEmpty,
 }: ProblemListProps) {
   const deleteProblem = useAppStore((state) => state.deleteProblem);
 
-  // ... (showDeleteConfirmation and handleLongPress handlers remain the same)
   const showDeleteConfirmation = (problemId: string, title: string) => {
     Alert.alert(
       `"${title}" 문제 삭제`,
@@ -83,18 +80,14 @@ export default function ProblemList({
     );
   };
 
-  // FIX: Wrap the empty component in a TouchableOpacity that calls the new prop
   const renderEmptyComponent = () => (
     <TouchableOpacity
       style={styles.emptyContainer}
       onPress={onPressEmpty}
       activeOpacity={0.7}
     >
-      <Feather name="plus" size={28} color="#adb5bd" />
-      <Text style={styles.emptyText}>
-        '{objective.title}'에 정의된 문제가 없습니다.
-      </Text>
-      <Text style={styles.emptySubText}>새로운 문제를 추가해보세요.</Text>
+      <Feather name="plus-circle" size={24} color="#adb5bd" />
+      <Text style={styles.emptyText}>새로운 문제를 추가해보세요</Text>
     </TouchableOpacity>
   );
 
@@ -109,39 +102,49 @@ export default function ProblemList({
         </Text>
       </View>
 
-      <View style={styles.listContainer}>
-        <FlatList
-          data={problems}
-          renderItem={({ item }) => (
-            <ProblemItem
-              problem={item}
-              objective={objective}
-              onPress={onPressProblem}
-              onLongPress={handleLongPress}
-            />
-          )}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={renderEmptyComponent}
-          scrollEnabled={false}
-          ItemSeparatorComponent={Separator}
-        />
-      </View>
+      {/* ✅ [변경] problems 배열 길이에 따라 조건부 렌더링 */}
+      {problems.length > 0 ? (
+        <View style={styles.listContainer}>
+          <FlatList
+            data={problems}
+            renderItem={({ item }) => (
+              <ProblemItem
+                problem={item}
+                objective={objective}
+                onPress={onPressProblem}
+                onLongPress={handleLongPress}
+              />
+            )}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            ItemSeparatorComponent={Separator}
+            // ✅ [변경] ListEmptyComponent는 외부에서 처리하므로 여기서 제거
+          />
+        </View>
+      ) : (
+        // ✅ [변경] 배열이 비어있을 경우 emptyComponent를 직접 렌더링
+        renderEmptyComponent()
+      )}
     </View>
   );
 }
 
+// ✅ [변경] 스타일 일부 수정
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    // 가로 패딩은 각 컴포넌트에서 개별적으로 제어하도록 제거
   },
   listContainer: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
     overflow: "hidden",
+    marginHorizontal: 16, // 좌우 마진 추가
   },
   titleContainer: {
     paddingBottom: 12,
+    paddingHorizontal: 16, // 제목에만 좌우 패딩 적용
   },
   titleText: {
     fontSize: 18,
@@ -151,29 +154,26 @@ const styles = StyleSheet.create({
   objectiveTitle: {
     color: "#40c057",
   },
-  // FIX: Updated styles to look more interactive
+  // WeeklyProblemCard의 emptyContainer와 유사하게 스타일 조정
   emptyContainer: {
-    minHeight: 150,
-    justifyContent: "center",
+    backgroundColor: "transparent",
+    flexDirection: "row", // 아이콘과 텍스트를 가로로 배치
+    padding: 20,
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#f8f9fa", // A slightly different background to indicate interactivity
+    justifyContent: "center",
+    minHeight: 80, // 높이 조정
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#dee2e6",
+    borderColor: "#ced4da",
     borderStyle: "dashed",
+    marginTop: 4, // 제목과의 간격
+    marginHorizontal: 16, // 좌우 마진 추가
   },
   emptyText: {
+    marginLeft: 12, // 아이콘과의 간격
     fontSize: 16,
-    color: "#6c757d",
+    color: "#868e96",
     fontWeight: "500",
-    textAlign: "center",
-    marginTop: 12, // Add margin from the icon
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: "#adb5bd",
-    marginTop: 8,
   },
   separator: {
     height: 1,

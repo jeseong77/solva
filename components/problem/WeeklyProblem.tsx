@@ -126,11 +126,13 @@ export default function WeeklyProblemCard({
   ) {
     return (
       <View style={styles.container}>
-        <Text style={styles.componentTitle}>집중 해결할 문제:</Text>
+        {/* ✅ [수정] 헤더 View로 제목을 감싸서 구조를 통일합니다. */}
+        <View style={styles.header}>
+          <Text style={styles.componentTitle}>집중 해결할 문제:</Text>
+        </View>
         <TouchableOpacity style={styles.emptyContainer} onPress={onPressNew}>
           <Feather name="target" size={24} color="#adb5bd" />
           <Text style={styles.emptyText}>
-            {/* FIX: Changed wording */}
             집중해서 해결할 문제를 설정해주세요.
           </Text>
         </TouchableOpacity>
@@ -208,8 +210,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e9ecef",
   },
   contentHeader: {
     flexDirection: "row",
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   statsText: { fontSize: 13, color: "#6c757d", marginLeft: 4 },
   separator: { color: "#ced4da", marginHorizontal: 8 },
   emptyContainer: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "transparent",
     padding: 20,
     alignItems: "center",
     justifyContent: "center",
@@ -257,7 +257,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#ced4da",
     borderStyle: "dashed",
-    marginTop: 12,
   },
   emptyText: {
     marginTop: 8,
